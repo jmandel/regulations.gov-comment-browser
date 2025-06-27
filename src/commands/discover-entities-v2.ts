@@ -14,6 +14,8 @@ export const discoverEntitiesV2Command = new Command("discover-entities-v2")
   .option("--word-limit <n>", "Target word count for prompt (default: 150000)", parseInt)
   .option("-d, --debug", "Enable debug output")
   .option("-m, --model <model>", "AI model to use (default: gemini-pro)")
+  .option("--discover-only", "Only discover entities, skip annotation")
+  .option("--annotate-only", "Only annotate comments with existing entities")
   .action(discoverEntitiesV2);
 
 async function discoverEntitiesV2(documentId: string, options: any) {
@@ -25,26 +27,92 @@ async function discoverEntitiesV2(documentId: string, options: any) {
   
   const ai = new AIClient(model, db);
   
-  console.log(`🔍 Discovering entities for document ${documentId} (v2 approach)`);
+  // Determine what operations to perform
+  const shouldDiscover = !options.annotateOnly;
+  const shouldAnnotate = !options.discoverOnly;
+  
+  if (options.discoverOnly && options.annotateOnly) {
+    console.log("❌ Cannot use both --discover-only and --annotate-only");
+    db.close();
+    return;
+  }
+  
+  console.log(`🔍 Processing entities for document ${documentId} (v2 approach)`);
+  console.log(`   Mode: ${shouldDiscover && shouldAnnotate ? 'Discover and annotate' : shouldDiscover ? 'Discover only' : 'Annotate only'}`);
   console.log(`   Using model: ${model}`);
-  console.log(`   Target words: ${targetWords.toLocaleString()}`);
-  
-  // Check if entities already exist
-  const existingEntities = db.prepare("SELECT COUNT(*) as count FROM entity_taxonomy").get() as { count: number };
-  if (existingEntities.count > 0) {
-    console.log(`⚠️  Entities already discovered (${existingEntities.count} entities)`);
-    console.log("   To re-run, clear entity_taxonomy table first");
-    return;
+  if (shouldDiscover) {
+    console.log(`   Target words: ${targetWords.toLocaleString()}`);
   }
   
-  // Load condensed comments with enriched metadata
-  const allComments = loadCondensedCommentsForEntities(db, options.limit);
-  if (allComments.length === 0) {
-    console.log("❌ No condensed comments found. Run 'condense' command first.");
-    return;
+  try {
+    // Check existing entities
+    const existingEntities = db.prepare("SELECT COUNT(*) as count FROM entity_taxonomy").get() as { count: number };
+    
+    if (shouldDiscover && existingEntities.count > 0) {
+      console.log(`⚠️  Entities already discovered (${existingEntities.count} entities)`);
+      console.log("   To re-run discovery, clear entity_taxonomy table first");
+      if (!shouldAnnotate) {
+        // User only wants to discover, but entities already exist
+        db.close();
+        return;
+      }
+      // User wants both discover and annotate, skip discovery
+      console.log("   Skipping discovery, proceeding to annotation...");
+    }
+    
+    if (shouldAnnotate && !shouldDiscover && existingEntities.count === 0) {
+      console.log("❌ No entities found. Run discovery first.");
+      db.close();
+      return;
+    }
+    
+    // Load all comments (needed for both discovery and annotation)
+    const allComments = loadCondensedCommentsForEntities(db, options.limit);
+    if (allComments.length === 0) {
+      console.log("❌ No condensed comments found. Run 'condense' command first.");
+      db.close();
+      return;
+    }
+    
+    console.log(`📊 Found ${allComments.length} condensed comments`);
+    
+    let taxonomy: EntityTaxonomy = {};
+    
+    // Discovery phase
+    if (shouldDiscover && existingEntities.count === 0) {
+      taxonomy = await discoverEntities(db, ai, allComments, targetWords, options.debug);
+    }
+    
+    // Annotation phase
+    if (shouldAnnotate) {
+      await annotateComments(db, allComments);
+    }
+    
+    // Final summary
+    const savedEntities = db.prepare("SELECT COUNT(*) as count FROM entity_taxonomy").get() as { count: number };
+    const annotationCount = db.prepare("SELECT COUNT(*) as count FROM comment_entities").get() as { count: number };
+    
+    console.log("\n✅ Entity processing complete!");
+    console.log(`   Entities in database: ${savedEntities.count}`);
+    console.log(`   Annotations: ${annotationCount.count}`);
+    
+  } catch (error) {
+    console.error("❌ Failed:", error);
+    throw error;
+  } finally {
+    db.close();
   }
-  
-  console.log(`📊 Found ${allComments.length} condensed comments`);
+}
+
+// Discover entities from comments
+async function discoverEntities(
+  db: Database,
+  ai: AIClient,
+  allComments: EnrichedComment[],
+  targetWords: number,
+  debug: boolean
+): Promise<EntityTaxonomy> {
+  console.log("\n🔍 Starting entity discovery...");
   
   // Randomly select comments to reach target word count
   const shuffled = [...allComments].sort(() => Math.random() - 0.5);
@@ -125,58 +193,43 @@ Generate the JSON taxonomy:`;
   console.log("\n🤖 Generating taxonomy with LLM...");
   const startTime = Date.now();
   
-  try {
-    const taxonomy = await ai.generateContent<EntityTaxonomy>(
-      prompt,
-      options.debug ? 'entities_v2_full' : undefined,
-      'entities_v2_full_taxonomy',
-      {
-        taskType: 'discover-entities-v2-full',
-        taskLevel: 0,
-        params: { 
-          commentCount: selectedComments.length,
-          wordCount: totalWords
-        }
-      },
-      parseJsonResponse
-    );
-    
-    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`✅ Taxonomy generated in ${elapsedTime}s`);
-    
-    if (options.debug) {
-      await debugSave('entities_v2_taxonomy.json', taxonomy);
-    }
-    
-    // Count entities
-    const totalEntities = Object.values(taxonomy).flat().length;
-    const categoryCount = Object.keys(taxonomy).length;
-    console.log(`   Categories: ${categoryCount}`);
-    console.log(`   Total entities: ${totalEntities}`);
-    
-    // Save entities and annotate comments
-    console.log("\n💾 Saving entity taxonomy and annotating comments...");
-    await saveAndAnnotateEntities(db, taxonomy, allComments);
-    
-    // Summary
-    const savedEntities = db.prepare("SELECT COUNT(*) as count FROM entity_taxonomy").get() as { count: number };
-    const annotationCount = db.prepare("SELECT COUNT(*) as count FROM comment_entities").get() as { count: number };
-    
-    console.log("\n✅ Entity discovery complete!");
-    console.log(`   Categories: ${categoryCount}`);
-    console.log(`   Entities saved: ${savedEntities.count} (filtered from ${totalEntities})`);
-    console.log(`   Annotations: ${annotationCount.count}`);
-    
-  } catch (error) {
-    console.error("❌ Failed to generate taxonomy:", error);
-    throw error;
-  } finally {
-    db.close();
+  const taxonomy = await ai.generateContent<EntityTaxonomy>(
+    prompt,
+    debug ? 'entities_v2_full' : undefined,
+    'entities_v2_full_taxonomy',
+    {
+      taskType: 'discover-entities-v2-full',
+      taskLevel: 0,
+      params: { 
+        commentCount: selectedComments.length,
+        wordCount: totalWords
+      }
+    },
+    parseJsonResponse
+  );
+  
+  const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`✅ Taxonomy generated in ${elapsedTime}s`);
+  
+  if (debug) {
+    await debugSave('entities_v2_taxonomy.json', taxonomy);
   }
+  
+  // Count entities
+  const totalEntities = Object.values(taxonomy).flat().length;
+  const categoryCount = Object.keys(taxonomy).length;
+  console.log(`   Categories: ${categoryCount}`);
+  console.log(`   Total entities: ${totalEntities}`);
+  
+  // Save entities with filtering
+  console.log("\n💾 Saving entity taxonomy...");
+  await saveEntitiesWithFiltering(db, taxonomy, allComments);
+  
+  return taxonomy;
 }
 
-// Save entities and annotate comments (reuse from discover-entities.ts)
-async function saveAndAnnotateEntities(
+// Save entities with filtering based on occurrence frequency
+async function saveEntitiesWithFiltering(
   db: Database,
   taxonomy: EntityTaxonomy,
   comments: EnrichedComment[]
@@ -281,31 +334,6 @@ async function saveAndAnnotateEntities(
     console.log(`   ✅ Saved ${saved} entities to database`);
   });
 
-  // ─────────────────── annotate comments ───────────────────
-  console.log("\n💾 Saving entity annotations...");
-  let annotationCount = 0;
-
-  withTransaction(db, () => {
-    for (const comment of comments) {
-      const sections = comment.structuredSections ?? {};
-      const detailedContent = sections.detailedContent ?? "";
-      if (!detailedContent) continue;
-
-      const alreadyAdded = new Set<string>();
-      for (const entry of searchEntries) {
-        if (entitiesToRemove.has(entry.entityKey)) continue; // skip filtered
-        if (alreadyAdded.has(entry.entityKey)) continue;     // only once per entity per comment
-        if (entry.regex.test(detailedContent)) {
-          insertAnnotation.run(comment.id, entry.category, entry.label);
-          alreadyAdded.add(entry.entityKey);
-          annotationCount++;
-        }
-      }
-    }
-  });
-
-  console.log(`   💡 Created ${annotationCount} entity annotations`);
-
   // ─────────────────── summary ───────────────────
   if (entitiesToRemove.size > 0) {
     console.log("\n⚠️  Entities removed due to frequency thresholds (showing up to 10):");
@@ -318,6 +346,92 @@ async function saveAndAnnotateEntities(
       console.log(`      ... and ${entitiesToRemove.size - 10} more`);
     }
   }
+}
+
+// Annotate comments with existing entities
+async function annotateComments(
+  db: Database,
+  comments: EnrichedComment[]
+) {
+  console.log("\n📝 Annotating comments with entities...");
+  
+  // Load existing taxonomy from database
+  const entityRows = db.prepare(
+    "SELECT category, label, terms FROM entity_taxonomy"
+  ).all() as Array<{
+    category: string;
+    label: string;
+    terms: string;
+  }>;
+  
+  if (entityRows.length === 0) {
+    console.log("❌ No entities found in database");
+    return;
+  }
+  
+  console.log(`   Found ${entityRows.length} entities to match`);
+  
+  // Build search index
+  type SearchEntry = {
+    entityKey: string;
+    category: string;
+    label: string;
+    regex: RegExp;
+  };
+  
+  const searchEntries: SearchEntry[] = [];
+  
+  for (const row of entityRows) {
+    const terms = JSON.parse(row.terms) as string[];
+    const entityKey = `${row.category}|${row.label}`;
+    
+    for (const term of terms) {
+      const regex = new RegExp(`\\b${escapeRegex(term)}\\b`, "g");
+      searchEntries.push({ 
+        entityKey, 
+        category: row.category, 
+        label: row.label, 
+        regex 
+      });
+    }
+  }
+  
+  // Clear existing annotations
+  db.prepare("DELETE FROM comment_entities").run();
+  
+  // Annotate comments
+  const insertAnnotation = db.prepare(
+    `INSERT OR IGNORE INTO comment_entities (comment_id, category, entity_label)
+     VALUES (?, ?, ?)`
+  );
+  
+  let annotationCount = 0;
+  let processedCount = 0;
+  
+  withTransaction(db, () => {
+    for (const comment of comments) {
+      const sections = comment.structuredSections ?? {};
+      const detailedContent = sections.detailedContent ?? "";
+      if (!detailedContent) continue;
+      
+      const alreadyAdded = new Set<string>();
+      for (const entry of searchEntries) {
+        if (alreadyAdded.has(entry.entityKey)) continue;
+        if (entry.regex.test(detailedContent)) {
+          insertAnnotation.run(comment.id, entry.category, entry.label);
+          alreadyAdded.add(entry.entityKey);
+          annotationCount++;
+        }
+      }
+      
+      processedCount++;
+      if (processedCount % 100 === 0) {
+        console.log(`   Processed ${processedCount}/${comments.length} comments...`);
+      }
+    }
+  });
+  
+  console.log(`   💡 Created ${annotationCount} entity annotations`);
 }
 
 // Escape regex special characters

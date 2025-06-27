@@ -56,8 +56,17 @@ function cleanExtract(extract: any): any {
   
   for (const section of sections) {
     if (extract.extract?.[section] && Array.isArray(extract.extract[section])) {
+      // Ensure all items are strings, stringifying if necessary
+      const stringified = extract.extract[section].map((item: any) => {
+        if (typeof item === 'string') {
+          return item;
+        }
+        console.warn(`[cleanExtract] Warning: non-string value found in '${section}'. Stringifying item: ${JSON.stringify(item)}`);
+        return JSON.stringify(item);
+      });
+      
       // Filter out weak entries
-      const filtered = extract.extract[section].filter((text: string) => !shouldFilterText(text));
+      const filtered = stringified.filter((text: string) => !shouldFilterText(text));
       
       // Only include section if it has remaining content
       if (filtered.length > 0) {

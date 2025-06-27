@@ -185,7 +185,7 @@ Identify trends that might not be explicit:
 - Unintended consequences: [Knock-on effects multiple commenters identify]
 
 ### KEY QUOTATIONS
-Select 3-5 powerful verbatim quotes that capture different aspects of this theme:
+Select AS MANY powerful verbatim quotes as you can identify to capture different aspects of this theme:
 - "[Quote that crystallizes the main concern]" - Nurse Practitioner, PQR-2025-0500-11111
 - "[Quote that offers unique insight]" - Hospital Administrator, STU-2025-0600-22222
 - "[Quote that shows real-world impact]" - Family Caregiver, VWX-2025-0700-33333
@@ -255,23 +255,20 @@ export const EXTRACT_MERGE_PROMPT = `You are merging multiple analyses of the sa
 - Note if concern intensity varies between batches
 
 ### For Noteworthy Insights:
-- Keep ALL unique insights from every batch
-- Don't duplicate similar insights, but preserve nuance
-- Maintain the variety of perspectives
+- Keep ALL UNIQUE INSIGHTS from across batches -- output a long list if needed
+- Keep the full attribution (Commenter Type, Comment ID)
 
 ### For Patterns:
 - Combine pattern observations across batches
-- Note if patterns are consistent or vary between batches
+- Preserve ALL UNIQUE OR IMPORTANT CONTENT
 - Aggregate any quantitative patterns
 
 ### For Key Quotations:
-- Select the MOST powerful quotes from across all batches
-- Ensure diversity of perspectives and aspects covered
-- Don't exceed 5 quotes total (choose the best)
+- Keep ALL KEY QUOTATONS from across batches -- output a long list if needed
 - Keep the full attribution (Commenter Type, Comment ID)
 
 ### For Executive Summary:
-- Write a NEW summary that encompasses all batches
+- Write a NEW summary that encompasses all batches (without mentioning batches)
 - Capture the overall sentiment across all comments
 - Highlight the most significant findings
 

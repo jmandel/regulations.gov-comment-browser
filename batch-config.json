@@ -16,8 +16,8 @@
   
   "tasks": {
     "condense": {
-      "concurrency": 5,
-      "model": "gemini-flash-lite",
+      "concurrency": 3,
+      "model": "gemini-flash",
       "batching": false,
       "description": "Processes comments individually for structured extraction"
     },
@@ -41,12 +41,12 @@
     },
     
     "summarizeThemes": {
-      "concurrency": 3,
-      "mergeWidth": 20,
-      "model": "gemini-flash",
+      "concurrency": 4,
+      "mergeWidth": 4,
+      "model": "gemini-pro",
       "batching": {
-        "triggerWordLimit": 200000,
-        "batchWordLimit": 125000,
+        "triggerWordLimit": 50000,
+        "batchWordLimit": 40000,
         "description": "Batching for v2 summarization based on extracted content"
       },
       "thresholds": {
