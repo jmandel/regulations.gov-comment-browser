@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "regulations-browser": {
+      "command": "bun",
+      "args": ["run", "src/cli.ts"],
+      "cwd": "/path/to/regulations.gov-comment-browser/v2/mcp",
+      "env": {
+        "REGULATIONS_BASE_URL": "https://joshuamandel.com/regulations.gov-comment-browser"
+      },
+      "timeout": 10000
+    }
+  }
+}

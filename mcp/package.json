@@ -1,0 +1,34 @@
+{
+  "name": "regulations-browser-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for browsing regulations.gov comments",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "start:cli": "bun run src/cli.ts",
+    "dev": "bun --watch src/index.ts",
+    "build": "tsc",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
+  },
+  "keywords": [
+    "mcp",
+    "regulations",
+    "comments",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "express": "^4.21.2",
+    "lru-cache": "^11.0.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@flydotio/dockerfile": "^0.7.10",
+    "@types/bun": "latest",
+    "@types/express": "^5.0.0",
+    "typescript": "^5.8.3"
+  }
+}
