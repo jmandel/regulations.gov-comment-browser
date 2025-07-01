@@ -1,4 +1,5 @@
 import { LRUCache } from 'lru-cache';
+import { DiskCache } from './disk-cache';
 import type { 
   Comment, 
   Theme, 
@@ -20,17 +21,24 @@ export interface FetcherConfig {
 
 export class DataFetcher {
   private baseUrl: string;
-  private cache: LRUCache<string, any>;
+  private memoryCache: LRUCache<string, any>;
+  private diskCache: DiskCache;
 
   constructor(config: FetcherConfig = {}) {
     this.baseUrl = config.baseUrl || process.env.REGULATIONS_BASE_URL || DEFAULT_BASE_URL;
     
-    this.cache = new LRUCache({
+    // Memory cache for small items and hot data
+    this.memoryCache = new LRUCache({
       max: config.cacheSize || parseInt(process.env.CACHE_MAX_SIZE || '') || DEFAULT_CACHE_SIZE,
       ttl: config.cacheTTL || parseInt(process.env.CACHE_TTL_MINUTES || '') * 60 * 1000 || DEFAULT_CACHE_TTL,
       updateAgeOnGet: true,
       updateAgeOnHas: true,
     });
+    
+    // Disk cache for large items with up to 4GB storage
+    this.diskCache = new DiskCache(4);
+    
+    console.error(`[DataFetcher] Initialized with memory cache size ${this.memoryCache.max}, TTL ${this.memoryCache.ttl}ms`);
   }
 
   /**
@@ -40,11 +48,61 @@ export class DataFetcher {
     const url = `${this.baseUrl}${path}`;
     const cacheKey = url;
 
-    // Check cache first
-    const cached = this.cache.get(cacheKey);
-    if (cached !== undefined) {
-      return cached as T;
+    // Check memory cache first
+    const memoryCached = this.memoryCache.get(cacheKey);
+    if (memoryCached !== undefined) {
+      console.error(`[DataFetcher] Memory cache HIT for ${path}`);
+      return memoryCached as T;
     }
+
+    // Check disk cache
+    const diskCached = this.diskCache.get(url);
+    if (diskCached) {
+      console.error(`[DataFetcher] Disk cache HIT for ${path}`);
+      
+      // Try conditional request with ETag
+      if (diskCached.etag) {
+        try {
+          const response = await fetch(url, {
+            headers: {
+              'If-None-Match': diskCached.etag
+            }
+          });
+          
+          if (response.status === 304) {
+            console.error(`[DataFetcher] ETag validated, content unchanged for ${path}`);
+            // Put back in memory cache
+            this.memoryCache.set(cacheKey, diskCached.data);
+            return diskCached.data as T;
+          }
+          
+          // If not 304, we'll re-download below
+          if (response.ok) {
+            const newData = await response.json();
+            const newEtag = response.headers.get('etag') || undefined;
+            
+            // Update caches
+            this.memoryCache.set(cacheKey, newData);
+            this.diskCache.set(url, newData, newEtag);
+            
+            console.error(`[DataFetcher] ETag changed, updated ${path}`);
+            return newData as T;
+          }
+        } catch (error) {
+          console.error(`[DataFetcher] ETag validation failed for ${path}, using cached data`);
+          // Put back in memory cache
+          this.memoryCache.set(cacheKey, diskCached.data);
+          return diskCached.data as T;
+        }
+      } else {
+        // No ETag, just use cached data
+        this.memoryCache.set(cacheKey, diskCached.data);
+        return diskCached.data as T;
+      }
+    }
+
+    console.error(`[DataFetcher] Cache MISS for ${path} - downloading...`);
+    const startTime = Date.now();
 
     try {
       const response = await fetch(url);
@@ -54,12 +112,21 @@ export class DataFetcher {
       }
 
       const data = await response.json();
+      const etag = response.headers.get('etag') || undefined;
+      const downloadTime = Date.now() - startTime;
+      
+      // Get size estimate
+      const sizeEstimate = JSON.stringify(data).length;
+      console.error(`[DataFetcher] Downloaded ${path} in ${downloadTime}ms (${Math.round(sizeEstimate / 1024)}KB)`);
       
       // Cache the result
-      this.cache.set(cacheKey, data);
+      this.memoryCache.set(cacheKey, data);
+      this.diskCache.set(url, data, etag);
       
       return data as T;
     } catch (error) {
+      const failTime = Date.now() - startTime;
+      console.error(`[DataFetcher] Failed to fetch ${path} after ${failTime}ms`);
       if (error instanceof Error) {
         throw new Error(`Failed to fetch ${url}: ${error.message}`);
       }
@@ -131,10 +198,19 @@ export class DataFetcher {
    * Get cache statistics
    */
   getCacheStats() {
+    const keys = [...this.memoryCache.keys()];
     return {
-      size: this.cache.size,
-      maxSize: this.cache.max,
-      ttl: this.cache.ttl,
+      size: this.memoryCache.size,
+      maxSize: this.memoryCache.max,
+      ttl: this.memoryCache.ttl,
+      keys: keys,
+      memoryCache: {
+        size: this.memoryCache.size,
+        maxSize: this.memoryCache.max,
+        ttl: this.memoryCache.ttl,
+        keys: keys,
+      },
+      diskCache: 'See disk cache logs for details'
     };
   }
 
@@ -142,6 +218,8 @@ export class DataFetcher {
    * Clear the cache
    */
   clearCache() {
-    this.cache.clear();
+    this.memoryCache.clear();
+    this.diskCache.clear();
+    console.error('[DataFetcher] Cleared both memory and disk caches');
   }
 }

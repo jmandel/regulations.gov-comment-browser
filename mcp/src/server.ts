@@ -13,14 +13,15 @@ import type {
 } from './data/types';
 
 
+// Create singleton instances outside of createServer
+const fetcher = new DataFetcher();
+const searchEngine = new SearchEngine();
+
 export function createServer() {
   const server = new McpServer({
     name: 'regulations.gov-comment-browser',
     version: '1.0.0',
   });
-
-  const fetcher = new DataFetcher();
-  const searchEngine = new SearchEngine();
 
   // Feature flag for listing dockets (disabled by default)
   const ENABLE_LIST_DOCKETS = process.env.ENABLE_LIST_DOCKETS === 'true';
@@ -76,13 +77,24 @@ Use this tool first to discover what regulations are available to search and ana
     'searchComments',
     {
       title: 'Search Comments',
-      description: `Search through public comments using a powerful query syntax with keywords, entities, and themes.
+      description: `Search through public comments to access rich, nuanced perspectives from healthcare stakeholders.
+
+IMPORTANT: The default returnType="fields" provides access to various data fields, but NOT ALL FIELDS ARE EQUAL:
+- detailedContent: The FAITHFUL REPRESENTATION of the original comment text - the most reliable source if you need a deep or nuanced understanding of the content
+- Other fields: AI-generated abstractions that compress and interpret the original
+
+Reading the detailedContent field reveals:
+- Specific implementation challenges and solutions
+- Personal experiences and case studies  
+- Detailed policy recommendations with rationale
+- Nuanced positions that defy simple categorization
+- Technical details and operational insights
 
 QUERY SYNTAX:
 - Keywords: Use plain words or "quoted phrases" to search comment text
   Examples: prior authorization, "nurse staffing", medicare
   
-- Entity filters: Use entity:label to find comments mentioning specific organizations
+- Entity filters: Use entity:label to find comments from specific organizations
   Examples: entity:CMS, entity:"American Medical Association", entity:ANA
   Note: Entity labels are case-insensitive
   
@@ -97,28 +109,34 @@ QUERY SYNTAX:
   Example: "prior authorization" entity:AMA theme:2.1 -deny
   This finds comments about prior authorization from the AMA on theme 2.1 that don't contain "deny"
 
-SEARCH FIELDS:
-By default, searches the detailed content. You can search specific fields:
-- detailedContent: Full comment text (default: true)
-- oneLineSummary: Brief summary
-- corePosition: Main stance
-- keyRecommendations: Specific suggestions
-- mainConcerns: Primary worries
-- notableExperiences: Personal stories
-- keyQuotations: Important quotes
+WHAT SEARCH RETURNS:
+Every result includes these fields for consistent browsing:
+- submitter: Person/organization name
+- submitterType: Their role (Physician, Patient, etc.)
+- date: When submitted
+- oneLineSummary: AI-generated one-line summary
+- commenterProfile: AI-generated background info
+- keyQuotations: Exact quotes from the comment
+- contextSnippet: ~100 words showing your search term in context
 
-RETURN OPTIONS:
-- returnType: "snippets" (default) shows text excerpts with matches highlighted
-- returnType: "fields" returns full field values
-- limit: Number of results (default: all results, no limit)
-- sortBy: "relevance" (default), "date", or "wordCount"
+IMPORTANT: These are OVERVIEW fields. To read the full original comment text (detailedContent), 
+use getComment with the commentId.
 
-TIPS:
-1. Start broad, then narrow with filters
-2. Use entity: to find comments from specific organizations
-3. Use theme: to focus on particular topics
-4. Review theme hierarchy with listThemes first
-5. Check entity taxonomy with listEntities for available organizations`,
+SEARCH FIELDS (what to search in):
+- detailedContent: The FAITHFUL original comment text (default: true) - most reliable
+- oneLineSummary: AI abstraction - brief summary (lossy compression)
+- corePosition: AI abstraction - extracted stance (oversimplified)
+- keyRecommendations: AI abstraction - extracted suggestions (incomplete list)
+- mainConcerns: AI abstraction - extracted worries (selective)
+- notableExperiences: AI abstraction - extracted stories (lacks context)
+- keyQuotations: AI-selected EXACT QUOTES - preserves original wording but limited selection
+
+BEST PRACTICES:
+1. Search broadly to see overview of many comments
+2. Use contextSnippet to see how your keywords appear
+3. Review oneLineSummary and commenterProfile to identify relevant perspectives
+4. CRUCIAL: Use getComment to read full detailedContent for selected comments
+5. Only detailedContent is faithful - summaries are AI interpretations`,
       inputSchema: {
         docketId: z.string().describe('The full docket ID (e.g., "CMS-2025-0050-0031")'),
         query: z.string().describe('Search query using keywords, entity:label, and theme:code syntax'),
@@ -131,26 +149,7 @@ TIPS:
           notableExperiences: z.boolean().optional(),
           keyQuotations: z.boolean().optional(),
         }).optional().describe('Which fields to search in'),
-        returnType: z.enum(['fields', 'snippets']).optional().describe('Return full fields or text snippets'),
-        returnFields: z.object({
-          detailedContent: z.boolean().optional(),
-          oneLineSummary: z.boolean().optional(),
-          corePosition: z.boolean().optional(),
-          keyRecommendations: z.boolean().optional(),
-          mainConcerns: z.boolean().optional(),
-          notableExperiences: z.boolean().optional(),
-          keyQuotations: z.boolean().optional(),
-          commenterProfile: z.boolean().optional(),
-          submitter: z.boolean().optional(),
-          submitterType: z.boolean().optional(),
-          date: z.boolean().optional(),
-          location: z.boolean().optional(),
-          themeScores: z.boolean().optional(),
-          entities: z.boolean().optional(),
-          hasAttachments: z.boolean().optional(),
-          wordCount: z.boolean().optional(),
-        }).optional().describe('Which fields to return when returnType is "fields"'),
-        limit: z.number().optional().describe('Maximum number of results (default: all)'),
+        limit: z.number().optional().describe('Maximum number of results (default: 1000)'),
         offset: z.number().optional().describe('Offset for pagination (default: 0)'),
         sortBy: z.enum(['date', 'relevance', 'wordCount']).optional().describe('Sort criteria'),
         sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort order'),
@@ -174,9 +173,9 @@ TIPS:
         const results = searchEngine.searchComments(comments, {
           query: parsedQuery,
           searchFields: params.searchFields || { detailedContent: true },
-          returnType: params.returnType || 'snippets',
-          returnFields: params.returnFields,
-          limit: params.limit || Number.MAX_SAFE_INTEGER, // Default to all results
+          returnType: 'fields', // Always return consistent fields
+          returnFields: {}, // Always use default overview fields
+          limit: params.limit || 1000, // Default to 1000 max
           offset: params.offset || 0,
           sortBy: params.sortBy || 'relevance',
           sortOrder: params.sortOrder || 'desc'
@@ -194,10 +193,10 @@ TIPS:
           suggestions.push(`Found ${results.totalCount} total results. To see next page, add offset: ${nextOffset}`);
         }
         
-        if (params.returnType !== 'fields' && results.results.length > 0) {
-          suggestions.push('To get full comment text, re-run with returnType: "fields" and returnFields: {detailedContent: true}');
+        if (results.results.length > 0) {
           const sampleIds = results.results.slice(0, 3).map(r => r.commentId).join('", "');
-          suggestions.push(`Or use getComment for specific comments: "${sampleIds}"`);
+          suggestions.push(`IMPORTANT: Search returns overview only. To read full comment text, use getComment with IDs like: "${sampleIds}"`);
+          suggestions.push('The oneLineSummary and commenterProfile are AI abstractions - always read detailedContent for nuanced understanding');
         }
 
         return {
@@ -237,37 +236,46 @@ TIPS:
     'getComment',
     {
       title: 'Get Comment Details',
-      description: `Retrieve detailed information about a specific comment by its ID.
+      description: `Retrieve the complete, unabridged content of a specific comment to understand nuanced perspectives.
 
-This tool fetches a single comment with all available fields or just the fields you specify. Use this when:
-- You found an interesting comment via search and want full details
-- You need specific fields like recommendations or concerns from a known comment
-- You want to analyze a comment's theme scores or entity mentions
+IMPORTANT: By default, this returns ALL FIELDS. Among these, detailedContent is the ONLY FAITHFUL REPRESENTATION of the original comment. It preserves:
+- Complete argumentation and reasoning chains
+- Specific examples and case studies with full context
+- Technical details and implementation specifics
+- Emotional context and stakeholder concerns
+- Nuanced positions that resist simple categorization
 
-AVAILABLE FIELDS:
-- detailedContent: Full comment text
-- oneLineSummary: Brief one-line summary
-- corePosition: The commenter's main position/stance
-- keyRecommendations: List of specific recommendations
-- mainConcerns: List of primary concerns raised
-- notableExperiences: Personal experiences or case studies mentioned
-- keyQuotations: Important quotes extracted
-- commenterProfile: Background info about the commenter
-- submitter: Name of person/organization
-- submitterType: Category (e.g., Physician, Patient, Organization)
-- date: Submission date
-- location: Geographic location
-- themeScores: Object mapping theme codes to relevance scores (1-3)
-- entities: List of mentioned organizations with categories
-- hasAttachments: Whether comment included attachments
-- wordCount: Length of comment
+WHEN TO USE THIS TOOL:
+- After search results, always fetch full comments to understand complete perspectives
+- When you need the actual words and full context, not AI summaries
+- To understand specific implementation details or technical recommendations
+- To capture personal stories and experiences in their entirety
 
-If no fields are specified, all available fields are returned (except entities).
+PRIMARY FIELDS (preserving original content):
+- detailedContent: COMPLETE ORIGINAL COMMENT TEXT - the most reliable source if you need a deep or nuanced understanding of the content
+- submitter: Actual name of person/organization who submitted
+- submitterType: Their role (e.g., Physician, Patient, Hospital)
+- date: When submitted
+- location: Geographic origin
 
-EXAMPLE USAGE:
-1. Get everything: getComment(docketId, commentId)
-2. Get just recommendations: getComment(docketId, commentId, {keyRecommendations: true})
-3. Get summary and themes: getComment(docketId, commentId, {oneLineSummary: true, themeScores: true})`,
+AI-EXTRACTED FIELDS (useful for quick overview but less reliable for nuanced understanding):
+- oneLineSummary: AI-generated brief summary (loses critical nuance)
+- corePosition: AI's attempt to extract stance (often oversimplified)
+- keyRecommendations: AI-extracted suggestions (may miss important ones)
+- mainConcerns: AI-extracted concerns (incomplete list)
+- notableExperiences: AI-extracted stories (lacks full narrative)
+- keyQuotations: AI-selected EXACT QUOTES from original text (preserves precise wording but limited selection)
+- commenterProfile: AI-generated background summary
+
+METADATA FIELDS:
+- themeScores: How strongly comment relates to each theme (1-3 scale)
+- entities: Organizations mentioned in the comment
+- hasAttachments: Whether comment included additional documents
+- wordCount: Length of original comment
+
+DEFAULT BEHAVIOR: Returns submitter info, detailedContent, and keyQuotations only. Request other fields explicitly if needed.
+
+BEST PRACTICE: For deep or nuanced understanding, focus on detailedContent - the faithful representation. The AI-extracted fields can provide quick orientation but are less reliable for understanding subtleties, specific implementation details, or complex arguments.`,
       inputSchema: {
         docketId: z.string().describe('The full docket ID (e.g., "CMS-2025-0050-0031")'),
         commentId: z.string().describe('The comment ID'),
@@ -311,21 +319,11 @@ EXAMPLE USAGE:
 
         // Add requested fields
         if (!params.fields || Object.keys(params.fields).length === 0) {
-          // Return ALL fields when none specified (full detailed content)
+          // Default: only essential fields
           if (comment.structuredSections) {
             result.detailedContent = comment.structuredSections.detailedContent;
-            result.oneLineSummary = comment.structuredSections.oneLineSummary;
-            result.corePosition = comment.structuredSections.corePosition;
-            result.keyRecommendations = comment.structuredSections.keyRecommendations;
-            result.mainConcerns = comment.structuredSections.mainConcerns;
-            result.notableExperiences = comment.structuredSections.notableExperiences;
             result.keyQuotations = comment.structuredSections.keyQuotations;
-            result.commenterProfile = comment.structuredSections.commenterProfile;
           }
-          result.themeScores = comment.themeScores;
-          // Don't include entities by default - they're verbose and redundant
-          result.wordCount = comment.wordCount;
-          result.hasAttachments = comment.hasAttachments;
         } else {
           // Return only requested fields
           const s = comment.structuredSections;
@@ -363,7 +361,7 @@ EXAMPLE USAGE:
         // Don't suggest entities - they're better for searching than displaying
         
         if (!params.fields || Object.keys(params.fields).length === 0) {
-          suggestions.push('All fields returned. Specify fields parameter to get only specific data.');
+          suggestions.push('Default fields returned. To get AI abstractions, specify fields like: oneLineSummary, corePosition, keyRecommendations, etc.');
         }
         
         return {
@@ -624,44 +622,47 @@ TIPS:
     'getThemeSummary',
     {
       title: 'Get Theme Summary',
-      description: `Get comprehensive AI-generated analysis and summary for a specific theme.
+      description: `Get AI-generated theme analysis - useful for overview but inherently limited compared to reading actual comments.
 
-This tool provides deep insights into all comments related to a particular theme, including:
+CRITICAL LIMITATIONS OF AI SUMMARIES:
+- Abstractions lose crucial implementation details and specific examples
+- Nuanced positions get oversimplified into broad categories  
+- Minority viewpoints may be underrepresented or omitted
+- Technical specifications and operational details are compressed away
+- Personal stories lose their emotional impact and specificity
+- Complex arguments get reduced to bullet points
+- Important edge cases and exceptions may be missed
 
-SUMMARY SECTIONS:
-1. Overview: High-level synthesis of the theme
-2. Key Positions: Major stances with supporting points and comment counts
-3. Major Concerns: Primary issues raised with specific problems and affected groups
-4. Recommendations: Concrete suggestions with rationale and support levels
-5. Stakeholder Perspectives: Views from different groups (patients, providers, payers)
-6. Notable Insights: Unique or particularly important points
+WHAT THIS TOOL PROVIDES:
+AI-generated analysis attempts to synthesize comments into:
+1. Overview: High-level themes (loses specific details)
+2. Key Positions: Grouped stances (oversimplifies nuanced views)
+3. Major Concerns: Common issues (may miss unique problems)
+4. Recommendations: Aggregated suggestions (lacks implementation specifics)
+5. Stakeholder Perspectives: Broad categories (loses individual voices)
+6. Notable Insights: Selected points (subjective AI selection)
 
-UNDERSTANDING THE ANALYSIS:
-- Positions show the main arguments and how many comments support each
-- Concerns identify specific problems and who is affected
-- Recommendations are rated by support level: Strong/Moderate/Limited
-- Stakeholder sentiment is categorized: Positive/Negative/Mixed/Neutral
-- All sections reference representative comment counts
+WHEN TO USE vs. READING COMMENTS:
+Use theme summaries for:
+- Initial orientation to a topic
+- Understanding broad patterns
+- Quick quantitative overview
 
-USE THIS TOOL WHEN YOU NEED TO:
-1. Understand the full scope of discussion on a topic
-2. Identify consensus positions and major disagreements
-3. Find specific recommendations from commenters
-4. Understand different stakeholder perspectives
-5. Get quantitative backing for qualitative insights
+Then ALWAYS follow up by searching and reading actual comments to:
+- Understand specific implementation challenges
+- Capture detailed recommendations with full context
+- Hear authentic stakeholder voices
+- Discover nuanced positions and edge cases
+- Find concrete examples and case studies
 
-WORKFLOW TIPS:
-1. Use listThemes first to find theme codes and comment counts
-2. Focus on themes with high comment counts for richer summaries
-3. Compare parent and child theme summaries for different granularity
-4. Cross-reference with searchComments to find specific examples
+BEST PRACTICE WORKFLOW:
+1. Use listThemes to see topic landscape
+2. Read theme summary for initial orientation
+3. CRUCIALLY: Use searchComments with theme filters to read actual comments
+4. Look for what the summary missed or oversimplified
+5. Pay special attention to detailed recommendations and specific examples
 
-EXAMPLE THEMES (codes vary by regulation):
-- "2.1"
-- "3.2" 
-- "4.1"
-
-The summaries are generated through systematic analysis of all comments tagged with the theme, providing both quantitative and qualitative insights.`,
+REMEMBER: Theme summaries are AI interpretations that compress thousands of unique perspectives into generalizations. They are starting points, not endpoints. The real insights come from reading what commenters actually wrote.`,
       inputSchema: {
         docketId: z.string().describe('The full docket ID (e.g., "CMS-2025-0050-0031")'),
         themeCode: z.string().describe('The theme code (e.g., "2.1")'),

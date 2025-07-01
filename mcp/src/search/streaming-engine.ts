@@ -8,30 +8,17 @@ import type {
 } from '../data/types';
 import { matchesQuery, extractSnippets } from './parser';
 
-export interface SearchOptions {
-  query: SearchQuery;
-  searchFields?: SearchFields;
-  returnType?: 'fields' | 'snippets';
-  returnFields?: ReturnFields;
-  limit?: number;
-  offset?: number;
-  sortBy?: 'date' | 'relevance' | 'wordCount';
-  sortOrder?: 'asc' | 'desc';
-}
-
-export class SearchEngine {
+/**
+ * Streaming search engine that processes comments in chunks to avoid OOM
+ */
+export class StreamingSearchEngine {
   private entityMap: Map<string, { category: string; label: string }> = new Map();
-
-  /**
-   * Initialize the search engine with entity taxonomy for label resolution
-   */
+  
   setEntityTaxonomy(taxonomy: EntityTaxonomy) {
     this.entityMap.clear();
     
-    // Iterate over categories in the taxonomy object
     for (const [category, entities] of Object.entries(taxonomy)) {
       for (const entity of entities) {
-        // Store by lowercase label for case-insensitive matching
         this.entityMap.set(entity.label.toLowerCase(), {
           category: category,
           label: entity.label
@@ -40,24 +27,19 @@ export class SearchEngine {
     }
   }
 
-  /**
-   * Resolve entity labels to include categories
-   */
   resolveEntities(query: SearchQuery): SearchQuery {
     const resolved = { ...query };
     
     resolved.entities = query.entities.map(entity => {
       if (entity.category) {
-        return entity; // Already has category
+        return entity;
       }
       
-      // Look up in entity map
       const found = this.entityMap.get(entity.label.toLowerCase());
       if (found) {
         return found;
       }
       
-      // Return as-is if not found
       return entity;
     });
     
@@ -65,63 +47,107 @@ export class SearchEngine {
   }
 
   /**
-   * Search comments with the given options
+   * Process comments in chunks and yield results as they're found
    */
-  searchComments(comments: Comment[], options: SearchOptions): {
-    results: SearchResult[];
-    totalCount: number;
-  } {
+  async *searchCommentsStreaming(
+    comments: Comment[],
+    options: {
+      query: SearchQuery;
+      searchFields?: SearchFields;
+      returnType?: 'fields' | 'snippets';
+      returnFields?: ReturnFields;
+      limit?: number;
+      offset?: number;
+      sortBy?: 'date' | 'relevance' | 'wordCount';
+      sortOrder?: 'asc' | 'desc';
+    }
+  ): AsyncGenerator<{
+    result?: SearchResult;
+    progress?: { processed: number; total: number };
+    done?: boolean;
+  }> {
     const {
       query,
       searchFields = { detailedContent: true },
       returnType = 'snippets',
       returnFields = {},
-      limit = Number.MAX_SAFE_INTEGER, // Default to all results
+      limit = Number.MAX_SAFE_INTEGER,
       offset = 0,
       sortBy = 'relevance',
       sortOrder = 'desc'
     } = options;
 
-    // Resolve entities with categories
     const resolvedQuery = this.resolveEntities(query);
-
-    // Filter comments
-    const matches = comments.filter(comment => 
-      this.matchesComment(comment, resolvedQuery, searchFields)
-    );
-
-    // Score and sort
-    const scored = matches.map(comment => ({
-      comment,
-      score: this.scoreComment(comment, resolvedQuery, searchFields)
-    }));
-
-    // Sort by selected criteria
-    this.sortResults(scored, sortBy, sortOrder);
-
-    // Paginate
-    const paginated = scored.slice(offset, offset + limit);
-
-    // Format results
-    const results = paginated.map(({ comment }) => 
-      this.formatResult(comment, resolvedQuery, searchFields, returnType, returnFields)
-    );
-
-    return {
-      results,
-      totalCount: matches.length
-    };
+    const CHUNK_SIZE = 1000; // Process 1000 comments at a time
+    
+    let found = 0;
+    let skipped = 0;
+    let processed = 0;
+    
+    // For relevance sorting, we need to collect all results first
+    // For date/wordCount, we can stream if the data is pre-sorted
+    const needsFullScan = sortBy === 'relevance';
+    const tempResults: Array<{ comment: Comment; score: number }> = [];
+    
+    for (let i = 0; i < comments.length; i += CHUNK_SIZE) {
+      const chunk = comments.slice(i, Math.min(i + CHUNK_SIZE, comments.length));
+      
+      for (const comment of chunk) {
+        processed++;
+        
+        if (!this.matchesComment(comment, resolvedQuery, searchFields)) {
+          continue;
+        }
+        
+        const score = this.scoreComment(comment, resolvedQuery, searchFields);
+        
+        if (needsFullScan) {
+          tempResults.push({ comment, score });
+        } else {
+          // Can yield immediately for non-relevance sorting
+          if (skipped < offset) {
+            skipped++;
+            continue;
+          }
+          
+          if (found >= limit) {
+            yield { done: true };
+            return;
+          }
+          
+          yield {
+            result: this.formatResult(comment, resolvedQuery, searchFields, returnType, returnFields)
+          };
+          found++;
+        }
+      }
+      
+      // Yield progress update
+      yield { progress: { processed, total: comments.length } };
+    }
+    
+    // Handle relevance-sorted results
+    if (needsFullScan) {
+      this.sortResults(tempResults, sortBy, sortOrder);
+      
+      const paginated = tempResults.slice(offset, offset + limit);
+      
+      for (const { comment } of paginated) {
+        yield {
+          result: this.formatResult(comment, resolvedQuery, searchFields, returnType, returnFields)
+        };
+      }
+    }
+    
+    yield { done: true };
   }
 
-  /**
-   * Check if a comment matches the search criteria
-   */
+  // Include all the private methods from the original SearchEngine
   private matchesComment(
     comment: Comment, 
     query: SearchQuery, 
     searchFields: SearchFields
   ): boolean {
-    // Check text matching in specified fields
     const searchTexts = this.getSearchTexts(comment, searchFields);
     const combinedText = searchTexts.join(' ');
     
@@ -129,7 +155,6 @@ export class SearchEngine {
       return false;
     }
 
-    // Check entity filters
     if (query.entities.length > 0) {
       const hasRequiredEntities = query.entities.every(queryEntity => 
         comment.entities?.some(commentEntity => 
@@ -143,7 +168,6 @@ export class SearchEngine {
       }
     }
 
-    // Check theme filters
     if (query.themes.length > 0) {
       const hasRequiredThemes = query.themes.every(themeCode =>
         comment.themeScores && 
@@ -159,9 +183,6 @@ export class SearchEngine {
     return true;
   }
 
-  /**
-   * Score a comment based on relevance to the query
-   */
   private scoreComment(
     comment: Comment,
     query: SearchQuery,
@@ -169,19 +190,15 @@ export class SearchEngine {
   ): number {
     let score = 0;
 
-    // Keyword frequency scoring
     const searchTexts = this.getSearchTexts(comment, searchFields);
     const combinedText = searchTexts.join(' ').toLowerCase();
     
     for (const keyword of query.keywords) {
-      // Escape special regex characters
-      const escapedKeyword = keyword.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(escapedKeyword, 'gi');
+      const regex = new RegExp(keyword.toLowerCase(), 'gi');
       const matches = combinedText.match(regex);
       score += matches ? matches.length : 0;
     }
 
-    // Entity match bonus
     score += query.entities.filter(queryEntity =>
       comment.entities?.some(commentEntity =>
         commentEntity.category === queryEntity.category &&
@@ -189,7 +206,6 @@ export class SearchEngine {
       )
     ).length * 5;
 
-    // Theme relevance bonus
     for (const themeCode of query.themes) {
       if (comment.themeScores && comment.themeScores[themeCode]) {
         score += comment.themeScores[themeCode] * 3;
@@ -199,14 +215,10 @@ export class SearchEngine {
     return score;
   }
 
-  /**
-   * Get searchable text fields from a comment
-   */
   private getSearchTexts(comment: Comment, searchFields: SearchFields): string[] {
     const texts: string[] = [];
 
     if (!comment.structuredSections) {
-      // No structured content available
       return texts;
     }
 
@@ -237,9 +249,6 @@ export class SearchEngine {
     return texts.filter(t => t && t.length > 0);
   }
 
-  /**
-   * Sort search results
-   */
   private sortResults(
     results: Array<{ comment: Comment; score: number }>,
     sortBy: 'date' | 'relevance' | 'wordCount',
@@ -268,9 +277,6 @@ export class SearchEngine {
     });
   }
 
-  /**
-   * Format a comment as a search result with consistent shape
-   */
   private formatResult(
     comment: Comment,
     query: SearchQuery,
@@ -285,70 +291,31 @@ export class SearchEngine {
       date: comment.date
     };
 
-    // Always include overview fields
-    const s = comment.structuredSections;
-    const fields: Record<string, any> = {};
-    
-    if (s) {
-      if (s.oneLineSummary) fields.oneLineSummary = s.oneLineSummary;
-      if (s.commenterProfile) fields.commenterProfile = s.commenterProfile;
-      if (s.keyQuotations) fields.keyQuotations = s.keyQuotations;
-    }
-    
-    // Add a context snippet showing keyword matches
-    if (s && s.detailedContent && query.keywords.length > 0) {
-      const snippet = this.extractContextSnippet(s.detailedContent, query.keywords);
-      if (snippet) {
-        fields.contextSnippet = snippet;
-      }
-    }
-    
-    result.fields = fields;
-    return result;
-  }
-  
-  /**
-   * Extract a ~100 word snippet showing keyword in context
-   */
-  private extractContextSnippet(text: string, keywords: string[]): string | null {
-    const words = text.split(/\s+/);
-    const lowerWords = words.map(w => w.toLowerCase());
-    
-    // Find first keyword match
-    let matchIndex = -1;
-    let matchedKeyword = '';
-    
-    for (const keyword of keywords) {
-      const keyLower = keyword.toLowerCase();
-      for (let i = 0; i < lowerWords.length; i++) {
-        if (lowerWords[i].includes(keyLower)) {
-          matchIndex = i;
-          matchedKeyword = keyword;
-          break;
+    if (returnType === 'snippets') {
+      const snippets: SearchResult['snippets'] = [];
+      const fieldTexts = this.getFieldTexts(comment, searchFields);
+
+      for (const [field, text] of Object.entries(fieldTexts)) {
+        const fieldSnippets = extractSnippets(text, query);
+        
+        for (const snippet of fieldSnippets) {
+          snippets.push({
+            field,
+            text: snippet.text,
+            matchStart: snippet.matchStart,
+            matchEnd: snippet.matchEnd
+          });
         }
       }
-      if (matchIndex >= 0) break;
+
+      result.snippets = snippets;
+    } else {
+      result.fields = this.extractFields(comment, returnFields);
     }
-    
-    if (matchIndex < 0) return null;
-    
-    // Extract ~50 words before and after
-    const contextWords = 50;
-    const start = Math.max(0, matchIndex - contextWords);
-    const end = Math.min(words.length, matchIndex + contextWords + 1);
-    
-    let snippet = words.slice(start, end).join(' ');
-    
-    // Add ellipsis if truncated
-    if (start > 0) snippet = '...' + snippet;
-    if (end < words.length) snippet = snippet + '...';
-    
-    return snippet;
+
+    return result;
   }
 
-  /**
-   * Get field texts for snippet extraction
-   */
   private getFieldTexts(
     comment: Comment, 
     searchFields: SearchFields
@@ -386,25 +353,15 @@ export class SearchEngine {
     return texts;
   }
 
-  /**
-   * Extract requested fields from a comment
-   */
   private extractFields(comment: Comment, fields: ReturnFields): Record<string, any> {
     const result: Record<string, any> = {};
 
     const s = comment.structuredSections;
 
-    // If no fields specified, return overview fields for browsing
+    // If no fields specified, return detailedContent by default
     if (!fields || Object.keys(fields).length === 0) {
-      // Always include basic info
-      result.submitter = comment.submitter;
-      result.submitterType = comment.submitterType;
-      
-      // Include overview fields if available
-      if (s) {
-        if (s.oneLineSummary) result.oneLineSummary = s.oneLineSummary;
-        if (s.commenterProfile) result.commenterProfile = s.commenterProfile;
-        if (s.keyQuotations) result.keyQuotations = s.keyQuotations;
+      if (s && s.detailedContent) {
+        result.detailedContent = s.detailedContent;
       }
       return result;
     }

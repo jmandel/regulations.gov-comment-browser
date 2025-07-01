@@ -97,8 +97,14 @@ export interface DocketMeta {
   };
 }
 
+export type KeywordExpression = 
+  | { type: 'term'; value: string }
+  | { type: 'and'; terms: KeywordExpression[] }
+  | { type: 'or'; terms: KeywordExpression[] };
+
 export interface SearchQuery {
-  keywords: string[];
+  keywords: string[]; // Keep for backward compatibility
+  keywordExpression?: KeywordExpression; // New expression tree
   entities: Array<{category: string; label: string}>;
   themes: string[];
   exclude: string[];
