@@ -13,11 +13,10 @@ import type {
 } from './data/types';
 
 
-// Create singleton instances outside of createServer
-const fetcher = new DataFetcher();
-const searchEngine = new SearchEngine();
-
 export function createServer() {
+  // Create singleton instances inside createServer to allow mocking in tests
+  const fetcher = new DataFetcher();
+  const searchEngine = new SearchEngine();
   const server = new McpServer({
     name: 'regulations.gov-comment-browser',
     version: '1.0.0',
@@ -241,7 +240,7 @@ BEST PRACTICES:
 IMPORTANT: By default, this returns ALL FIELDS. Among these, detailedContent is the ONLY FAITHFUL REPRESENTATION of the original comment. It preserves:
 - Complete argumentation and reasoning chains
 - Specific examples and case studies with full context
-- Technical details and implementation specifics
+- Technical details and operational insights
 - Emotional context and stakeholder concerns
 - Nuanced positions that resist simple categorization
 
@@ -281,12 +280,12 @@ BEST PRACTICE: For deep or nuanced understanding, focus on detailedContent - the
         commentId: z.string().describe('The comment ID'),
         fields: z.object({
           detailedContent: z.boolean().optional(),
+          keyQuotations: z.boolean().optional(),
           oneLineSummary: z.boolean().optional(),
           corePosition: z.boolean().optional(),
           keyRecommendations: z.boolean().optional(),
           mainConcerns: z.boolean().optional(),
           notableExperiences: z.boolean().optional(),
-          keyQuotations: z.boolean().optional(),
           commenterProfile: z.boolean().optional(),
           submitter: z.boolean().optional(),
           submitterType: z.boolean().optional(),
@@ -296,7 +295,11 @@ BEST PRACTICE: For deep or nuanced understanding, focus on detailedContent - the
           entities: z.boolean().optional(),
           hasAttachments: z.boolean().optional(),
           wordCount: z.boolean().optional(),
-        }).optional().describe('Which fields to return (all if not specified)'),
+        }).optional().describe('Which fields to return (default: detailedContent only)'),
+        chunk: z.object({
+          index: z.number().min(0).default(0),
+          of: z.number().min(1).default(1),
+        }).optional().describe('Splits detailedContent into chunks for large comments'),
       },
     },
     async (params) => {
@@ -319,7 +322,7 @@ BEST PRACTICE: For deep or nuanced understanding, focus on detailedContent - the
 
         // Add requested fields
         if (!params.fields || Object.keys(params.fields).length === 0) {
-          // Default: only essential fields
+          // Default: detailedContent and keyQuotations only
           if (comment.structuredSections) {
             result.detailedContent = comment.structuredSections.detailedContent;
             result.keyQuotations = comment.structuredSections.keyQuotations;
@@ -330,18 +333,37 @@ BEST PRACTICE: For deep or nuanced understanding, focus on detailedContent - the
           if (params.fields.detailedContent && s) {
             result.detailedContent = s.detailedContent;
           }
+          if (params.fields.keyQuotations && s) result.keyQuotations = s.keyQuotations;
           if (params.fields.oneLineSummary && s) result.oneLineSummary = s.oneLineSummary;
           if (params.fields.corePosition && s) result.corePosition = s.corePosition;
           if (params.fields.keyRecommendations && s) result.keyRecommendations = s.keyRecommendations;
           if (params.fields.mainConcerns && s) result.mainConcerns = s.mainConcerns;
           if (params.fields.notableExperiences && s) result.notableExperiences = s.notableExperiences;
-          if (params.fields.keyQuotations && s) result.keyQuotations = s.keyQuotations;
           if (params.fields.commenterProfile && s) result.commenterProfile = s.commenterProfile;
+          if (params.fields.submitter) result.submitter = comment.submitter;
+          if (params.fields.submitterType) result.submitterType = comment.submitterType;
+          if (params.fields.date) result.date = comment.date;
           if (params.fields.location) result.location = comment.location;
           if (params.fields.themeScores) result.themeScores = comment.themeScores;
           if (params.fields.entities) result.entities = comment.entities;
           if (params.fields.hasAttachments) result.hasAttachments = comment.hasAttachments;
           if (params.fields.wordCount) result.wordCount = comment.wordCount;
+        }
+
+        // Handle chunking
+        if (params.chunk && result.detailedContent) {
+          const { index, of } = params.chunk;
+          if (index >= of) {
+            throw new Error(`Chunk index (${index}) must be less than total chunks (${of})`);
+          }
+          const totalLength = result.detailedContent.length;
+          const chunkSize = Math.ceil(totalLength / of);
+          const start = index * chunkSize;
+          const end = start + chunkSize;
+          
+          result.detailedContent = result.detailedContent.substring(start, end);
+          result.chunk = { index, of };
+          result.totalLength = totalLength;
         }
 
         // Get docket metadata
@@ -358,10 +380,19 @@ BEST PRACTICE: For deep or nuanced understanding, focus on detailedContent - the
           suggestions.push(`This comment relates to themes: ${topThemes.join(', ')}. Use getThemeSummary for analysis.`);
         }
         
-        // Don't suggest entities - they're better for searching than displaying
-        
         if (!params.fields || Object.keys(params.fields).length === 0) {
-          suggestions.push('Default fields returned. To get AI abstractions, specify fields like: oneLineSummary, corePosition, keyRecommendations, etc.');
+          suggestions.push('This is the default view (detailedContent and keyQuotations only). To get more info, request specific fields like: submitter, date, oneLineSummary, etc.');
+        } else if (Object.keys(params.fields).length < 5) { // Suggest more if they only asked for a few
+          suggestions.push('You can request more fields, like: corePosition, mainConcerns, commenterProfile, themeScores.');
+        }
+        
+        if (params.chunk) {
+          const { index, of } = params.chunk;
+          if (index < of - 1) {
+            suggestions.push(`To get the next part of this comment, use chunk: { index: ${index + 1}, of: ${of} }`);
+          }
+        } else if (result.detailedContent && result.detailedContent.length > 5 * 20000) { // Suggest chunking if content is large
+          suggestions.push('This comment is long. To read it in smaller parts, use the `chunk` parameter (e.g., chunk: { index: 0, of: 5 })');
         }
         
         return {
@@ -372,8 +403,8 @@ BEST PRACTICE: For deep or nuanced understanding, focus on detailedContent - the
                 documentId: meta.documentId,
                 totalComments: meta.stats.totalComments
               },
+              suggestions,
               comment: result,
-              suggestions
             }, null, 2)
           }]
         };
