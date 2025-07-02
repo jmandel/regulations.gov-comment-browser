@@ -44,14 +44,14 @@ describe('SearchEngine', () => {
         date: '2024-01-01',
         location: 'NY',
         structuredSections: {
-          detailedContent: 'We need better prior authorization processes for Medicare patients',
-          oneLineSummary: 'Improve prior auth',
+          detailedContent: 'We need better prior authorization processes for Medicare patients. The current system causes significant delays in patient care.',
+          oneLineSummary: 'Improve prior auth for Medicare patients',
           corePosition: 'Support reform',
           keyRecommendations: ['Streamline processes', 'Reduce delays'],
           mainConcerns: ['Patient access', 'Administrative burden'],
           notableExperiences: ['Delayed treatment for 3 months'],
-          keyQuotations: ['Prior auth is broken'],
-          commenterProfile: 'Healthcare provider'
+          keyQuotations: ['Prior auth is broken', 'Patients suffer from delays'],
+          commenterProfile: 'Healthcare provider with 20 years experience'
         },
         entities: [
           { category: 'Government Agencies', label: 'Medicare' },
@@ -72,14 +72,14 @@ describe('SearchEngine', () => {
         date: '2024-01-02',
         location: 'CA',
         structuredSections: {
-          detailedContent: 'Nurse staffing ratios are critical for patient safety',
-          oneLineSummary: 'Support staffing ratios',
+          detailedContent: 'Nurse staffing ratios are critical for patient safety. Without adequate staffing, nurses experience burnout and patients receive substandard care.',
+          oneLineSummary: 'Support mandated nurse staffing ratios',
           corePosition: 'Mandate ratios',
           keyRecommendations: ['Set minimum ratios', 'Monitor compliance'],
           mainConcerns: ['Patient safety', 'Nurse burnout'],
           notableExperiences: ['Unsafe conditions due to understaffing'],
-          keyQuotations: ['We need mandated ratios'],
-          commenterProfile: 'Registered nurse'
+          keyQuotations: ['We need mandated ratios', 'Patient safety depends on staffing'],
+          commenterProfile: 'Registered nurse in acute care'
         },
         entities: [
           { category: 'Healthcare Organizations', label: 'AMA' }
@@ -99,14 +99,14 @@ describe('SearchEngine', () => {
         date: '2024-01-03',
         location: 'TX',
         structuredSections: {
-          detailedContent: 'We should deny this proposal as it will harm patients',
-          oneLineSummary: 'Oppose proposal',
+          detailedContent: 'We should deny this proposal as it will harm patients and increase costs for everyone involved.',
+          oneLineSummary: 'Oppose proposal due to patient harm',
           corePosition: 'Strong opposition',
           keyRecommendations: ['Reject proposal', 'Start over'],
           mainConcerns: ['Patient harm', 'Cost increases'],
           notableExperiences: [],
           keyQuotations: ['This will hurt vulnerable populations'],
-          commenterProfile: 'Patient advocate'
+          commenterProfile: 'Patient advocate and caregiver'
         },
         entities: [],
         themeScores: {
@@ -164,8 +164,8 @@ describe('SearchEngine', () => {
     });
   });
 
-  describe('searchComments', () => {
-    it('should find comments by keywords', () => {
+  describe('searchComments with new consistent format', () => {
+    it('should always return overview fields', () => {
       const result = engine.searchComments(testComments, {
         query: {
           keywords: ['prior', 'authorization'],
@@ -176,7 +176,38 @@ describe('SearchEngine', () => {
       });
 
       expect(result.totalCount).toBe(1);
-      expect(result.results[0].commentId).toBe('1');
+      const firstResult = result.results[0];
+      
+      // Check basic fields always present
+      expect(firstResult.commentId).toBe('1');
+      expect(firstResult.submitter).toBe('Dr. Smith');
+      expect(firstResult.submitterType).toBe('Physician');
+      expect(firstResult.date).toBe('2024-01-01');
+      
+      // Check overview fields
+      expect(firstResult.fields).toBeDefined();
+      expect(firstResult.fields!.oneLineSummary).toBe('Improve prior auth for Medicare patients');
+      expect(firstResult.fields!.commenterProfile).toBe('Healthcare provider with 20 years experience');
+      expect(firstResult.fields!.keyQuotations).toEqual(['Prior auth is broken', 'Patients suffer from delays']);
+      
+      // Check context snippet
+      expect(firstResult.fields!.contextSnippet).toBeDefined();
+      expect(firstResult.fields!.contextSnippet).toContain('prior authorization');
+    });
+
+    it('should find comments by keywords', () => {
+      const result = engine.searchComments(testComments, {
+        query: {
+          keywords: ['staffing', 'ratios'],
+          entities: [],
+          themes: [],
+          exclude: []
+        }
+      });
+
+      expect(result.totalCount).toBe(1);
+      expect(result.results[0].commentId).toBe('2');
+      expect(result.results[0].fields!.contextSnippet).toContain('staffing ratios');
     });
 
     it('should exclude comments with excluded terms', () => {
@@ -234,7 +265,7 @@ describe('SearchEngine', () => {
       expect(result.results[0].commentId).toBe('1');
     });
 
-    it('should search multiple fields', () => {
+    it('should search multiple fields when specified', () => {
       const result = engine.searchComments(testComments, {
         query: {
           keywords: ['burnout'],
@@ -250,43 +281,6 @@ describe('SearchEngine', () => {
 
       expect(result.totalCount).toBe(1);
       expect(result.results[0].commentId).toBe('2');
-    });
-
-    it('should return snippets by default', () => {
-      const result = engine.searchComments(testComments, {
-        query: {
-          keywords: ['prior', 'authorization'],
-          entities: [],
-          themes: [],
-          exclude: []
-        }
-      });
-
-      expect(result.results[0].snippets).toBeDefined();
-      expect(result.results[0].snippets!.length).toBeGreaterThan(0);
-      expect(result.results[0].snippets![0].field).toBe('detailedContent');
-    });
-
-    it('should return fields when requested', () => {
-      const result = engine.searchComments(testComments, {
-        query: {
-          keywords: ['prior'],
-          entities: [],
-          themes: [],
-          exclude: []
-        },
-        returnType: 'fields',
-        returnFields: {
-          detailedContent: true,
-          keyRecommendations: true,
-          themeScores: true
-        }
-      });
-
-      expect(result.results[0].fields).toBeDefined();
-      expect(result.results[0].fields!.detailedContent).toContain('prior authorization');
-      expect(result.results[0].fields!.keyRecommendations).toHaveLength(2);
-      expect(result.results[0].fields!.themeScores).toEqual({ '2.1': 1, '2.1.1': 1 });
     });
 
     it('should handle pagination', () => {
@@ -346,6 +340,77 @@ describe('SearchEngine', () => {
       // Comment 1 should score highest due to keyword, entity, and theme matches
       expect(result.results[0].commentId).toBe('1');
     });
+
+    it('should handle comments without keywords in contextSnippet', () => {
+      const result = engine.searchComments(testComments, {
+        query: {
+          keywords: [],
+          entities: [{ category: 'Healthcare Organizations', label: 'AMA' }],
+          themes: [],
+          exclude: []
+        }
+      });
+
+      expect(result.totalCount).toBe(1);
+      expect(result.results[0].commentId).toBe('2');
+      // No keywords, so no context snippet
+      expect(result.results[0].fields!.contextSnippet).toBeUndefined();
+    });
+  });
+
+  describe('regex special characters handling', () => {
+    it('should handle regex special characters in scoring', () => {
+      const specialCharComment: Comment = {
+        id: '6',
+        documentId: 'DOCKET-1',
+        submitter: 'Test User',
+        submitterType: 'Individual',
+        date: '2024-01-06',
+        location: 'CA',
+        structuredSections: {
+          detailedContent: 'This discusses TEFCA (trusted exchange framework) and config[prod].json file',
+          oneLineSummary: 'TEFCA and config discussion',
+          keyQuotations: ['TEFCA (trusted exchange framework)', 'config[prod].json']
+        },
+        entities: [],
+        themeScores: {},
+        hasAttachments: false,
+        wordCount: 50
+      };
+
+      // Test parentheses don't break regex
+      const result1 = engine.searchComments([specialCharComment], {
+        query: {
+          keywords: ['TEFCA (trusted exchange framework)'],
+          entities: [],
+          themes: [],
+          exclude: []
+        }
+      });
+      expect(result1.totalCount).toBe(1);
+
+      // Test brackets don't break regex  
+      const result2 = engine.searchComments([specialCharComment], {
+        query: {
+          keywords: ['config[prod]'],
+          entities: [],
+          themes: [],
+          exclude: []
+        }
+      });
+      expect(result2.totalCount).toBe(1);
+
+      // Test dots don't break regex
+      const result3 = engine.searchComments([specialCharComment], {
+        query: {
+          keywords: ['config[prod].json'],
+          entities: [],
+          themes: [],
+          exclude: []
+        }
+      });
+      expect(result3.totalCount).toBe(1);
+    });
   });
 
   describe('edge cases', () => {
@@ -391,7 +456,7 @@ describe('SearchEngine', () => {
       expect(result.results).toHaveLength(0);
     });
 
-    it('should handle comments with missing fields', () => {
+    it('should handle comments with missing overview fields', () => {
       const incompleteComment: Comment = {
         id: '5',
         documentId: 'DOCKET-1',
@@ -400,7 +465,7 @@ describe('SearchEngine', () => {
         date: '2024-01-05',
         location: 'Unknown',
         structuredSections: {
-          detailedContent: 'Test content',
+          detailedContent: 'Test content with important information',
           oneLineSummary: '',
           corePosition: '',
           keyRecommendations: [],
@@ -412,7 +477,7 @@ describe('SearchEngine', () => {
         entities: [],
         themeScores: {},
         hasAttachments: false,
-        wordCount: 0
+        wordCount: 10
       };
 
       const result = engine.searchComments([incompleteComment], {
@@ -421,19 +486,23 @@ describe('SearchEngine', () => {
           entities: [],
           themes: [],
           exclude: []
-        },
-        returnType: 'fields',
-        returnFields: {
-          detailedContent: true,
-          submitter: true,
-          keyRecommendations: true
         }
       });
 
       expect(result.totalCount).toBe(1);
-      expect(result.results[0].fields!.detailedContent).toBe('Test content');
-      expect(result.results[0].fields!.submitter).toBe('Test User');
-      expect(result.results[0].fields!.keyRecommendations).toEqual([]);
+      
+      // Basic fields should still be present
+      expect(result.results[0].submitter).toBe('Test User');
+      expect(result.results[0].submitterType).toBe('Individual');
+      
+      // Empty string fields should not be included
+      expect(result.results[0].fields!.oneLineSummary).toBeUndefined();
+      expect(result.results[0].fields!.commenterProfile).toBeUndefined();
+      // Empty array for keyQuotations is still included
+      expect(result.results[0].fields!.keyQuotations).toEqual([]);
+      
+      // Context snippet should still work
+      expect(result.results[0].fields!.contextSnippet).toContain('Test content');
     });
   });
 });

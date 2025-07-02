@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { DataFetcher } from '../../src/data/fetcher';
 
 // Mock fetch globally
@@ -6,6 +6,9 @@ const mockFetch = mock(() => Promise.resolve({
   ok: true,
   status: 200,
   statusText: 'OK',
+  headers: {
+    get: (name: string) => null
+  },
   json: () => Promise.resolve({})
 }));
 
@@ -15,12 +18,39 @@ describe('DataFetcher', () => {
   let fetcher: DataFetcher;
 
   beforeEach(() => {
+    // Set a test-specific cache directory
+    process.env.DISK_CACHE_DIR = `/tmp/test-cache-${Date.now()}-${Math.random()}`;
+    
+    // Clear the mock completely
+    mockFetch.mockClear();
+    mockFetch.mockReset();
+    
+    // Reset the default mock implementation
+    mockFetch.mockImplementation(() => Promise.resolve({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: (name: string) => null
+      },
+      json: () => Promise.resolve({})
+    }));
+    
     fetcher = new DataFetcher({
       baseUrl: 'https://example.com',
       cacheSize: 10,
       cacheTTL: 5000
     });
-    mockFetch.mockClear();
+    
+    // Clear any existing cache
+    fetcher.clearCache();
+  });
+  
+  afterEach(() => {
+    // Clean up the test cache directory
+    if (process.env.DISK_CACHE_DIR) {
+      delete process.env.DISK_CACHE_DIR;
+    }
   });
 
   describe('constructor', () => {
@@ -59,6 +89,9 @@ describe('DataFetcher', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: {
+          get: (name: string) => null
+        },
         json: () => Promise.resolve(mockMeta)
       });
 
@@ -75,6 +108,9 @@ describe('DataFetcher', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: {
+          get: (name: string) => null
+        },
         json: () => Promise.resolve(mockMeta)
       });
 
@@ -93,6 +129,9 @@ describe('DataFetcher', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        headers: {
+          get: (name: string) => null
+        },
         json: () => Promise.reject(new Error('Not JSON'))
       });
 
@@ -117,6 +156,9 @@ describe('DataFetcher', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: {
+          get: (name: string) => null
+        },
         json: () => Promise.resolve(mockComments)
       });
 
@@ -140,6 +182,9 @@ describe('DataFetcher', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: {
+          get: (name: string) => null
+        },
         json: () => Promise.resolve(mockMeta)
       });
 
@@ -166,6 +211,9 @@ describe('DataFetcher', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: {
+          get: (name: string) => null
+        },
         json: () => Promise.resolve(mockData)
       });
 
