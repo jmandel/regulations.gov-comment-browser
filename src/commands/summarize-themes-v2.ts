@@ -9,6 +9,7 @@ import { parseJsonResponse } from "../lib/json-parser";
 import { runPool } from "../lib/worker-pool";
 import { getTaskConfig, getTaskModel, getBatchOptions } from "../lib/batch-config";
 import { createEvenBatches } from "../lib/batch-processor";
+import { getRepresentativeCommentIds } from "../lib/comment-processing";
 
 export const summarizeThemesV2Command = new Command("summarize-themes-v2")
   .description("Generate theme summaries from pre-extracted theme-specific content")
@@ -20,6 +21,8 @@ export const summarizeThemesV2Command = new Command("summarize-themes-v2")
   .option("-d, --debug", "Enable debug output")
   .option("-c, --concurrency <n>", "Number of parallel API calls (default: 3)", parseInt)
   .option("-m, --model <model>", "AI model to use (overrides config)")
+  .option("--filter-duplicates", "Only use extracts from representative comments (filters form letters)")
+  .option("--similarity-threshold <n>", "Similarity threshold for duplicate filtering (default: 0.8)", parseFloat)
   .action(summarizeThemesV2);
 
 async function summarizeThemesV2(documentId: string, options: any) {
@@ -34,11 +37,19 @@ async function summarizeThemesV2(documentId: string, options: any) {
   console.log(`📝 Summarizing themes (v2) for document ${documentId}`);
   console.log(`   Using model: ${effectiveModel}`);
   
+  // Optionally filter to representative comments only
+  let representativeIds: Set<string> | undefined;
+  if (options.filterDuplicates) {
+    const threshold = options.similarityThreshold || 0.8;
+    representativeIds = await getRepresentativeCommentIds(db, threshold);
+    console.log(`🔍 Using only representative comments for filtering (${representativeIds.size} comments)`);
+  }
+  
   // Load task configuration  
   const taskConfig = getTaskConfig('summarizeThemes', effectiveModel);
   const minComments = options.minComments || taskConfig.thresholds?.minCommentsPerTheme || 5;
   
-  // Get themes with sufficient extracts
+  // Get themes with sufficient extracts (optionally filtered to representative comments)
   let themeQuery = `
     SELECT 
       th.code,
@@ -47,10 +58,21 @@ async function summarizeThemesV2(documentId: string, options: any) {
       COUNT(DISTINCT cte.comment_id) as extract_count
     FROM theme_hierarchy th
     INNER JOIN comment_theme_extracts cte ON th.code = cte.theme_code
+  `;
+  const queryParams: any[] = [];
+  
+  // Add filter for representative comments if requested
+  if (representativeIds && representativeIds.size > 0) {
+    const placeholders = Array.from(representativeIds).map(() => '?').join(',');
+    themeQuery += ` WHERE cte.comment_id IN (${placeholders})`;
+    queryParams.push(...Array.from(representativeIds));
+  }
+  
+  themeQuery += `
     GROUP BY th.code
     HAVING extract_count >= ?
   `;
-  const queryParams: any[] = [minComments];
+  queryParams.push(minComments);
   
   if (options.themes) {
     const themeCodes = options.themes.split(',').map((t: string) => t.trim());
@@ -103,8 +125,8 @@ async function summarizeThemesV2(documentId: string, options: any) {
       console.log(`   Extracts: ${theme.extract_count}`);
       
       try {
-        // Get all extracts for this theme with commenter metadata
-        const extracts = db.prepare(`
+        // Get extracts for this theme with commenter metadata (optionally filtered to representatives)
+        let extractQuery = `
           SELECT 
             cte.comment_id,
             cte.extract_json,
@@ -112,8 +134,19 @@ async function summarizeThemesV2(documentId: string, options: any) {
           FROM comment_theme_extracts cte
           JOIN condensed_comments cc ON cte.comment_id = cc.comment_id
           WHERE cte.theme_code = ?
-          ORDER BY cte.comment_id
-        `).all(theme.code) as {
+        `;
+        const extractParams: any[] = [theme.code];
+        
+        // Add filter for representative comments if requested
+        if (representativeIds && representativeIds.size > 0) {
+          const placeholders = Array.from(representativeIds).map(() => '?').join(',');
+          extractQuery += ` AND cte.comment_id IN (${placeholders})`;
+          extractParams.push(...Array.from(representativeIds));
+        }
+        
+        extractQuery += ` ORDER BY cte.comment_id`;
+        
+        const extracts = db.prepare(extractQuery).all(...extractParams) as {
           comment_id: string;
           extract_json: string;
           structured_sections: string;

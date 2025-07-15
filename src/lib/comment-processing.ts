@@ -41,22 +41,121 @@ export function loadComments(db: Database, limit?: number): {
   return { comments, attachments, total };
 }
 
+// Text similarity calculation using Jaccard similarity on words
+function calculateJaccardSimilarity(text1: string, text2: string): number {
+  const normalize = (text: string) => 
+    text.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 2); // Filter out short words
+  
+  const words1 = new Set(normalize(text1));
+  const words2 = new Set(normalize(text2));
+  
+  const intersection = new Set([...words1].filter(x => words2.has(x)));
+  const union = new Set([...words1, ...words2]);
+  
+  return intersection.size / union.size;
+}
+
+// Cluster similar comments and return representative IDs
+export async function getRepresentativeCommentIds(
+  db: Database, 
+  threshold: number = 0.8
+): Promise<Set<string>> {
+  console.log(`🔍 Clustering comments to filter duplicates (threshold: ${threshold})`);
+  
+  // Load all raw comments and attachments
+  const { comments: rawComments, attachments } = loadComments(db);
+  console.log(`📊 Loaded ${rawComments.length} raw comments`);
+  
+  // Enrich comments to get full content including attachments
+  const enrichedComments: EnrichedComment[] = [];
+  
+  for (const rawComment of rawComments) {
+    const enriched = await enrichComment(rawComment, attachments, { includePdfs: true });
+    if (enriched) {
+      enrichedComments.push(enriched);
+    }
+  }
+  
+  console.log(`📊 Enriched ${enrichedComments.length} comments for clustering`);
+  
+  // Cluster similar comments
+  const clusters = new Map<number, EnrichedComment[]>();
+  let nextClusterId = 0;
+  
+  for (const comment of enrichedComments) {
+    const commentText = comment.content.trim();
+    let assigned = false;
+    
+    // Check if this comment belongs to any existing cluster
+    for (const [clusterId, clusterComments] of clusters.entries()) {
+      // Use longest comment as representative for comparison
+      const representative = clusterComments.reduce((longest, current) => 
+        current.content.length > longest.content.length ? current : longest
+      );
+      const representativeText = representative.content.trim();
+      
+      const similarity = calculateJaccardSimilarity(commentText, representativeText);
+      
+      if (similarity >= threshold) {
+        clusterComments.push(comment);
+        assigned = true;
+        break;
+      }
+    }
+    
+    // If not assigned to any cluster, create a new one
+    if (!assigned) {
+      clusters.set(nextClusterId++, [comment]);
+    }
+  }
+  
+  // Get representative IDs (longest comment from each cluster)
+  const representativeIds = new Set<string>();
+  let totalDuplicates = 0;
+  
+  for (const [clusterId, clusterComments] of clusters.entries()) {
+    const representative = clusterComments.reduce((longest, current) => 
+      current.content.length > longest.content.length ? current : longest
+    );
+    representativeIds.add(representative.id);
+    
+    if (clusterComments.length > 1) {
+      totalDuplicates += clusterComments.length - 1;
+    }
+  }
+  
+  const reductionPercent = ((enrichedComments.length - representativeIds.size) / enrichedComments.length * 100).toFixed(1);
+  console.log(`📉 Clustering complete: ${enrichedComments.length} → ${representativeIds.size} comments (${reductionPercent}% reduction)`);
+  console.log(`🔗 Found ${clusters.size} clusters, filtered ${totalDuplicates} duplicates`);
+  
+  return representativeIds;
+}
+
 // Load condensed comments
-export function loadCondensedComments(db: Database, limit?: number): EnrichedComment[] {
-  const query = limit
-    ? `SELECT c.id, cc.structured_sections, c.attributes_json 
-       FROM comments c 
-       JOIN condensed_comments cc ON c.id = cc.comment_id 
-       WHERE cc.status = 'completed' 
-       LIMIT ?`
-    : `SELECT c.id, cc.structured_sections, c.attributes_json 
+export function loadCondensedComments(db: Database, limit?: number, filterIds?: Set<string>): EnrichedComment[] {
+  let query = `SELECT c.id, cc.structured_sections, c.attributes_json 
        FROM comments c 
        JOIN condensed_comments cc ON c.id = cc.comment_id 
        WHERE cc.status = 'completed'`;
   
-  const rows = limit
-    ? db.prepare(query).all(limit)
-    : db.prepare(query).all();
+  const params: any[] = [];
+  
+  // Add filter for specific comment IDs if provided
+  if (filterIds && filterIds.size > 0) {
+    const placeholders = Array.from(filterIds).map(() => '?').join(',');
+    query += ` AND c.id IN (${placeholders})`;
+    params.push(...Array.from(filterIds));
+  }
+  
+  if (limit) {
+    query += ` LIMIT ?`;
+    params.push(limit);
+  }
+  
+  const rows = db.prepare(query).all(...params);
   
   return rows.map((row: any) => {
     const attrs = JSON.parse(row.attributes_json) as CommentAttributes;

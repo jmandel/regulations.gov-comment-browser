@@ -137,7 +137,7 @@ async function discoverEntities(
     `<comment id="${c.id}">\n${c.content}\n</comment>`
   ).join("\n\n");
   
-  const prompt = `You are analyzing public comments on a proposed CMS rule. Based on the following ${selectedComments.length} comment excerpts (${totalWords.toLocaleString()} words total), create a comprehensive taxonomy of entities mentioned or relevant to this domain.
+  const prompt = `You are analyzing public comments on a regultions.gov docket. Based on the following ${selectedComments.length} comment excerpts (${totalWords.toLocaleString()} words total), create a comprehensive taxonomy of entities mentioned or relevant to this domain.
 
 Generate a JSON taxonomy with the following structure:
 {

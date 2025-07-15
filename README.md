@@ -74,11 +74,20 @@ Build hierarchical theme taxonomy:
 bun run discover-themes CMS-2025-0050-0031
 ```
 
+**Filter out form letters and duplicates:**
+```bash
+bun run discover-themes CMS-2025-0050-0031 --filter-duplicates
+```
+
 Options:
 - `--limit <n>` - Use only first N condensed comments
 - `--batch-limit <n>` - Word count to trigger batching (default: 200000)
 - `--batch-size <n>` - Target words per batch (default: 150000)
+- `--filter-duplicates` - Filter out duplicate/form letter comments using clustering
+- `--similarity-threshold <n>` - Similarity threshold for duplicate filtering (default: 0.8)
 - `--debug` - Save intermediate results
+
+**Duplicate Filtering**: When `--filter-duplicates` is enabled, the system clusters similar comments based on full content (including PDFs) and selects only the longest representative from each cluster. This removes form letter campaigns while preserving unique content. Lower thresholds (e.g., 0.75) are more aggressive at filtering duplicates.
 
 **Simplified Architecture**: Theme discovery now works with plain text responses instead of complex JSON structures, improving reliability and reducing parsing errors. The system automatically extracts multiple quotes per theme with proper citation tracking.
 
@@ -86,7 +95,7 @@ Options:
 
 Extract named entities and build taxonomy:
 ```bash
-bun run discover-entities CMS-2025-0050-0031
+bun run discover-entities-v2 CMS-2025-0050-0031
 ```
 
 Options: Same as discover-themes
@@ -108,16 +117,24 @@ Options:
 
 Generate detailed narrative summaries for themes:
 ```bash
-bun run summarize-themes CMS-2025-0050-0031
+bun run summarize-themes-v2 CMS-2025-0050-0031
+```
+
+**Filter to representative comments only:**
+```bash
+bun run summarize-themes-v2 CMS-2025-0050-0031 --filter-duplicates
 ```
 
 Options:
-- `--themes <list>` - Comma-separated theme IDs to analyze
+- `--themes <codes>` - Comma-separated theme codes to analyze
 - `--min-comments <n>` - Minimum comments required for a theme (default: 5)
-- `--depth <n>` - Maximum theme hierarchy depth to summarize (default: 2)
+- `--filter-duplicates` - Only use extracts from representative comments (filters form letters)
+- `--similarity-threshold <n>` - Similarity threshold for duplicate filtering (default: 0.8)
 - `--batch-limit <n>` - Word limit to trigger batching (default: 150000)
 - `--batch-size <n>` - Target words per batch (default: 75000)
 - `--concurrency <n>` - Number of parallel API calls (default: 3)
+
+**Form Letter Filtering**: When enabled, only extracts from representative comments (longest from each cluster) are used for theme summarization. This ensures summaries reflect unique perspectives rather than repetitive form letter content.
 - `--debug` - Save prompts and responses
 
 **Key Features**:
@@ -175,7 +192,7 @@ Each document gets its own SQLite database in `dbs/<document-id>.sqlite` contain
 
 ## Environment Variables
 
-- `GEMINI_API_KEY` - Required for AI features (condense, discover-themes, discover-entities, score-themes)
+- `GEMINI_API_KEY` - Required for AI features (condense, discover-themes, discover-entities-v2, score-themes)
 - `REGSGOV_API_KEY` - For regulations.gov API (defaults to DEMO_KEY)
 
 ## Examples
@@ -187,17 +204,22 @@ Run all steps at once:
 # Run the complete pipeline
 bun run pipeline CMS-2025-0050-0031
 
+# Filter out form letters during theme discovery
+bun run pipeline CMS-2025-0050-0031 --filter-duplicates
+
 # Start from a specific step (e.g., step 3 = discover-themes)
 bun run pipeline CMS-2025-0050-0031 --start-at 3
 
-# With options
-bun run pipeline CMS-2025-0050-0031 --limit-total-comment-load 100 --debug --start-at 2
+# With options and duplicate filtering
+bun run pipeline CMS-2025-0050-0031 --limit-total-comment-load 100 --debug --start-at 2 --filter-duplicates --similarity-threshold 0.75
 
 # With crash recovery (default: 10 max crashes)
 bun run pipeline CMS-2025-0050-0031 --max-crashes 20
 ```
 
 **Crash Recovery**: The pipeline automatically retries from the failed step if it crashes (e.g., due to API errors). It will retry up to `--max-crashes` times (default: 10) before giving up. Each retry waits 5 seconds before restarting.
+
+**Form Letter Filtering**: Use `--filter-duplicates` to automatically detect and filter out form letter campaigns during theme discovery. This dramatically improves theme quality by focusing on unique content rather than repetitive submissions. Adjust `--similarity-threshold` (default: 0.8) to control filtering aggressiveness.
 
 Or run individual steps:
 ```bash
@@ -211,7 +233,7 @@ bun run condense CMS-2025-0050-0031
 bun run discover-themes CMS-2025-0050-0031
 
 # Extract entities
-bun run discover-entities CMS-2025-0050-0031
+bun run discover-entities-v2 CMS-2025-0050-0031
 
 # Score all themes
 bun run score-themes CMS-2025-0050-0031

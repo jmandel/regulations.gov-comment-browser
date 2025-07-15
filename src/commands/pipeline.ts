@@ -5,7 +5,7 @@ import { condenseCommand } from "./condense";
 import { discoverThemesCommand } from "./discover-themes";
 import { extractThemeContentCommand } from "./extract-theme-content";
 import { summarizeThemesV2Command } from "./summarize-themes-v2";
-import { discoverEntitiesCommand } from "./discover-entities";
+import { discoverEntitiesV2Command } from "./discover-entities-v2";
 import { buildWebsiteCommand } from "../website-build-script";
 
 export const pipelineCommand = new Command("pipeline")
@@ -19,6 +19,8 @@ export const pipelineCommand = new Command("pipeline")
   .option("-c, --concurrency <N>", "Number of concurrent operations")
   .option("--max-crashes <N>", "Maximum number of crashes before giving up (default: 10)", parseInt)
   .option("-m, --model <model>", "AI model to use (gemini-pro, gemini-flash, gemini-flash-lite, claude)")
+  .option("--filter-duplicates", "Filter out duplicate/form letter comments during theme discovery")
+  .option("--similarity-threshold <N>", "Similarity threshold for duplicate filtering (default: 0.8)", parseFloat)
   .action(async (sourceArg: string, options: any) => {
     // Detect if first argument is a CSV path (contains '.' or '/' or ends with .csv)
     const isCsv = sourceArg.includes("/") || sourceArg.toLowerCase().endsWith(".csv");
@@ -76,6 +78,8 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.debug ? ['--debug'] : []),
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
+            ...(options.filterDuplicates ? ['--filter-duplicates'] : []),
+            ...(options.similarityThreshold ? ['--similarity-threshold', options.similarityThreshold] : []),
           ]);
         }
       },
@@ -104,6 +108,8 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.debug ? ['--debug'] : []),
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
+            ...(options.filterDuplicates ? ['--filter-duplicates'] : []),
+            ...(options.similarityThreshold ? ['--similarity-threshold', options.similarityThreshold] : []),
           ]);
         }
       },
@@ -112,7 +118,7 @@ export const pipelineCommand = new Command("pipeline")
         name: "Discovering entities",
         icon: "🏷️",
         execute: async () => {
-          await discoverEntitiesCommand.parseAsync([
+          await discoverEntitiesV2Command.parseAsync([
             'bun', 'cli.ts', 
             documentId,
             ...(options.debug ? ['--debug'] : []),

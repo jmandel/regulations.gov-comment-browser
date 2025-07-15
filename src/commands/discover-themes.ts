@@ -3,7 +3,7 @@ import { openDb, withTransaction } from "../lib/database";
 import type { Database } from "bun:sqlite";
 import { initDebug } from "../lib/debug";
 import { AIClient } from "../lib/ai-client";
-import { loadCondensedComments, parseThemeHierarchy } from "../lib/comment-processing";
+import { loadCondensedComments, parseThemeHierarchy, getRepresentativeCommentIds } from "../lib/comment-processing";
 import { createEvenBatches, DEFAULT_BATCH_OPTIONS } from "../lib/batch-processor";
 import { THEME_DISCOVERY_PROMPT, THEME_MERGE_PROMPT } from "../prompts/theme-discovery";
 import { TaskQueue, buildHierarchicalTasks, type Task } from "../lib/task-queue";
@@ -19,6 +19,8 @@ export const discoverThemesCommand = new Command("discover-themes")
   .option("-c, --concurrency <n>", "Number of parallel API calls (default: 5)", parseInt)
   .option("-m, --model <model>", "AI model to use (overrides config)")
   .option("--merge-width <n>", "Number of taxonomies to merge at once (default: 10)", parseInt)
+  .option("--filter-duplicates", "Filter out duplicate comments using clustering")
+  .option("--similarity-threshold <n>", "Similarity threshold for duplicate filtering (default: 0.8)", parseFloat)
   .action(discoverThemes);
 
 async function discoverThemes(documentId: string, options: any) {
@@ -41,14 +43,21 @@ async function discoverThemes(documentId: string, options: any) {
     return;
   }
   
-  // Load condensed comments
-  const comments = loadCondensedComments(db, options.limit);
+  // Optionally filter duplicates using clustering
+  let filterIds: Set<string> | undefined;
+  if (options.filterDuplicates) {
+    const threshold = options.similarityThreshold || 0.8;
+    filterIds = await getRepresentativeCommentIds(db, threshold);
+  }
+  
+  // Load condensed comments (filtered if requested)
+  const comments = loadCondensedComments(db, options.limit, filterIds);
   if (comments.length === 0) {
     console.log("❌ No condensed comments found. Run 'condense' command first.");
     return;
   }
   
-  console.log(`📊 Loaded ${comments.length} condensed comments`);
+  console.log(`📊 Loaded ${comments.length} condensed comments${filterIds ? ' (filtered for duplicates)' : ''}`);
   
   // Load task configuration
   const taskConfig = getTaskConfig('discoverThemes', options.model);
