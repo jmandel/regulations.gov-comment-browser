@@ -101,12 +101,16 @@ QUERY SYNTAX:
   Examples: theme:2.1, theme:3.1.2
   Note: Use listThemes first to discover available theme codes
   
+- Submitter type filters: Use submitterType:type to find comments from specific types of submitters
+  Examples: submitterType:[use getSubmitterTypes to see options]
+  Note: IMPORTANT - Use getSubmitterTypes first to see valid types. Invalid types will return an error.
+  
 - Exclusions: Use -term to exclude comments containing specific words
   Examples: -deny, -"not support"
   
 - Combinations: All filters use AND logic
-  Example: "prior authorization" entity:AMA theme:2.1 -deny
-  This finds comments about prior authorization from the AMA on theme 2.1 that don't contain "deny"
+  Example: "prior authorization" entity:AMA theme:2.1
+  This finds comments about prior authorization from the AMA on theme 2.1
 
 WHAT SEARCH RETURNS:
 Every result includes these fields for consistent browsing:
@@ -167,6 +171,35 @@ BEST PRACTICES:
 
         // Parse query
         const parsedQuery = parseQuery(params.query);
+
+        // Validate submitter types if any are specified
+        if (parsedQuery.submitterTypes.length > 0) {
+          // Get all valid submitter types
+          const validTypes = new Set<string>();
+          for (const comment of comments) {
+            validTypes.add(comment.submitterType.toLowerCase());
+          }
+          
+          // Check each requested submitter type
+          const invalidTypes: string[] = [];
+          for (const requestedType of parsedQuery.submitterTypes) {
+            if (!validTypes.has(requestedType.toLowerCase())) {
+              invalidTypes.push(requestedType);
+            }
+          }
+          
+          if (invalidTypes.length > 0) {
+            // Get sorted list of valid types for error message
+            const sortedValidTypes = Array.from(validTypes)
+              .sort((a, b) => a.localeCompare(b));
+            
+            throw new Error(
+              `Invalid submitter type(s): ${invalidTypes.join(', ')}. ` +
+              `Valid submitter types are: ${sortedValidTypes.join(', ')}. ` +
+              `Use getSubmitterTypes to see all options with counts.`
+            );
+          }
+        }
 
         // Search
         const results = searchEngine.searchComments(comments, {
@@ -751,6 +784,82 @@ REMEMBER: Theme summaries are AI interpretations that compress thousands of uniq
         };
       } catch (error) {
         throw new Error(`Failed to get theme summary: ${error}`);
+      }
+    }
+  );
+
+  server.registerTool(
+    'getSubmitterTypes',
+    {
+      title: 'Get Submitter Types',
+      description: `Get an alphabetized list of all unique submitter types found in the comments.
+
+This tool returns a list of all submitter types (e.g., Physician, Patient, Healthcare Organization) that appear in the comments, along with the count of comments from each type.
+
+USE THIS TOOL TO:
+1. Discover what types of stakeholders have submitted comments
+2. Find the exact submitter type values to use with submitterType: filters in searchComments
+3. Understand the distribution of comments across different stakeholder types
+4. Identify which types of submitters are most active in the comment process
+
+TIPS:
+- Use exact submitter type values from this list in your submitterType: search filters
+- Submitter type matching is case-insensitive in searches
+- Invalid submitter types in search queries will return an error with the list of valid types`,
+      inputSchema: {
+        docketId: z.string().describe('The full docket ID (e.g., "CMS-2025-0050-0031")'),
+      },
+    },
+    async (params) => {
+      try {
+        const comments = await fetcher.getComments(params.docketId);
+        
+        // Count submitter types
+        const typeCounts = new Map<string, number>();
+        for (const comment of comments) {
+          const type = comment.submitterType || 'Unknown';
+          typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+        }
+        
+        // Convert to array and sort alphabetically
+        const submitterTypes = Array.from(typeCounts.entries())
+          .map(([type, count]) => ({ type, count }))
+          .sort((a, b) => a.type.localeCompare(b.type));
+        
+        // Get docket metadata
+        const meta = await fetcher.getDocketMeta(params.docketId);
+        
+        // Generate suggestions
+        const suggestions = [];
+        
+        // Find most common types
+        const topTypes = [...submitterTypes]
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+        
+        if (topTypes.length > 0) {
+          suggestions.push(`Most common types: ${topTypes.map(t => `${t.type} (${t.count})`).join(', ')}`);
+        }
+        
+        suggestions.push('Use submitterType values in searchComments with submitterType:"Type" syntax (case-insensitive)');
+        suggestions.push('Combine with other filters to find specific perspectives');
+        
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              docketInfo: {
+                documentId: meta.documentId,
+                totalComments: meta.stats.totalComments
+              },
+              submitterTypes,
+              totalTypes: submitterTypes.length,
+              suggestions
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        throw new Error(`Failed to get submitter types: ${error}`);
       }
     }
   );

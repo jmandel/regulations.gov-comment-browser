@@ -42,7 +42,7 @@ export function loadComments(db: Database, limit?: number): {
 }
 
 // Text similarity calculation using Jaccard similarity on words
-function calculateJaccardSimilarity(text1: string, text2: string): number {
+export function calculateJaccardSimilarity(text1: string, text2: string): number {
   const normalize = (text: string) => 
     text.toLowerCase()
       .replace(/[^\w\s]/g, ' ')
@@ -58,11 +58,15 @@ function calculateJaccardSimilarity(text1: string, text2: string): number {
   return intersection.size / union.size;
 }
 
-// Cluster similar comments and return representative IDs
-export async function getRepresentativeCommentIds(
+// Cluster similar comments and return detailed cluster info
+export async function getDetailedClusterInfo(
   db: Database, 
   threshold: number = 0.8
-): Promise<Set<string>> {
+): Promise<{
+  clusters: Map<number, EnrichedComment[]>;
+  representativeIds: Set<string>;
+  enrichedComments: EnrichedComment[];
+}> {
   console.log(`🔍 Clustering comments to filter duplicates (threshold: ${threshold})`);
   
   // Load all raw comments and attachments
@@ -130,6 +134,50 @@ export async function getRepresentativeCommentIds(
   const reductionPercent = ((enrichedComments.length - representativeIds.size) / enrichedComments.length * 100).toFixed(1);
   console.log(`📉 Clustering complete: ${enrichedComments.length} → ${representativeIds.size} comments (${reductionPercent}% reduction)`);
   console.log(`🔗 Found ${clusters.size} clusters, filtered ${totalDuplicates} duplicates`);
+  
+  return { clusters, representativeIds, enrichedComments };
+}
+
+// Cluster similar comments and return representative IDs
+// Disaggregates clusters smaller than 4 comments (treats all members as individuals)
+export async function getRepresentativeCommentIds(
+  db: Database, 
+  threshold: number = 0.8,
+  minClusterSize: number = 4
+): Promise<Set<string>> {
+  const { clusters } = await getDetailedClusterInfo(db, threshold);
+  
+  const representativeIds = new Set<string>();
+  let totalDuplicates = 0;
+  let disaggregatedClusters = 0;
+  
+  for (const [clusterId, clusterComments] of clusters.entries()) {
+    if (clusterComments.length >= minClusterSize) {
+      // Large cluster: use only the representative (longest comment)
+      const representative = clusterComments.reduce((longest, current) => 
+        current.content.length > longest.content.length ? current : longest
+      );
+      representativeIds.add(representative.id);
+      totalDuplicates += clusterComments.length - 1;
+    } else {
+      // Small cluster: disaggregate and include all members
+      for (const comment of clusterComments) {
+        representativeIds.add(comment.id);
+      }
+      if (clusterComments.length > 1) {
+        disaggregatedClusters++;
+      }
+    }
+  }
+  
+  const originalTotal = Array.from(clusters.values()).reduce((sum, cluster) => sum + cluster.length, 0);
+  const reductionPercent = ((originalTotal - representativeIds.size) / originalTotal * 100).toFixed(1);
+  
+  console.log(`📉 Clustering complete: ${originalTotal} → ${representativeIds.size} comments (${reductionPercent}% reduction)`);
+  console.log(`🔗 Found ${clusters.size} clusters, filtered ${totalDuplicates} duplicates`);
+  if (disaggregatedClusters > 0) {
+    console.log(`📤 Disaggregated ${disaggregatedClusters} small clusters (all members included)`);
+  }
   
   return representativeIds;
 }

@@ -156,6 +156,17 @@ export class SearchEngine {
       }
     }
 
+    // Check submitterType filters
+    if (query.submitterTypes.length > 0) {
+      const matchesSubmitterType = query.submitterTypes.some(submitterType =>
+        comment.submitterType.toLowerCase() === submitterType.toLowerCase()
+      );
+      
+      if (!matchesSubmitterType) {
+        return false;
+      }
+    }
+
     return true;
   }
 

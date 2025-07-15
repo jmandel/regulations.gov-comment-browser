@@ -2,7 +2,7 @@
   "mcpServers": {
     "regulations-comment-browser": {
       "type": "http",
-      "url": "https://regulations-gov-comment-browser-mcp.fly.dev/mcp"
+      "url": "http://localhost:3000/mcp"
     }
   }
 }

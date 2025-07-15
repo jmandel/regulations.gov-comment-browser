@@ -107,6 +107,7 @@ export interface SearchQuery {
   keywordExpression?: KeywordExpression; // New expression tree
   entities: Array<{category: string; label: string}>;
   themes: string[];
+  submitterTypes: string[];
   exclude: string[];
 }
 

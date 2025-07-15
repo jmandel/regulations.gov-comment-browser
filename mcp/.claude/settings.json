@@ -1,11 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "mcp__regulations-browser__searchComments",
-      "mcp__regulations-browser__getComment",
+      "mcp__regulations-comment-browser__searchComments",
+      "mcp__regulations-comment-browser__getComment",
       "Bash(bun test:*)",
       "Bash(grep:*)",
-      "mcp__regulations-browser__listEntities",
+      "mcp__regulations-comment-browser__listEntities",
       "Bash(bun run:*)",
       "Bash(chmod:*)",
       "Bash(mkdir:*)"

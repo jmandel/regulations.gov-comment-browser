@@ -8,6 +8,7 @@ import { SearchQuery, KeywordExpression } from '../data/types';
  * - Boolean operators: AND (default), OR
  * - Entities: entity:label or entity:"quoted label"
  * - Themes: theme:code (e.g., theme:2.1)
+ * - Submitter types: submitterType:type or submitterType:"quoted type"
  * - Exclusions: -word or -"quoted phrase"
  * 
  * Examples:
@@ -15,12 +16,14 @@ import { SearchQuery, KeywordExpression } from '../data/types';
  * - nurse staffing -shortage entity:"American Nurses Association"
  * - "prior auth" OR "preauthorization" 
  * - medicare AND advantage
+ * - submitterType:[use getSubmitterTypes to see options]
  */
 export function parseQuery(query: string): SearchQuery {
   const result: SearchQuery = {
     keywords: [],
     entities: [],
     themes: [],
+    submitterTypes: [],
     exclude: []
   };
 
@@ -28,11 +31,12 @@ export function parseQuery(query: string): SearchQuery {
     return result;
   }
 
-  // First extract special tokens (entity:, theme:, exclusions)
-  const { cleanQuery, entities, themes, excludes } = extractSpecialTokens(query);
+  // First extract special tokens (entity:, theme:, submitterType:, exclusions)
+  const { cleanQuery, entities, themes, submitterTypes, excludes } = extractSpecialTokens(query);
   
   result.entities = entities;
   result.themes = themes;
+  result.submitterTypes = submitterTypes;
   result.exclude = excludes;
 
   // Parse the remaining query for keywords with OR/AND
@@ -48,16 +52,18 @@ export function parseQuery(query: string): SearchQuery {
 }
 
 /**
- * Extract entity:, theme:, and -exclusion tokens from query
+ * Extract entity:, theme:, submitterType:, and -exclusion tokens from query
  */
 function extractSpecialTokens(query: string): {
   cleanQuery: string;
   entities: Array<{category: string; label: string}>;
   themes: string[];
+  submitterTypes: string[];
   excludes: string[];
 } {
   const entities: Array<{category: string; label: string}> = [];
   const themes: string[] = [];
+  const submitterTypes: string[] = [];
   const excludes: string[] = [];
   
   // Tokenize preserving quotes
@@ -69,6 +75,8 @@ function extractSpecialTokens(query: string): {
       entities.push({ category: '', label: token.slice(7) });
     } else if (token.startsWith('theme:') && token.length > 6) {
       themes.push(token.slice(6));
+    } else if (token.startsWith('submitterType:') && token.length > 14) {
+      submitterTypes.push(token.slice(14));
     } else if (token.startsWith('-') && token.length > 1) {
       excludes.push(token.slice(1));
     } else {
@@ -81,7 +89,7 @@ function extractSpecialTokens(query: string): {
     token.includes(' ') ? `"${token}"` : token
   ).join(' ');
   
-  return { cleanQuery, entities, themes, excludes };
+  return { cleanQuery, entities, themes, submitterTypes, excludes };
 }
 
 /**

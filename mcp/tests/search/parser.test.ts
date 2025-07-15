@@ -136,6 +136,7 @@ describe('parseQuery', () => {
         { category: '', label: 'American Medical Association' }
       ],
       themes: [],
+      submitterTypes: [],
       exclude: []
     });
   });
@@ -147,6 +148,7 @@ describe('parseQuery', () => {
       keywordExpression: undefined,
       entities: [],
       themes: ['2.1', '2.1.1'],
+      submitterTypes: [],
       exclude: []
     });
   });
@@ -180,6 +182,7 @@ describe('parseQuery', () => {
       keywordExpression: undefined,
       entities: [],
       themes: [],
+      submitterTypes: [],
       exclude: []
     });
   });

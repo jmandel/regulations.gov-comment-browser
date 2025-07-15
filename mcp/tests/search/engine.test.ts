@@ -126,6 +126,7 @@ describe('SearchEngine', () => {
         keywords: [],
         entities: [{ category: '', label: 'CMS' }],
         themes: [],
+        submitterTypes: [],
         exclude: []
       };
 
@@ -140,6 +141,7 @@ describe('SearchEngine', () => {
         keywords: [],
         entities: [{ category: '', label: 'cms' }],
         themes: [],
+        submitterTypes: [],
         exclude: []
       };
 
@@ -154,6 +156,7 @@ describe('SearchEngine', () => {
         keywords: [],
         entities: [{ category: '', label: 'Unknown Org' }],
         themes: [],
+        submitterTypes: [],
         exclude: []
       };
 
@@ -171,7 +174,8 @@ describe('SearchEngine', () => {
           keywords: ['prior', 'authorization'],
           entities: [],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
 
@@ -201,7 +205,8 @@ describe('SearchEngine', () => {
           keywords: ['staffing', 'ratios'],
           entities: [],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
 
@@ -216,6 +221,7 @@ describe('SearchEngine', () => {
           keywords: ['proposal'],
           entities: [],
           themes: [],
+          submitterTypes: [],
           exclude: ['deny']
         }
       });
@@ -229,7 +235,8 @@ describe('SearchEngine', () => {
           keywords: [],
           entities: [{ category: 'Healthcare Organizations', label: 'CMS' }],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
 
@@ -243,7 +250,8 @@ describe('SearchEngine', () => {
           keywords: [],
           entities: [],
           themes: ['3.1'],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
 
@@ -257,7 +265,8 @@ describe('SearchEngine', () => {
           keywords: ['prior'],
           entities: [{ category: 'Government Agencies', label: 'Medicare' }],
           themes: ['2.1'],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
 
@@ -271,7 +280,8 @@ describe('SearchEngine', () => {
           keywords: ['burnout'],
           entities: [],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         },
         searchFields: {
           detailedContent: true,
@@ -285,13 +295,15 @@ describe('SearchEngine', () => {
 
     it('should handle pagination', () => {
       const result1 = engine.searchComments(testComments, {
-        query: { keywords: [], entities: [], themes: [], exclude: [] },
+        query: { keywords: [], entities: [], themes: [], submitterTypes: [],
+        exclude: [] },
         limit: 2,
         offset: 0
       });
 
       const result2 = engine.searchComments(testComments, {
-        query: { keywords: [], entities: [], themes: [], exclude: [] },
+        query: { keywords: [], entities: [], themes: [], submitterTypes: [],
+        exclude: [] },
         limit: 2,
         offset: 2
       });
@@ -304,7 +316,8 @@ describe('SearchEngine', () => {
 
     it('should sort by date', () => {
       const result = engine.searchComments(testComments, {
-        query: { keywords: [], entities: [], themes: [], exclude: [] },
+        query: { keywords: [], entities: [], themes: [], submitterTypes: [],
+        exclude: [] },
         sortBy: 'date',
         sortOrder: 'desc'
       });
@@ -316,7 +329,8 @@ describe('SearchEngine', () => {
 
     it('should sort by word count', () => {
       const result = engine.searchComments(testComments, {
-        query: { keywords: [], entities: [], themes: [], exclude: [] },
+        query: { keywords: [], entities: [], themes: [], submitterTypes: [],
+        exclude: [] },
         sortBy: 'wordCount',
         sortOrder: 'desc'
       });
@@ -332,7 +346,8 @@ describe('SearchEngine', () => {
           keywords: ['prior'],
           entities: [{ category: 'Healthcare Organizations', label: 'CMS' }],
           themes: ['2.1'],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         },
         sortBy: 'relevance'
       });
@@ -347,7 +362,8 @@ describe('SearchEngine', () => {
           keywords: [],
           entities: [{ category: 'Healthcare Organizations', label: 'AMA' }],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
 
@@ -384,7 +400,8 @@ describe('SearchEngine', () => {
           keywords: ['TEFCA (trusted exchange framework)'],
           entities: [],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
       expect(result1.totalCount).toBe(1);
@@ -395,7 +412,8 @@ describe('SearchEngine', () => {
           keywords: ['config[prod]'],
           entities: [],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
       expect(result2.totalCount).toBe(1);
@@ -406,7 +424,8 @@ describe('SearchEngine', () => {
           keywords: ['config[prod].json'],
           entities: [],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
       expect(result3.totalCount).toBe(1);
@@ -434,7 +453,8 @@ describe('SearchEngine', () => {
           keywords: ['test'],
           entities: [],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
 
@@ -448,7 +468,8 @@ describe('SearchEngine', () => {
           keywords: ['nonexistent'],
           entities: [],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
 
@@ -485,7 +506,8 @@ describe('SearchEngine', () => {
           keywords: ['test'],
           entities: [],
           themes: [],
-          exclude: []
+          submitterTypes: [],
+        exclude: []
         }
       });
 

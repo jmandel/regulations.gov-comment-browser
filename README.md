@@ -33,14 +33,35 @@ Or use the shorthand scripts:
 bun run <command> <document-id> [options]
 ```
 
+### Getting Comment Data
+
+You can obtain comment data in two ways:
+
+#### Option 1: CSV Bulk Download (Recommended)
+1. Visit https://www.regulations.gov/bulkdownload
+2. Enter the **Docket ID** (e.g., `CMS-2025-0050-0031`)
+3. Select **"All Comments"** 
+4. Submit the request and wait for the email with download link
+5. Download the CSV file from the email
+6. Rename the file to `[Docket-ID].csv` and place it in the repository root
+   - Example: `CMS-2025-0050-0031.csv`
+
+#### Option 2: Direct API Access
+Use the regulations.gov API directly (limited to smaller datasets).
+
 ### 1. Load Comments
+
+Load from CSV file (recommended):
+```bash
+bun run load CMS-2025-0050-0031.csv --limit 500
+```
 
 Load from regulations.gov API:
 ```bash
 bun run load CMS-2025-0050-0031 --limit 100
 ```
 
-Load from CSV file:
+Load from CSV file with custom path:
 ```bash
 bun run load path/to/comments.csv --limit 500
 ```
@@ -52,6 +73,8 @@ Options:
 - `--debug` - Save all API responses to debug/
 
 **PDF Text Extraction**: The system now automatically extracts text content from PDF attachments using `pdf-parse`, providing actual document content instead of placeholder messages.
+
+**CSV vs API**: CSV bulk download is recommended for large datasets as it's faster, more reliable, and doesn't hit API rate limits. The API method is suitable for smaller datasets or testing.
 
 ### 2. Condense Comments
 
@@ -201,20 +224,23 @@ Each document gets its own SQLite database in `dbs/<document-id>.sqlite` contain
 
 Run all steps at once:
 ```bash
-# Run the complete pipeline
+# Run the complete pipeline with CSV file
+bun run pipeline CMS-2025-0050-0031.csv
+
+# Run with document ID (API access)
 bun run pipeline CMS-2025-0050-0031
 
 # Filter out form letters during theme discovery
-bun run pipeline CMS-2025-0050-0031 --filter-duplicates
+bun run pipeline CMS-2025-0050-0031.csv --filter-duplicates
 
 # Start from a specific step (e.g., step 3 = discover-themes)
-bun run pipeline CMS-2025-0050-0031 --start-at 3
+bun run pipeline CMS-2025-0050-0031.csv --start-at 3
 
 # With options and duplicate filtering
-bun run pipeline CMS-2025-0050-0031 --limit-total-comment-load 100 --debug --start-at 2 --filter-duplicates --similarity-threshold 0.75
+bun run pipeline CMS-2025-0050-0031.csv --limit-total-comment-load 100 --debug --start-at 2 --filter-duplicates --similarity-threshold 0.75
 
 # With crash recovery (default: 10 max crashes)
-bun run pipeline CMS-2025-0050-0031 --max-crashes 20
+bun run pipeline CMS-2025-0050-0031.csv --max-crashes 20
 ```
 
 **Crash Recovery**: The pipeline automatically retries from the failed step if it crashes (e.g., due to API errors). It will retry up to `--max-crashes` times (default: 10) before giving up. Each retry waits 5 seconds before restarting.
@@ -223,14 +249,14 @@ bun run pipeline CMS-2025-0050-0031 --max-crashes 20
 
 Or run individual steps:
 ```bash
-# Load first 1000 comments
-bun run load CMS-2025-0050-0031 --limit 1000
+# Load comments from CSV file
+bun run load CMS-2025-0050-0031.csv --limit 1000
 
 # Condense all loaded comments
 bun run condense CMS-2025-0050-0031
 
-# Discover themes from condensed comments
-bun run discover-themes CMS-2025-0050-0031
+# Discover themes from condensed comments (with duplicate filtering)
+bun run discover-themes CMS-2025-0050-0031 --filter-duplicates
 
 # Extract entities
 bun run discover-entities-v2 CMS-2025-0050-0031
@@ -238,8 +264,8 @@ bun run discover-entities-v2 CMS-2025-0050-0031
 # Score all themes
 bun run score-themes CMS-2025-0050-0031
 
-# Summarize themes
-bun run summarize-themes CMS-2025-0050-0031
+# Summarize themes (with duplicate filtering)
+bun run summarize-themes-v2 CMS-2025-0050-0031 --filter-duplicates
 
 # Build website
 bun run build-website CMS-2025-0050-0031
