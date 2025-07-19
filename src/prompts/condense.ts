@@ -8,7 +8,7 @@ You MUST organize every comment into these exact sections with these exact heade
 
 ### DETAILED CONTENT
 
-Transform the FULL CONTENT of the original comment into a consistent bullet point outline:
+Transform the FULL CONTENT of the original comment including all attachments into a consistent bullet point outline:
 - Use ONLY bullets and sub-bullets (no bold, no headers, no special formatting)
 - Preserve the original organizational structure as nested bullets
 - If the original has section headings, include them as top-level bullets

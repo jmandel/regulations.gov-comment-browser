@@ -310,27 +310,55 @@ export async function enrichComment(
   }
   parts.push(commentText);
   
-  // Add PDF content if requested
+  // Add attachment content if requested
   if (options.includePdfs) {
     const commentAttachments = attachments.get(comment.id) || [];
-    const pdfAttachments = commentAttachments.filter(a => 
-      a.format.toLowerCase() === "pdf" && a.blob_data
-    );
     
-    if (pdfAttachments.length > 0) {
-      parts.push("\n=== PDF ATTACHMENTS ===");
-      
-      for (const pdf of pdfAttachments) {
+    // Group attachments by ID to select best format for each
+    const attachmentGroups = new Map<string, Attachment[]>();
+    for (const attachment of commentAttachments) {
+      if (!attachmentGroups.has(attachment.id)) {
+        attachmentGroups.set(attachment.id, []);
+      }
+      attachmentGroups.get(attachment.id)!.push(attachment);
+    }
+    
+    const processedAttachments: Array<{attachment: Attachment, text: string}> = [];
+    
+    // Process each attachment group (select best format per attachment ID)
+    for (const [attachmentId, attachmentFormats] of attachmentGroups) {
+      const bestAttachment = selectBestAttachmentFormat(attachmentFormats);
+      if (bestAttachment && bestAttachment.blob_data) {
         try {
-          const extractedText = (await extractPdfText(Buffer.from(pdf.blob_data!))).trim();
-          if (extractedText.length > 0) {
-            parts.push(`\nPDF: ${pdf.file_name}`);
-            parts.push(extractedText);
-          } else {
-            parts.push(`\nPDF: ${pdf.file_name} (no extractable text)`);
-          }
+          const extractedText = await extractTextFromAttachment(bestAttachment);
+          processedAttachments.push({ attachment: bestAttachment, text: extractedText });
         } catch (err) {
-          parts.push(`\nPDF: ${pdf.file_name} (error reading)`);
+          console.warn(`Error extracting text from attachment ${attachmentId} (${bestAttachment.format}):`, err);
+          processedAttachments.push({ 
+            attachment: bestAttachment, 
+            text: `(error extracting ${bestAttachment.format})` 
+          });
+        }
+      } else if (attachmentFormats.length > 0) {
+        console.warn(`Attachment ${attachmentId} has no supported formats or blob data`);
+        const firstAttachment = attachmentFormats[0];
+        processedAttachments.push({ 
+          attachment: firstAttachment, 
+          text: `(unsupported format: ${firstAttachment.format})` 
+        });
+      }
+    }
+    
+    if (processedAttachments.length > 0) {
+      parts.push("\n=== ATTACHMENTS ===");
+      
+      for (const { attachment, text } of processedAttachments) {
+        const displayText = text.trim();
+        if (displayText.length > 0 && !displayText.startsWith('(')) {
+          parts.push(`\n${attachment.format.toUpperCase()}: ${attachment.file_name}`);
+          parts.push(displayText);
+        } else {
+          parts.push(`\n${attachment.format.toUpperCase()}: ${attachment.file_name} ${displayText || '(no extractable text)'}`);
         }
       }
     }
@@ -524,6 +552,79 @@ export function parseEntityTaxonomy(text: string): Record<string, Array<{
   }
   
   return result;
+}
+
+// Format preference order for text extraction (higher index = higher priority)
+const FORMAT_PREFERENCE = ['txt', 'docx', 'pdf'] as const;
+
+function selectBestAttachmentFormat(attachments: Attachment[]): Attachment | null {
+  if (attachments.length === 0) return null;
+  if (attachments.length === 1) return attachments[0];
+  
+  // Find the format with highest preference
+  let bestAttachment: Attachment | null = null;
+  let bestPriority = -1;
+  
+  for (const attachment of attachments) {
+    const priority = FORMAT_PREFERENCE.indexOf(attachment.format.toLowerCase() as any);
+    if (priority > bestPriority) {
+      bestPriority = priority;
+      bestAttachment = attachment;
+    }
+  }
+  
+  // If no format matches our preferences, use the first one
+  return bestAttachment || attachments[0];
+}
+
+async function extractTextFromAttachment(attachment: Attachment): Promise<string> {
+  if (!attachment.blob_data) {
+    return '';
+  }
+  
+  const format = attachment.format.toLowerCase();
+  
+  switch (format) {
+    case 'pdf':
+      return extractPdfText(Buffer.from(attachment.blob_data));
+    case 'docx':
+      return extractDocxText(Buffer.from(attachment.blob_data));
+    case 'txt':
+      return Buffer.from(attachment.blob_data).toString('utf-8').trim();
+    default:
+      console.warn(`Unsupported attachment format: ${format}`);
+      return '';
+  }
+}
+
+async function extractDocxText(buffer: Buffer | Uint8Array): Promise<string> {
+  // Create a temporary directory and file
+  const tempDir = await mkdtemp(join(tmpdir(), 'docx-extract-'));
+  const tempDocxPath = join(tempDir, 'temp.docx');
+  
+  try {
+    // Write DOCX buffer to temporary file
+    await writeFile(tempDocxPath, buffer);
+    
+    // Use pandoc to extract plain text from DOCX
+    // -t plain for plain text output, --wrap=none to avoid line wrapping
+    const result = await $`pandoc -f docx -t plain --wrap=none ${tempDocxPath}`.text();
+    
+    return result.trim();
+  } catch (error) {
+    console.error('Error extracting DOCX text:', error);
+    // Fallback to empty string if pandoc fails
+    return '';
+  } finally {
+    // Clean up temporary file
+    try {
+      await unlink(tempDocxPath);
+      // Remove the temporary directory
+      await $`rmdir ${tempDir}`.quiet();
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
 }
 
 async function extractPdfText(buffer: Buffer | Uint8Array): Promise<string> {
