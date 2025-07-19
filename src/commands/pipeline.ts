@@ -7,15 +7,16 @@ import { extractThemeContentCommand } from "./extract-theme-content";
 import { summarizeThemesV2Command } from "./summarize-themes-v2";
 import { discoverEntitiesV2Command } from "./discover-entities-v2";
 import { buildWebsiteCommand } from "../website-build-script";
+import { vacuumDbCommand } from "./vacuum-db";
 
 export const pipelineCommand = new Command("pipeline")
-  .description("Run the complete analysis pipeline: load, condense, discover themes, extract theme content, summarize themes, discover entities, and build website")
+  .description("Run the complete analysis pipeline: load, condense, discover themes, extract theme content, summarize themes, discover entities, build website, and vacuum database")
   .argument("<source-arg>", "Source argument (e.g., CMS-2025-0050-0031 or path to CSV)")
   .option("-s, --skip-attachments", "Skip downloading attachments")
   .option("-d, --debug", "Enable debug mode for all steps")
   .option("-o, --output <dir>", "Output directory for website files", "dist/data")
   .option("-l, --limit-total-comment-load <N>", "Limit initial number of comments loaded")
-  .option("--start-at <step>", "Start at a specific step (1-7): 1=load, 2=condense, 3=discover-themes, 4=extract-theme-content, 5=summarize-themes, 6=discover-entities, 7=build-website")
+  .option("--start-at <step>", "Start at a specific step (1-8): 1=load, 2=condense, 3=discover-themes, 4=extract-theme-content, 5=summarize-themes, 6=discover-entities, 7=build-website, 8=vacuum-db")
   .option("-c, --concurrency <N>", "Number of concurrent operations")
   .option("--max-crashes <N>", "Maximum number of crashes before giving up (default: 10)", parseInt)
   .option("-m, --model <model>", "AI model to use (gemini-pro, gemini-flash, gemini-flash-lite, claude)")
@@ -30,8 +31,8 @@ export const pipelineCommand = new Command("pipeline")
     const startStep = options.startAt ? parseInt(options.startAt) : 1;
     const maxCrashes = options.maxCrashes || 10;
     
-    if (isNaN(startStep) || startStep < 1 || startStep > 7) {
-      console.error("❌ Invalid start step. Please provide a number between 1 and 7.");
+    if (isNaN(startStep) || startStep < 1 || startStep > 8) {
+      console.error("❌ Invalid start step. Please provide a number between 1 and 8.");
       process.exit(1);
     }
     
@@ -138,13 +139,25 @@ export const pipelineCommand = new Command("pipeline")
             '--output', options.output,
           ]);
         }
+      },
+      {
+        num: 8,
+        name: "Vacuuming database",
+        icon: "🧹",
+        execute: async () => {
+          await vacuumDbCommand.parseAsync([
+            'bun', 'cli.ts', 
+            documentId,
+            ...(options.debug ? ['--verbose'] : []),
+          ]);
+        }
       }
     ];
     
     let crashCount = 0;
     let currentStep = startStep;
     
-    while (currentStep <= 7 && crashCount < maxCrashes) {
+    while (currentStep <= 8 && crashCount < maxCrashes) {
       try {
         // Execute only steps from currentStep onwards
         for (const step of steps) {
@@ -163,6 +176,7 @@ export const pipelineCommand = new Command("pipeline")
         console.log("\n✅ Pipeline completed successfully!");
         console.log(`📁 Website files are in: ${options.output}`);
         console.log(`🌐 Copy to dashboard/public/data/ and run the dashboard`);
+        console.log(`🧹 Database has been vacuumed and optimized`);
         break; // Exit the retry loop
         
       } catch (error) {

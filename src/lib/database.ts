@@ -15,8 +15,8 @@ export function openDb(documentId: string): Database {
   const path = getDbPath(documentId);
   const db = new Database(path);
   
-  // Enable WAL mode for better concurrent access
-  db.exec("PRAGMA journal_mode = WAL");
+  // Use DELETE mode for simpler file management (no separate WAL files)
+  db.exec("PRAGMA journal_mode = DELETE");
   
   // Initialize schema
   initSchema(db);

@@ -12,6 +12,7 @@ import { buildWebsiteCommand } from "./website-build-script";
 import { pipelineCommand } from "./commands/pipeline";
 import { generateLandingPageCommand } from "./commands/generate-landing-page";
 import { cacheCommand } from "./commands/cache";
+import { vacuumDbCommand } from "./commands/vacuum-db";
 
 const program = new Command()
   .name("regulations-comment-analysis")
@@ -31,6 +32,7 @@ program.addCommand(buildWebsiteCommand);
 program.addCommand(pipelineCommand);
 program.addCommand(generateLandingPageCommand);
 program.addCommand(cacheCommand);
+program.addCommand(vacuumDbCommand);
 
 // Parse and execute
 program.parse();
