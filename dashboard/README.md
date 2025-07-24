@@ -4,13 +4,14 @@ A TypeScript React application for browsing and analyzing public comments from r
 
 ## Features
 
-- **Theme-Centric Navigation**: Browse hierarchical themes with expand/collapse functionality
-- **Smart Comment Filtering**: Filter by themes, entities, stakeholder types
-- **Markdown Rendering**: Condensed comments are displayed with proper markdown formatting
-- **Hash-Based Routing**: All views are bookmarkable URLs (e.g., `#/themes/1.2.3`)
-- **Export Capabilities**: Export filtered comments to CSV
-- **Entity Browser**: Explore entities by category with mention counts
-- **Responsive Design**: Works on desktop and mobile devices
+- **Theme-Centric Navigation**: Browse hierarchical themes with expand/collapse functionality.
+- **Theme Summaries**: Read detailed, AI-generated narrative analyses for key themes.
+- **Smart Comment Filtering**: Filter by themes, entities, and stakeholder types.
+- **Markdown Rendering**: Condensed comments are displayed with proper markdown formatting.
+- **Hash-Based Routing**: All views are bookmarkable URLs (e.g., `#/themes/1.2.3`).
+- **Copy for LLM**: Export data in LLM-friendly formats for further analysis.
+- **Entity Browser**: Explore entities by category with mention counts.
+- **Responsive Design**: Works on desktop and mobile devices.
 
 ## Development
 
@@ -32,12 +33,13 @@ bun run preview
 
 The dashboard expects the following JSON files in `/public/data/`:
 
-- `meta.json` - Document metadata and statistics
-- `themes.json` - Theme hierarchy with quotes
-- `entities.json` - Entity taxonomy by category
-- `comments.json` - All comments with condensed text
-- `indexes/theme-comments.json` - Theme to comment mapping
-- `indexes/entity-comments.json` - Entity to comment mapping
+- `meta.json` - Document metadata and statistics.
+- `themes.json` - Theme hierarchy with comment counts.
+- `theme-summaries.json` - **(New)** Detailed narrative summaries for themes.
+- `entities.json` - Entity taxonomy by category.
+- `comments.json` - All comments with condensed text and metadata.
+- `indexes/theme-comments.json` - Theme to comment mapping.
+- `indexes/entity-comments.json` - Entity to comment mapping.
 
 Generate these files using the main CLI tool:
 ```bash
@@ -46,13 +48,14 @@ bun run build-website <document-id>
 
 ## URL Structure
 
-- `#/overview` - Dashboard overview with statistics
-- `#/themes` - Theme hierarchy browser
-- `#/themes/:code` - Individual theme detail with comments
-- `#/entities` - Entity browser by category
-- `#/entities/:category/:label` - Entity detail with mentions
-- `#/comments` - Comment browser with filters
-- `#/comments/:id` - Individual comment detail
+- `#/overview` - Dashboard overview with statistics.
+- `#/themes` - Theme hierarchy browser.
+- `#/themes/:code` - Individual theme detail with comments.
+- `#/summaries` - **(New)** Browse all theme analysis summaries.
+- `#/entities` - Entity browser by category.
+- `#/entities/:category/:label` - Entity detail with mentions.
+- `#/comments` - Comment browser with filters.
+- `#/comments/:id` - Individual comment detail.
 
 ## Technology Stack
 
