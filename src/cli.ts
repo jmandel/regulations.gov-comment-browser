@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { loadCommentsCommand } from "./commands/load-comments";
+import { clusterCommentsCommand } from "./commands/cluster-comments";
+import { clusterCommentsExactCommand } from "./commands/cluster-comments-exact";
+import { clusterCommentsFastCommand } from "./commands/cluster-comments-fast";
 import { condenseCommand } from "./commands/condense";
 import { discoverThemesCommand } from "./commands/discover-themes";
-import { scoreThemesCommand } from "./commands/score-themes";
 import { summarizeThemesCommand } from "./commands/summarize-themes";
 import { extractThemeContentCommand } from "./commands/extract-theme-content";
 import { summarizeThemesV2Command } from "./commands/summarize-themes-v2";
@@ -21,9 +23,11 @@ const program = new Command()
 
 // Register all commands
 program.addCommand(loadCommentsCommand);
+program.addCommand(clusterCommentsCommand);
+program.addCommand(clusterCommentsExactCommand);
+program.addCommand(clusterCommentsFastCommand);
 program.addCommand(condenseCommand);
 program.addCommand(discoverThemesCommand);
-program.addCommand(scoreThemesCommand);
 program.addCommand(summarizeThemesCommand);
 program.addCommand(extractThemeContentCommand);
 program.addCommand(summarizeThemesV2Command);

@@ -53,6 +53,47 @@ async function loadFromApi(documentId: string, options: any) {
     const objectId = docData.data.attributes.objectId;
     debugLog(`Object ID: ${objectId}`);
     
+    // Save document metadata
+    const docAttrs = docData.data.attributes;
+    const agencyId = docAttrs.agencyId || documentId.split('-')[0];
+    
+    // Fetch agency name if possible
+    let agencyName = agencyId;
+    try {
+      const agencyResponse = await fetch(
+        `https://api.regulations.gov/v4/agencies/${agencyId}`,
+        { headers }
+      );
+      if (agencyResponse.ok) {
+        const agencyData: any = await agencyResponse.json();
+        agencyName = agencyData.data.attributes.name || agencyId;
+      }
+    } catch (e) {
+      console.warn(`⚠️  Could not fetch agency name for ${agencyId}`);
+    }
+    
+    // Insert or update document metadata
+    db.prepare(`
+      INSERT OR REPLACE INTO document_metadata (
+        document_id, title, docket_id, agency_id, agency_name,
+        document_type, posted_date, comment_start_date, comment_end_date,
+        metadata_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(
+      documentId,
+      docAttrs.title || documentId,
+      docAttrs.docketId || documentId,
+      agencyId,
+      agencyName,
+      docAttrs.documentType || 'Unknown',
+      docAttrs.postedDate || null,
+      docAttrs.commentStartDate || null,
+      docAttrs.commentEndDate || null,
+      JSON.stringify(docAttrs)
+    );
+    
+    console.log(`💾 Saved document metadata: ${docAttrs.title || documentId}`);
+    
     // Get existing comment count
     const existingCount = db.prepare("SELECT COUNT(*) as count FROM comments").get() as { count: number };
     console.log(`📊 Existing comments in database: ${existingCount.count}`);

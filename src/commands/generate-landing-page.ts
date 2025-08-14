@@ -32,7 +32,17 @@ async function generateLandingPage(options: any) {
   
   // Find all SQLite databases
   const files = await readdir(dbDir);
-  const dbFiles = files.filter(f => f.endsWith('.sqlite') && !f.includes('.sqlite-'));
+  const dbFiles = files.filter(f => {
+    // Must end with .sqlite
+    if (!f.endsWith('.sqlite')) return false;
+    // Exclude WAL/SHM files
+    if (f.includes('.sqlite-')) return false;
+    // Exclude duplicate .sqlite.sqlite files
+    if (f.endsWith('.sqlite.sqlite')) return false;
+    // Exclude other sqlite variants
+    if (f.includes('.sqlite.')) return false;
+    return true;
+  });
   
   if (dbFiles.length === 0) {
     console.log("❌ No databases found in", dbDir);
@@ -40,37 +50,6 @@ async function generateLandingPage(options: any) {
   }
   
   console.log(`📊 Found ${dbFiles.length} regulation databases`);
-  
-  // Fetch agency names from API
-  const agencyNames = new Map<string, string>();
-  try {
-    const apiKey = process.env.REGSGOV_API_KEY;
-    if (apiKey) {
-      const response = await fetch(
-        `https://api.regulations.gov/v4/agencies`,
-        {
-          headers: {
-            'X-Api-Key': apiKey,
-            'Accept': 'application/json'
-          }
-        }
-      );
-      
-      if (response.ok) {
-        const data: any = await response.json();
-        if (data.data && Array.isArray(data.data)) {
-          for (const agency of data.data) {
-            agencyNames.set(agency.id, agency.attributes.name);
-          }
-          console.log(`📋 Loaded ${agencyNames.size} agency names`);
-        }
-      } else {
-        console.warn(`⚠️  Could not fetch agency list: ${response.status}`);
-      }
-    }
-  } catch (error) {
-    console.warn("⚠️  Failed to fetch agency names:", error);
-  }
   
   // Collect information from each database
   const regulations: RegulationInfo[] = [];
@@ -82,43 +61,37 @@ async function generateLandingPage(options: any) {
     try {
       const db = openDb(documentId);
       
-      // Fetch document details from regulations.gov API
+      // Read document details from database
       let title = documentId;
       let docketId = documentId;
       let agency = "Unknown Agency";
       
       try {
-        const apiKey = process.env.REGSGOV_API_KEY;
-        if (apiKey) {
-          const response = await fetch(
-            `https://api.regulations.gov/v4/documents/${documentId}`,
-            {
-              headers: {
-                'X-Api-Key': apiKey,
-                'Accept': 'application/json'
-              }
-            }
-          );
+        // Check if document_metadata table exists and has data
+        const hasMetadata = db.prepare(`
+          SELECT name FROM sqlite_master 
+          WHERE type='table' AND name='document_metadata'
+        `).get();
+        
+        if (hasMetadata) {
+          const metadata = db.prepare(`
+            SELECT title, docket_id, agency_name, agency_id
+            FROM document_metadata
+            WHERE document_id = ?
+          `).get(documentId) as any;
           
-          if (response.ok) {
-            const data: any = await response.json();
-            title = data.data.attributes.title || documentId;
-            docketId = data.data.attributes.docketId || documentId;
-            
-            // Extract agency from docket ID and get full name
-            const agencyMatch = docketId.match(/^([A-Z]+)-/);
-            if (agencyMatch) {
-              const agencyId = agencyMatch[1];
-              agency = agencyNames.get(agencyId) || agencyId;
-            }
+          if (metadata) {
+            title = metadata.title || documentId;
+            docketId = metadata.docket_id || documentId;
+            agency = metadata.agency_name || metadata.agency_id || "Unknown Agency";
           } else {
-            console.warn(`  ⚠️  Could not fetch details from API for ${documentId}: ${response.status}`);
+            console.warn(`  ⚠️  No metadata found in database for ${documentId}`);
           }
         } else {
-          console.warn("  ⚠️  REGSGOV_API_KEY not set, using document IDs as titles");
+          console.warn(`  ⚠️  No document_metadata table in database for ${documentId}`);
         }
       } catch (error) {
-        console.warn(`  ⚠️  Failed to fetch API details for ${documentId}:`, error);
+        console.warn(`  ⚠️  Failed to read metadata for ${documentId}:`, error);
       }
       
       // Get statistics

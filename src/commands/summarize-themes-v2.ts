@@ -9,7 +9,7 @@ import { parseJsonResponse } from "../lib/json-parser";
 import { runPool } from "../lib/worker-pool";
 import { getTaskConfig, getTaskModel, getBatchOptions } from "../lib/batch-config";
 import { createEvenBatches } from "../lib/batch-processor";
-import { getRepresentativeCommentIds } from "../lib/comment-processing";
+import { checkClusteringStatus, getStoredRepresentativeIds } from "../lib/comment-processing";
 
 export const summarizeThemesV2Command = new Command("summarize-themes-v2")
   .description("Generate theme summaries from pre-extracted theme-specific content")
@@ -21,8 +21,7 @@ export const summarizeThemesV2Command = new Command("summarize-themes-v2")
   .option("-d, --debug", "Enable debug output")
   .option("-c, --concurrency <n>", "Number of parallel API calls (default: 3)", parseInt)
   .option("-m, --model <model>", "AI model to use (overrides config)")
-  .option("--filter-duplicates", "Only use extracts from representative comments (filters form letters)")
-  .option("--similarity-threshold <n>", "Similarity threshold for duplicate filtering (default: 0.8)", parseFloat)
+  .option("--use-clustering", "Use clustering data and weight by cluster sizes")
   .action(summarizeThemesV2);
 
 async function summarizeThemesV2(documentId: string, options: any) {
@@ -37,12 +36,16 @@ async function summarizeThemesV2(documentId: string, options: any) {
   console.log(`📝 Summarizing themes (v2) for document ${documentId}`);
   console.log(`   Using model: ${effectiveModel}`);
   
-  // Optionally filter to representative comments only
+  // Check for clustering if requested
   let representativeIds: Set<string> | undefined;
-  if (options.filterDuplicates) {
-    const threshold = options.similarityThreshold || 0.8;
-    representativeIds = await getRepresentativeCommentIds(db, threshold);
-    console.log(`🔍 Using only representative comments for filtering (${representativeIds.size} comments)`);
+  if (options.useClustering) {
+    const clusteringExists = checkClusteringStatus(db);
+    if (!clusteringExists) {
+      console.error("❌ No clustering data found. Run 'cluster-comments-fast' first.");
+      process.exit(1);
+    }
+    representativeIds = getStoredRepresentativeIds(db) || undefined;
+    console.log(`🔗 Using stored clustering (${representativeIds?.size || 0} representative comments)`);
   }
   
   // Load task configuration  
@@ -130,6 +133,7 @@ async function summarizeThemesV2(documentId: string, options: any) {
           SELECT 
             cte.comment_id,
             cte.extract_json,
+            cte.cluster_size,
             cc.structured_sections
           FROM comment_theme_extracts cte
           JOIN condensed_comments cc ON cte.comment_id = cc.comment_id
@@ -144,11 +148,12 @@ async function summarizeThemesV2(documentId: string, options: any) {
           extractParams.push(...Array.from(representativeIds));
         }
         
-        extractQuery += ` ORDER BY cte.comment_id`;
+        extractQuery += ` ORDER BY cte.cluster_size DESC, cte.comment_id`;
         
         const extracts = db.prepare(extractQuery).all(...extractParams) as {
           comment_id: string;
           extract_json: string;
+          cluster_size: number;
           structured_sections: string;
         }[];
         
@@ -249,15 +254,31 @@ async function summarizeThemesV2(documentId: string, options: any) {
 async function analyzeThemeExtracts(
   ai: AIClient,
   theme: { code: string; description: string; detailed_guidelines?: string },
-  extracts: { comment_id: string; extract_json: string; structured_sections: string }[],
+  extracts: { comment_id: string; extract_json: string; cluster_size: number; structured_sections: string }[],
   debug: boolean,
   batchNum?: number,
   totalBatches?: number
 ): Promise<string> {
+  // Calculate total comments represented
+  const totalComments = extracts.reduce((sum, e) => sum + e.cluster_size, 0);
+  const uniquePerspectives = extracts.length;
+  
   // Build extract blocks with commenter metadata and formatted content
   const extractBlocks = extracts.map(e => {
     const extract = JSON.parse(e.extract_json);
     const sections = JSON.parse(e.structured_sections || '{}');
+    
+    // Determine cluster type label
+    let clusterLabel = '';
+    if (e.cluster_size >= 100) {
+      clusterLabel = `[FORM LETTER - ${e.cluster_size} identical submissions]`;
+    } else if (e.cluster_size >= 10) {
+      clusterLabel = `[CLUSTER - ${e.cluster_size} similar submissions]`;
+    } else if (e.cluster_size > 1) {
+      clusterLabel = `[SMALL CLUSTER - ${e.cluster_size} similar comments]`;
+    } else {
+      clusterLabel = '[INDIVIDUAL]';
+    }
     
     // Format the extract data as readable markdown
     let formattedExtract = '';
@@ -302,6 +323,7 @@ async function analyzeThemeExtracts(
     }
     
     return `<comment id="${e.comment_id}">
+${clusterLabel}
 <commenter_profile>
 ${sections.commenterProfile || 'No profile information provided'}
 </commenter_profile>
@@ -312,6 +334,19 @@ ${formattedExtract.trim() || 'No specific content extracted for this theme'}
 </comment>`;
   }).join('\n\n---\n\n');
   
+  // Add clustering context to prompt
+  let clusteringContext = '';
+  if (totalComments > uniquePerspectives) {
+    clusteringContext = `
+IMPORTANT CONTEXT:
+- You are analyzing ${uniquePerspectives} unique perspectives
+- These represent ${totalComments} total comments (including duplicates/similar submissions)
+- Larger clusters (form letters, campaigns) should be weighted more heavily in your analysis
+- When a perspective is marked as [FORM LETTER - N submissions] or [CLUSTER - N submissions], this means N people submitted identical or very similar comments
+- Consider both the diversity of viewpoints AND the volume of support for each viewpoint
+`;
+  }
+  
   const fullThemeDescription = theme.detailed_guidelines 
     ? `${theme.description}. ${theme.detailed_guidelines}`
     : theme.description;
@@ -319,7 +354,7 @@ ${formattedExtract.trim() || 'No specific content extracted for this theme'}
   const prompt = THEME_SUMMARY_FROM_EXTRACTS_PROMPT
     .replace('{THEME_CODE}', theme.code)
     .replace('{THEME_DESCRIPTION}', fullThemeDescription)
-    .replace('{EXTRACTS}', extractBlocks);
+    .replace('{EXTRACTS}', clusteringContext + extractBlocks);
   
   const debugId = batchNum 
     ? `theme_summary_v2_${theme.code}_batch_${batchNum}-of-${totalBatches}` 
@@ -347,7 +382,7 @@ ${formattedExtract.trim() || 'No specific content extracted for this theme'}
 async function processThemeInBatches(
   ai: AIClient,
   theme: { code: string; description: string; detailed_guidelines?: string },
-  extracts: { comment_id: string; extract_json: string; structured_sections: string }[],
+  extracts: { comment_id: string; extract_json: string; cluster_size: number; structured_sections: string }[],
   batchOptions: any,
   debug: boolean
 ): Promise<string> {

@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { openDb, withTransaction } from "../lib/database";
 import { initDebug } from "../lib/debug";
 import { AIClient } from "../lib/ai-client";
+import { checkClusteringStatus } from "../lib/comment-processing";
 import { THEME_EXTRACT_PROMPT } from "../prompts/theme-extract";
 import { parseJsonResponse } from "../lib/json-parser";
 import { runPool } from "../lib/worker-pool";
@@ -12,6 +13,7 @@ export const extractThemeContentCommand = new Command("extract-theme-content")
   .argument("<document-id>", "Document ID (e.g., CMS-2025-0050-0031)")
   .option("-l, --limit <n>", "Process only N comments", parseInt)
   .option("--retry-failed", "Retry previously failed extractions")
+  .option("--use-clustering", "Only extract from representative comments, include cluster sizes")
   .option("-d, --debug", "Enable debug output")
   .option("-c, --concurrency <n>", "Number of parallel API calls (default: 3)", parseInt)
   .option("-m, --model <model>", "AI model to use (overrides config)")
@@ -93,6 +95,16 @@ async function extractThemeContent(documentId: string, options: any) {
   console.log(`🎯 Extracting theme-specific content for document ${documentId}`);
   console.log(`   Using model: ${effectiveModel}`);
   
+  // Check for clustering if requested
+  if (options.useClustering) {
+    const clusteringExists = checkClusteringStatus(db);
+    if (!clusteringExists) {
+      console.error("❌ No clustering data found. Run 'cluster-comments-fast' first.");
+      process.exit(1);
+    }
+    console.log("🔗 Using stored clustering to process only representative comments");
+  }
+  
   // Load theme hierarchy
   const themes = db.prepare(`
     SELECT code, description, detailed_guidelines 
@@ -115,17 +127,44 @@ async function extractThemeContent(documentId: string, options: any) {
   }).join("\n");
   
   // Get comments that have been condensed but not yet extracted
-  let query = `
-    SELECT DISTINCT cc.comment_id, cc.structured_sections
-    FROM condensed_comments cc
-    LEFT JOIN (
-      SELECT DISTINCT comment_id 
-      FROM comment_theme_extracts
-    ) cte ON cc.comment_id = cte.comment_id
-    WHERE cc.status = 'completed' 
-      AND cte.comment_id IS NULL  -- Not yet extracted
-    ORDER BY cc.comment_id
-  `;
+  let query: string;
+  
+  if (options.useClustering) {
+    // Load only representative comments WITH cluster sizes
+    query = `
+      SELECT DISTINCT 
+        cc.comment_id, 
+        cc.structured_sections,
+        ccl.cluster_size
+      FROM condensed_comments cc
+      INNER JOIN comment_cluster_membership ccm ON cc.comment_id = ccm.comment_id
+      INNER JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id
+      LEFT JOIN (
+        SELECT DISTINCT comment_id 
+        FROM comment_theme_extracts
+      ) cte ON cc.comment_id = cte.comment_id
+      WHERE cc.status = 'completed' 
+        AND ccm.is_representative = 1
+        AND cte.comment_id IS NULL  -- Not yet extracted
+      ORDER BY cc.comment_id
+    `;
+  } else {
+    // Standard query - all comments have cluster_size = 1
+    query = `
+      SELECT DISTINCT 
+        cc.comment_id, 
+        cc.structured_sections,
+        1 as cluster_size
+      FROM condensed_comments cc
+      LEFT JOIN (
+        SELECT DISTINCT comment_id 
+        FROM comment_theme_extracts
+      ) cte ON cc.comment_id = cte.comment_id
+      WHERE cc.status = 'completed' 
+        AND cte.comment_id IS NULL  -- Not yet extracted
+      ORDER BY cc.comment_id
+    `;
+  }
   
   const params: any[] = [];
   if (options.limit) {
@@ -136,6 +175,7 @@ async function extractThemeContent(documentId: string, options: any) {
   const comments = db.prepare(query).all(...params) as { 
     comment_id: string; 
     structured_sections: string;
+    cluster_size: number;
   }[];
   
   console.log(`🎯 Found ${comments.length} comments to process`);
@@ -197,8 +237,8 @@ async function extractThemeContent(documentId: string, options: any) {
         // Save extracts for each theme
         withTransaction(db, () => {
           const insertStmt = db.prepare(`
-            INSERT INTO comment_theme_extracts (comment_id, theme_code, extract_json)
-            VALUES (?, ?, ?)
+            INSERT INTO comment_theme_extracts (comment_id, theme_code, extract_json, cluster_size)
+            VALUES (?, ?, ?, ?)
           `);
           
           let relevantThemes = 0;
@@ -228,7 +268,8 @@ async function extractThemeContent(documentId: string, options: any) {
                 insertStmt.run(
                   comment.comment_id,
                   themeCode,
-                  JSON.stringify(cleanedExtract)
+                  JSON.stringify(cleanedExtract),
+                  comment.cluster_size  // Store cluster size!
                 );
               } else {
                 filteredThemes++;
@@ -237,6 +278,9 @@ async function extractThemeContent(documentId: string, options: any) {
           }
           
           const messages = [`  ✅ Extracted content for ${relevantThemes} themes`];
+          if (comment.cluster_size > 1) {
+            messages.push(`representing ${comment.cluster_size} similar comments`);
+          }
           if (filteredThemes > 0) {
             messages.push(`filtered ${filteredThemes} empty extracts`);
           }

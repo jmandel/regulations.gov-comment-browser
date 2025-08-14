@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { openDb, withTransaction, getProcessingStatus } from "../lib/database";
 import { initDebug, debugSave } from "../lib/debug";
 import { AIClient } from "../lib/ai-client";
-import { loadComments, enrichComment } from "../lib/comment-processing";
+import { loadComments, enrichComment, checkClusteringStatus, loadRepresentativeComments } from "../lib/comment-processing";
 import { CONDENSE_PROMPT } from "../prompts/condense";
 import { parseCondensedSections } from "../lib/parse-condensed-sections";
 import type { RawComment } from "../types";
@@ -14,6 +14,7 @@ export const condenseCommand = new Command("condense")
   .argument("<document-id>", "Document ID (e.g., CMS-2025-0050-0031)")
   .option("-l, --limit <n>", "Process only N comments", parseInt)
   .option("--retry-failed", "Retry previously failed comments")
+  .option("--use-clustering", "Only condense representative comments from clusters")
   .option("-d, --debug", "Enable debug output")
   .option("-c, --concurrency <n>", "Number of parallel API calls (default: 5)", parseInt)
   .option("-m, --model <model>", "AI model to use (overrides config)")
@@ -31,6 +32,16 @@ async function condenseComments(documentId: string, options: any) {
   console.log(`📝 Condensing comments for document ${documentId}`);
   console.log(`   Using model: ${effectiveModel}`);
   
+  // Check for clustering if requested
+  if (options.useClustering) {
+    const clusteringExists = checkClusteringStatus(db);
+    if (!clusteringExists) {
+      console.error("❌ No clustering data found. Run 'cluster-comments-fast' first.");
+      process.exit(1);
+    }
+    console.log("🔗 Using stored clustering to process only representative comments");
+  }
+  
   // Get processing status
   const status = getProcessingStatus(db, "condensed_comments");
   console.log(`📊 Status: ${status.completed} completed, ${status.failed} failed, ${status.pending} pending`);
@@ -38,15 +49,43 @@ async function condenseComments(documentId: string, options: any) {
   // Build query based on options
   let query: string;
   let params: any[] = [];
+  let comments: RawComment[];
   
-  if (options.retryFailed) {
+  if (options.useClustering && !options.retryFailed) {
+    // Load only representative comments that haven't been processed
+    query = `
+      SELECT c.id, c.attributes_json 
+      FROM comments c
+      INNER JOIN comment_cluster_membership ccm ON c.id = ccm.comment_id
+      LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
+      WHERE ccm.is_representative = 1 
+        AND (cc.comment_id IS NULL OR cc.status IN ('pending', 'processing'))
+      ORDER BY c.id
+    `;
+    if (options.limit) {
+      query += " LIMIT ?";
+      params.push(options.limit);
+    }
+    comments = db.prepare(query).all(...params) as RawComment[];
+  } else if (options.retryFailed) {
     query = `
       SELECT c.id, c.attributes_json 
       FROM comments c
       LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
       WHERE cc.status = 'failed'
-      ORDER BY cc.attempt_count ASC, c.id
     `;
+    if (options.useClustering) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM comment_cluster_membership ccm 
+        WHERE ccm.comment_id = c.id AND ccm.is_representative = 1
+      )`;
+    }
+    query += ` ORDER BY cc.attempt_count ASC, c.id`;
+    if (options.limit) {
+      query += " LIMIT ?";
+      params.push(options.limit);
+    }
+    comments = db.prepare(query).all(...params) as RawComment[];
   } else {
     query = `
       SELECT c.id, c.attributes_json 
@@ -55,14 +94,13 @@ async function condenseComments(documentId: string, options: any) {
       WHERE cc.comment_id IS NULL OR cc.status IN ('pending', 'processing')
       ORDER BY c.id
     `;
+    if (options.limit) {
+      query += " LIMIT ?";
+      params.push(options.limit);
+    }
+    comments = db.prepare(query).all(...params) as RawComment[];
   }
   
-  if (options.limit) {
-    query += " LIMIT ?";
-    params.push(options.limit);
-  }
-  
-  const comments = db.prepare(query).all(...params) as RawComment[];
   console.log(`🎯 Found ${comments.length} comments to process`);
   
   if (comments.length === 0) {

@@ -41,16 +41,33 @@ export const THEME_DISCOVERY_PROMPT = `As an expert policy analyst, your task is
 
 You are analyzing the most substantive parts of each comment: their commenter profiles, core positions, key recommendations, and main concerns. These structured sections capture the essential policy arguments and positions taken by commenters.
 
-Your analysis should:
-1. IDENTIFY POLICY POSITIONS: Look for distinct policy stances, arguments, and viewpoints expressed in core positions
-2. CATEGORIZE RECOMMENDATIONS: Group similar policy suggestions, implementation approaches, and proposed changes
-3. ORGANIZE CONCERNS: Cluster related worries, objections, and potential problems raised by commenters
-4. CONSIDER COMMENTER CONTEXT: Use commenter profiles to understand the perspective and stakeholder group behind each position
-5. CREATE DEEP HIERARCHY: Go as deep as needed to capture all nuances. If a theme has sub-aspects, create sub-themes. If those have further distinctions, create sub-sub-themes. Don't artificially limit depth.
-6. BE COMPREHENSIVE: Capture every distinct viewpoint, concern, or recommendation. It's better to have too many specific themes than to lose important distinctions.
-7. PRIORITIZE SPECIFICITY: When in doubt, create a more specific sub-theme rather than lumping concepts together.
+CRITICAL RULE: Organize themes by ISSUE AREAS and TOPICS, not by stance or perspective. NEVER create themes like "Support for X" vs "Opposition to X". Instead, create themes around specific issues where both supporters and opponents can be found together.
 
-Focus on substantive policy content rather than procedural comments or general statements. Each theme should capture a meaningful policy position, recommendation, or concern that appears across multiple comments or represents a significant stakeholder viewpoint.
+Your analysis should:
+1. IDENTIFY ISSUE AREAS: Look for distinct policy topics, implementation challenges, affected populations, or specific provisions being discussed
+2. GROUP BY SUBJECT MATTER: Organize themes around what is being discussed (e.g., "Impact on Small Businesses", "Healthcare Access", "Implementation Timeline") rather than positions taken
+3. CAPTURE DEBATES WITHIN THEMES: Each theme should potentially contain both supportive and critical viewpoints about that specific issue
+4. CATEGORIZE RECOMMENDATIONS: Group policy suggestions by the problem they address or the area they affect, not by whether they support or oppose
+5. ORGANIZE CONCERNS: Cluster worries and objections by the specific issue area they relate to (e.g., "Cost Implications", "Legal Challenges", "Technical Feasibility")
+6. CREATE DEEP HIERARCHY: Go as deep as needed to capture all nuances. If a theme has sub-aspects, create sub-themes. If those have further distinctions, create sub-sub-themes. Don't artificially limit depth.
+7. BE COMPREHENSIVE: Capture every distinct issue area and topic. It's better to have too many specific themes than to lose important distinctions.
+8. AVOID PERSPECTIVE-BASED GROUPING: Never use theme names like "Arguments For", "Arguments Against", "Support", "Opposition", "Proponents Say", "Critics Argue". Use neutral, issue-focused titles.
+
+Examples of GOOD theme names:
+- "Impact on Rural Healthcare Facilities"
+- "Compliance Costs and Administrative Burden"
+- "Timeline and Implementation Challenges"
+- "Effects on Vulnerable Populations"
+- "Data Privacy and Security Requirements"
+
+Examples of BAD theme names (avoid these):
+- "Support for the Proposed Rule"
+- "Opposition to Changes"
+- "Arguments in Favor"
+- "Criticisms and Objections"
+- "Positive Impacts" vs "Negative Impacts"
+
+Focus on substantive policy content rather than procedural comments or general statements. Each theme should capture a meaningful issue area that appears across multiple comments, potentially with diverse viewpoints about that issue.
 
 IMPORTANT: Do not limit yourself to 2 or 3 levels. Go as deep as the content requires - 4, 5, or even 6 levels if needed to fully capture the nuances in the comments.
 
@@ -74,17 +91,21 @@ You have now reviewed all the structured comment sections. Proceed with generati
  */
 export const THEME_MERGE_PROMPT = `You are a senior analyst tasked with synthesizing research. Your goal is to merge multiple theme taxonomies into a single, comprehensive two-level hierarchy that preserves the richness and specificity of important topics.
 
+CRITICAL RULE: Organize themes by ISSUE AREAS and TOPICS, not by stance or perspective. If you see themes organized by support vs. opposition, you MUST reorganize them by the actual issues being discussed.
+
 Your input taxonomies:
 {TAXONOMIES}
 
 Your process should be:
 
-1. **EXTRACT ALL SUBSTANTIVE TOPICS**: Identify every topic from the source taxonomies that could warrant a focused one-page explainer. This includes:
-   - Specific policy proposals (e.g., "Require all new buildings over 5 stories to include rooftop gardens")
-   - Key tensions or debates (e.g., "Bike Lane Expansion vs. Street Parking Preservation")
-   - Specific problem areas (e.g., "Textbook Publishers' Bundling Practices")
-   - Distinct stakeholder concerns (e.g., "Small Farmers' Barriers to Organic Certification")
-   - Concrete technical issues (e.g., "Legacy COBOL Systems in State Unemployment Offices")
+1. **FIX PERSPECTIVE-BASED GROUPING**: If you see themes like "Support for X" and "Opposition to X", reorganize them into issue-based themes like "Impact of X on Healthcare", "Legal Implications of X", "Implementation Challenges with X", etc. Each new theme should potentially contain both supportive and critical viewpoints.
+
+2. **EXTRACT ALL SUBSTANTIVE TOPICS**: Identify every topic from the source taxonomies that could warrant a focused one-page explainer. This includes:
+   - Specific policy issues (e.g., "Impact on Emergency Medical Services")
+   - Implementation challenges (e.g., "Database Integration Requirements")
+   - Affected populations (e.g., "Effects on Rural Communities")
+   - Specific provisions or requirements (e.g., "90-Day Reporting Deadline")
+   - Cost and resource implications (e.g., "Staffing Requirements for Compliance")
 
 2. **CREATE DEPTH-TWO NODES LIBERALLY**: Each important topic gets its own depth-two node. Ask yourself: "Would someone write a policy brief about this specific issue?" If yes, it deserves its own node. Aim for 50-100 depth-two nodes total rather than 20-30.
 

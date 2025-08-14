@@ -442,12 +442,36 @@ export function parseThemeHierarchy(text: string): ParsedTheme[] {
     const code = codeMatch[1];
     const afterCode = themeContent.substring(codeMatch[0].length);
     
-    // Find first ". " that's not part of "vs. "
-    const labelMatch = afterCode.match(/^(.*?)(?<!vs)\.\s(.*)$/s);
-    if (!labelMatch) continue;
+    // Find first ". " that's not part of common abbreviations like "vs." or "U.S."
+    // Try to intelligently split the label from the rest of the content
+    let label = '';
+    let restOfContent = '';
     
-    const label = labelMatch[1];
-    const restOfContent = labelMatch[2];
+    // First try to find a clear sentence boundary (period followed by space and capital letter)
+    const sentenceMatch = afterCode.match(/^(.+?[^U.S][^vs])\.\s+([A-Z].*)$/s);
+    if (sentenceMatch) {
+      label = sentenceMatch[1];
+      restOfContent = sentenceMatch[2];
+    } else {
+      // Fallback: look for any period-space, but handle common abbreviations
+      const parts = afterCode.split(/\.\s+/);
+      if (parts.length >= 2) {
+        // Check if first part ends with known abbreviation patterns
+        const firstPart = parts[0];
+        if (firstPart.endsWith(' U.S') || firstPart.endsWith(' vs')) {
+          // This is an abbreviation, include the next part in the label
+          label = parts[0] + '. ' + (parts[1] || '');
+          restOfContent = parts.slice(2).join('. ');
+        } else {
+          label = parts[0];
+          restOfContent = parts.slice(1).join('. ');
+        }
+      } else {
+        // No clear split point, use the whole thing as label
+        label = afterCode;
+        restOfContent = '';
+      }
+    }
     const level = code.split(".").length;
     
     // Determine parent code
@@ -655,4 +679,104 @@ async function extractPdfText(buffer: Buffer | Uint8Array): Promise<string> {
       // Ignore cleanup errors
     }
   }
+}
+
+// ============================================================================
+// CLUSTERING HELPER FUNCTIONS FOR STORED CLUSTERS
+// ============================================================================
+
+// Check if clustering exists in database
+export function checkClusteringStatus(db: Database): boolean {
+  const status = db.prepare(
+    "SELECT 1 FROM clustering_status WHERE status = 'completed' LIMIT 1"
+  ).get();
+  return !!status;
+}
+
+// Get stored representative IDs from database
+export function getStoredRepresentativeIds(db: Database): Set<string> | null {
+  if (!checkClusteringStatus(db)) return null;
+  
+  const reps = db.prepare(`
+    SELECT comment_id 
+    FROM comment_cluster_membership 
+    WHERE is_representative = 1
+  `).all() as { comment_id: string }[];
+  
+  return new Set(reps.map(r => r.comment_id));
+}
+
+// Get cluster size for a specific comment
+export function getClusterSize(db: Database, commentId: string): number {
+  const result = db.prepare(`
+    SELECT cc.cluster_size 
+    FROM comment_cluster_membership ccm
+    JOIN comment_clusters cc ON ccm.cluster_id = cc.cluster_id
+    WHERE ccm.comment_id = ?
+  `).get(commentId) as { cluster_size: number } | undefined;
+  
+  return result?.cluster_size || 1;
+}
+
+// Get clustering statistics from database
+export function getClusteringStatistics(db: Database): {
+  totalComments: number;
+  totalClusters: number;
+  representativeCount: number;
+  duplicatesFiltered: number;
+  largestClusterSize: number;
+  similarityThreshold: number;
+  minClusterSize: number;
+  createdAt: string;
+} | null {
+  const status = db.prepare(
+    "SELECT * FROM clustering_status WHERE status = 'completed' ORDER BY created_at DESC LIMIT 1"
+  ).get() as any;
+  
+  if (!status) return null;
+  
+  const largestCluster = db.prepare(
+    "SELECT MAX(cluster_size) as max FROM comment_clusters"
+  ).get() as { max: number };
+  
+  return {
+    totalComments: status.total_comments,
+    totalClusters: status.total_clusters,
+    representativeCount: status.representative_count,
+    duplicatesFiltered: status.duplicates_filtered,
+    largestClusterSize: largestCluster.max,
+    similarityThreshold: status.similarity_threshold,
+    minClusterSize: status.min_cluster_size,
+    createdAt: status.created_at
+  };
+}
+
+// Load only representative comments from clustering
+export function loadRepresentativeComments(
+  db: Database,
+  limit?: number
+): RawComment[] {
+  let query = `
+    SELECT c.id, c.attributes_json
+    FROM comments c
+    INNER JOIN comment_cluster_membership ccm ON c.id = ccm.comment_id
+    WHERE ccm.is_representative = 1
+  `;
+  
+  if (limit) {
+    query += ` LIMIT ${limit}`;
+  }
+  
+  return db.prepare(query).all() as RawComment[];
+}
+
+// Check if a comment is a cluster representative
+export function isRepresentative(db: Database, commentId: string): boolean {
+  const result = db.prepare(`
+    SELECT is_representative 
+    FROM comment_cluster_membership 
+    WHERE comment_id = ? AND is_representative = 1
+  `).get(commentId);
+  
+  return !!result;
 }

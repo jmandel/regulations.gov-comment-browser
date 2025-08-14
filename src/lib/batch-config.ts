@@ -46,7 +46,6 @@ export interface BatchConfigFile {
   tasks: {
     condense?: TaskConfig;
     discoverThemes?: TaskConfig;
-    scoreThemes?: TaskConfig;
     summarizeThemes?: TaskConfig;
     extractThemeContent?: TaskConfig;
     discoverEntities?: EntityTaskConfig;

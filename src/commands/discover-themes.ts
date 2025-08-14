@@ -3,7 +3,7 @@ import { openDb, withTransaction } from "../lib/database";
 import type { Database } from "bun:sqlite";
 import { initDebug } from "../lib/debug";
 import { AIClient } from "../lib/ai-client";
-import { loadCondensedComments, parseThemeHierarchy, getRepresentativeCommentIds } from "../lib/comment-processing";
+import { loadCondensedComments, parseThemeHierarchy, checkClusteringStatus, getStoredRepresentativeIds } from "../lib/comment-processing";
 import { createEvenBatches, DEFAULT_BATCH_OPTIONS } from "../lib/batch-processor";
 import { THEME_DISCOVERY_PROMPT, THEME_MERGE_PROMPT } from "../prompts/theme-discovery";
 import { TaskQueue, buildHierarchicalTasks, type Task } from "../lib/task-queue";
@@ -19,8 +19,7 @@ export const discoverThemesCommand = new Command("discover-themes")
   .option("-c, --concurrency <n>", "Number of parallel API calls (default: 5)", parseInt)
   .option("-m, --model <model>", "AI model to use (overrides config)")
   .option("--merge-width <n>", "Number of taxonomies to merge at once (default: 10)", parseInt)
-  .option("--filter-duplicates", "Filter out duplicate comments using clustering")
-  .option("--similarity-threshold <n>", "Similarity threshold for duplicate filtering (default: 0.8)", parseFloat)
+  .option("--use-clustering", "Use stored clustering to process only representative comments")
   .action(discoverThemes);
 
 async function discoverThemes(documentId: string, options: any) {
@@ -43,11 +42,16 @@ async function discoverThemes(documentId: string, options: any) {
     return;
   }
   
-  // Optionally filter duplicates using clustering
+  // Use stored clustering if requested
   let filterIds: Set<string> | undefined;
-  if (options.filterDuplicates) {
-    const threshold = options.similarityThreshold || 0.8;
-    filterIds = await getRepresentativeCommentIds(db, threshold);
+  if (options.useClustering) {
+    const storedReps = getStoredRepresentativeIds(db);
+    if (!storedReps) {
+      console.error("❌ No clustering data found. Run 'cluster-comments-fast' first.");
+      process.exit(1);
+    }
+    console.log("🔗 Using stored clustering data");
+    filterIds = storedReps;
   }
   
   // Load condensed comments (filtered if requested)
@@ -57,7 +61,7 @@ async function discoverThemes(documentId: string, options: any) {
     return;
   }
   
-  console.log(`📊 Loaded ${comments.length} condensed comments${filterIds ? ' (filtered for duplicates)' : ''}`);
+  console.log(`📊 Loaded ${comments.length} condensed comments${filterIds ? ' (representatives only)' : ''}`);
   
   // Load task configuration
   const taskConfig = getTaskConfig('discoverThemes', options.model);

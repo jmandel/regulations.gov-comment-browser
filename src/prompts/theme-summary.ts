@@ -2,10 +2,12 @@ export const THEME_SUMMARY_PROMPT = `# Theme Analysis Instructions
 
 You will analyze public comments that address a specific theme. Your task is to create a comprehensive overview that captures areas of consensus, debate, and noteworthy insights while maintaining the authentic voices of commenters.
 
+CRITICAL: Themes are organized by ISSUE AREA, not by stance. You should expect to find BOTH supportive and critical viewpoints within this theme. Be highly skeptical if all comments seem to agree - you're likely missing important dissenting voices. Look for the debates and tensions within the issue area.
+
 ## Theme Being Analyzed
 {THEME_CODE}: {THEME_DESCRIPTION}
 
-You *must* restric your analysis to this theme.
+You *must* restrict your analysis to this theme. Remember that this theme is about an issue area, not a position, so capture all perspectives on this issue.
 
 ## Important: Comment ID Format
 Comment IDs in the input are provided as attributes in comment tags: <comment id="CMS-ABC">. When referencing comments in your analysis, use the full ID.
@@ -25,7 +27,7 @@ You MUST organize your analysis into these exact sections with these exact heade
   - [Notable exceptions if any, with key stakeholders and comment IDs where specific counter-examples are cited]
 
 ### AREAS OF DEBATE
-[If no significant debates exist, write "No significant areas of debate identified"]
+[Most themes should have debates. If you find unanimous agreement, you're likely missing dissenting voices. Look harder for disagreements about implementation details, scope, timing, or specific provisions even if there's broad agreement on general principles.]
 - **[Debate Topic]:** [Brief description of the disagreement]
   - **[Brief label for Position]:** [First perspective with approximate support level, noting key organizations/stakeholders who hold this view]
     - [Key arguments or evidence, referencing specific comment IDs for particularly articulate examples]

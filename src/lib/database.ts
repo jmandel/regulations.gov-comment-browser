@@ -26,6 +26,22 @@ export function openDb(documentId: string): Database {
 
 export function initSchema(db: Database) {
   db.exec(`
+    -- Document metadata from regulations.gov
+    CREATE TABLE IF NOT EXISTS document_metadata (
+      document_id TEXT PRIMARY KEY,
+      title TEXT,
+      docket_id TEXT,
+      agency_id TEXT,
+      agency_name TEXT,
+      document_type TEXT,
+      posted_date TEXT,
+      comment_start_date TEXT,
+      comment_end_date TEXT,
+      metadata_json TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
     -- Raw comments from regulations.gov
     CREATE TABLE IF NOT EXISTS comments (
       id TEXT PRIMARY KEY,
@@ -151,6 +167,7 @@ export function initSchema(db: Database) {
       comment_id TEXT NOT NULL,
       theme_code TEXT NOT NULL,
       extract_json TEXT NOT NULL, -- JSON with positions, concerns, recommendations specific to theme
+      cluster_size INTEGER DEFAULT 1, -- Number of comments this extract represents
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (comment_id, theme_code),
       FOREIGN KEY (comment_id) REFERENCES comments(id),
@@ -159,6 +176,48 @@ export function initSchema(db: Database) {
     
     -- Index for efficient theme-based queries
     CREATE INDEX IF NOT EXISTS idx_theme_extracts_theme ON comment_theme_extracts(theme_code);
+    
+    -- Comment clusters based on similarity analysis
+    CREATE TABLE IF NOT EXISTS comment_clusters (
+      cluster_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      representative_comment_id TEXT NOT NULL UNIQUE,
+      cluster_size INTEGER NOT NULL,
+      similarity_threshold REAL NOT NULL,
+      cluster_method TEXT NOT NULL DEFAULT 'jaccard',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (representative_comment_id) REFERENCES comments(id)
+    );
+    
+    -- Track all cluster members
+    CREATE TABLE IF NOT EXISTS comment_cluster_membership (
+      comment_id TEXT PRIMARY KEY,
+      cluster_id INTEGER NOT NULL,
+      is_representative BOOLEAN NOT NULL DEFAULT 0,
+      similarity_score REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (comment_id) REFERENCES comments(id),
+      FOREIGN KEY (cluster_id) REFERENCES comment_clusters(cluster_id)
+    );
+    
+    -- Clustering run metadata
+    CREATE TABLE IF NOT EXISTS clustering_status (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      total_comments INTEGER NOT NULL,
+      total_clusters INTEGER NOT NULL,
+      representative_count INTEGER NOT NULL,
+      duplicates_filtered INTEGER NOT NULL,
+      similarity_threshold REAL NOT NULL,
+      min_cluster_size INTEGER NOT NULL,
+      cluster_method TEXT NOT NULL DEFAULT 'jaccard',
+      status TEXT DEFAULT 'completed' CHECK(status IN ('pending', 'processing', 'completed', 'failed')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME
+    );
+    
+    -- Indexes for clustering performance
+    CREATE INDEX IF NOT EXISTS idx_cluster_membership_cluster ON comment_cluster_membership(cluster_id);
+    CREATE INDEX IF NOT EXISTS idx_cluster_membership_representative ON comment_cluster_membership(is_representative);
+    CREATE INDEX IF NOT EXISTS idx_cluster_representative ON comment_clusters(representative_comment_id);
   `);
 }
 

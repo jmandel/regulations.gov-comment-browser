@@ -50,52 +50,179 @@ async function buildWebsite(documentId: string, options: any) {
 }
 
 function getStats(db: any) {
+  // Check if clustering tables exist AND have data
+  const hasClusteringTables = db.prepare(`
+    SELECT name FROM sqlite_master 
+    WHERE type='table' AND name='comment_clusters'
+  `).get();
+  
+  const hasClusteringData = hasClusteringTables ? db.prepare(`
+    SELECT COUNT(*) as count FROM comment_cluster_membership
+  `).get()?.count > 0 : false;
+  
+  let totalComments;
+  if (hasClusteringData) {
+    // Get the actual total including cluster sizes
+    const clusterStats = db.prepare(`
+      SELECT 
+        COUNT(*) as total_comments,
+        COALESCE(SUM(cluster_size), COUNT(*)) as actual_submissions
+      FROM comments c
+      LEFT JOIN comment_cluster_membership ccm ON c.id = ccm.comment_id
+      LEFT JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id AND ccm.is_representative = 1
+    `).get();
+    
+    // Use actual_submissions if clustering exists, otherwise fall back to total_comments
+    totalComments = clusterStats.actual_submissions || clusterStats.total_comments;
+  } else {
+    totalComments = db.prepare("SELECT COUNT(*) as count FROM comments").get().count;
+  }
+  
   return {
-    totalComments: db.prepare("SELECT COUNT(*) as count FROM comments").get().count,
+    totalComments,
     condensedComments: db.prepare("SELECT COUNT(*) as count FROM condensed_comments WHERE status = 'completed'").get().count,
     totalThemes: db.prepare("SELECT COUNT(*) as count FROM theme_hierarchy").get().count,
     totalEntities: db.prepare("SELECT COUNT(*) as count FROM entity_taxonomy").get().count,
-    scoredComments: db.prepare("SELECT COUNT(DISTINCT comment_id) as count FROM comment_theme_extracts").get().count,
+    scoredComments: hasClusteringData 
+      ? db.prepare(`
+          SELECT COALESCE(SUM(cluster_size), 0) as count
+          FROM (
+            SELECT DISTINCT ccl.cluster_id, ccl.cluster_size
+            FROM comment_theme_extracts cte
+            JOIN comment_cluster_membership ccm ON cte.comment_id = ccm.comment_id
+            JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id
+            WHERE ccm.is_representative = 1
+          )
+        `).get().count || db.prepare("SELECT COUNT(DISTINCT comment_id) as count FROM comment_theme_extracts").get().count
+      : db.prepare("SELECT COUNT(DISTINCT comment_id) as count FROM comment_theme_extracts").get().count,
     themeSummaries: db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get().count,
   };
 }
 
 function getThemeHierarchy(db: any) {
-  const themes = db.prepare(`
-    SELECT 
-      t.code,
-      t.description,
-      t.level,
-      t.parent_code,
-      t.detailed_guidelines,
-      COUNT(DISTINCT cte.comment_id) as comment_count,
-      COUNT(DISTINCT cte.comment_id) as direct_count,
-      0 as touch_count
-    FROM theme_hierarchy t
-    LEFT JOIN comment_theme_extracts cte ON t.code = cte.theme_code
-    GROUP BY t.code
-    ORDER BY t.code
-  `).all();
+  // Check if detailed_guidelines column exists
+  const hasDetailedGuidelines = db.prepare(`
+    SELECT COUNT(*) as count 
+    FROM pragma_table_info('theme_hierarchy') 
+    WHERE name='detailed_guidelines'
+  `).get().count > 0;
+  
+  // Check if clustering data exists
+  const hasClusteringData = db.prepare(`
+    SELECT COUNT(*) as count 
+    FROM pragma_table_info('comment_theme_extracts') 
+    WHERE name='cluster_size'
+  `).get().count > 0;
+  
+  let themes;
+  if (hasClusteringData) {
+    // Include cluster sizes in counts
+    themes = db.prepare(`
+      SELECT 
+        t.code,
+        t.description,
+        t.level,
+        t.parent_code,
+        ${hasDetailedGuidelines ? 't.detailed_guidelines' : 'NULL as detailed_guidelines'},
+        COALESCE(SUM(cte.cluster_size), COUNT(DISTINCT cte.comment_id)) as comment_count,
+        COALESCE(SUM(cte.cluster_size), COUNT(DISTINCT cte.comment_id)) as direct_count,
+        0 as touch_count
+      FROM theme_hierarchy t
+      LEFT JOIN comment_theme_extracts cte ON t.code = cte.theme_code
+      GROUP BY t.code
+      ORDER BY t.code
+    `).all();
+  } else {
+    // Fallback to simple count
+    themes = db.prepare(`
+      SELECT 
+        t.code,
+        t.description,
+        t.level,
+        t.parent_code,
+        ${hasDetailedGuidelines ? 't.detailed_guidelines' : 'NULL as detailed_guidelines'},
+        COUNT(DISTINCT cte.comment_id) as comment_count,
+        COUNT(DISTINCT cte.comment_id) as direct_count,
+        0 as touch_count
+      FROM theme_hierarchy t
+      LEFT JOIN comment_theme_extracts cte ON t.code = cte.theme_code
+      GROUP BY t.code
+      ORDER BY t.code
+    `).all();
+  }
   
   // Build hierarchy without quotes
-  return themes.map((t: any) => ({
-    ...t,
-    children: themes.filter((child: any) => child.parent_code === t.code).map((c: any) => c.code)
-  }));
+  return themes.map((t: any) => {
+    // Fix truncated descriptions by using the first sentence of detailed_guidelines
+    let description = t.description;
+    if (t.detailed_guidelines && t.description) {
+      // Check if description appears truncated (ends with "U.S" or other incomplete words)
+      const seemsTruncated = t.description.match(/\s+\w+\.\w{1,2}$/) || // Ends with abbreviation like "U.S"
+                             (!t.description.includes('.') && t.description.length < 50); // Short with no period
+      
+      if (seemsTruncated) {
+        // Try to extract the complete theme name from detailed_guidelines
+        // Look for pattern like "Citizen Children. This theme..."
+        const match = t.detailed_guidelines.match(/^(.+?)\.\s+This theme/);
+        if (match) {
+          // Combine truncated description with the completion from guidelines
+          const completion = match[1];
+          if (!completion.startsWith(t.description)) {
+            // The guidelines start with just the completion part
+            description = t.description + ". " + completion;
+          } else {
+            // The guidelines repeat the full description
+            description = completion;
+          }
+        }
+      }
+    }
+    
+    return {
+      ...t,
+      description,
+      children: themes.filter((child: any) => child.parent_code === t.code).map((c: any) => c.code)
+    };
+  });
 }
 
 function getThemeSummaries(db: any) {
-  const summaries = db.prepare(`
-    SELECT 
-      ts.theme_code,
-      ts.structured_sections,
-      ts.comment_count,
-      ts.word_count,
-      th.description as theme_description
-    FROM theme_summaries ts
-    JOIN theme_hierarchy th ON ts.theme_code = th.code
-    ORDER BY ts.theme_code
-  `).all();
+  // Check if clustering data exists
+  const hasClusteringData = db.prepare(`
+    SELECT COUNT(*) as count 
+    FROM pragma_table_info('comment_theme_extracts') 
+    WHERE name='cluster_size'
+  `).get().count > 0;
+  
+  let summaries;
+  if (hasClusteringData) {
+    // Get cluster-weighted comment count
+    summaries = db.prepare(`
+      SELECT 
+        ts.theme_code,
+        ts.structured_sections,
+        COALESCE(SUM(cte.cluster_size), ts.comment_count) as comment_count,
+        ts.word_count,
+        th.description as theme_description
+      FROM theme_summaries ts
+      JOIN theme_hierarchy th ON ts.theme_code = th.code
+      LEFT JOIN comment_theme_extracts cte ON ts.theme_code = cte.theme_code
+      GROUP BY ts.theme_code
+      ORDER BY ts.theme_code
+    `).all();
+  } else {
+    summaries = db.prepare(`
+      SELECT 
+        ts.theme_code,
+        ts.structured_sections,
+        ts.comment_count,
+        ts.word_count,
+        th.description as theme_description
+      FROM theme_summaries ts
+      JOIN theme_hierarchy th ON ts.theme_code = th.code
+      ORDER BY ts.theme_code
+    `).all();
+  }
   
   // Parse structured sections and create a map
   const summaryMap: any = {};
@@ -114,15 +241,41 @@ function getThemeSummaries(db: any) {
 }
 
 function getEntityTaxonomy(db: any) {
-  const entities = db.prepare(`
-    SELECT 
-      e.*,
-      COUNT(DISTINCT ce.comment_id) as mention_count
-    FROM entity_taxonomy e
-    LEFT JOIN comment_entities ce ON e.category = ce.category AND e.label = ce.entity_label
-    GROUP BY e.category, e.label
-    ORDER BY e.category, mention_count DESC
-  `).all();
+  // Check if clustering tables exist AND have data
+  const hasClusteringTables = db.prepare(`
+    SELECT name FROM sqlite_master 
+    WHERE type='table' AND name='comment_cluster_membership'
+  `).get();
+  
+  const hasClusteringData = hasClusteringTables ? db.prepare(`
+    SELECT COUNT(*) as count FROM comment_cluster_membership
+  `).get()?.count > 0 : false;
+  
+  let entities;
+  if (hasClusteringData) {
+    // Include cluster sizes in entity mention counts
+    entities = db.prepare(`
+      SELECT 
+        e.*,
+        COALESCE(SUM(COALESCE(ccl.cluster_size, 1)), COUNT(DISTINCT ce.comment_id)) as mention_count
+      FROM entity_taxonomy e
+      LEFT JOIN comment_entities ce ON e.category = ce.category AND e.label = ce.entity_label
+      LEFT JOIN comment_cluster_membership ccm ON ce.comment_id = ccm.comment_id
+      LEFT JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id
+      GROUP BY e.category, e.label
+      ORDER BY e.category, mention_count DESC
+    `).all();
+  } else {
+    entities = db.prepare(`
+      SELECT 
+        e.*,
+        COUNT(DISTINCT ce.comment_id) as mention_count
+      FROM entity_taxonomy e
+      LEFT JOIN comment_entities ce ON e.category = ce.category AND e.label = ce.entity_label
+      GROUP BY e.category, e.label
+      ORDER BY e.category, mention_count DESC
+    `).all();
+  }
   
   // Group by category
   const taxonomy: any = {};
@@ -144,23 +297,65 @@ function getEntityTaxonomy(db: any) {
 async function exportAllComments(db: any, outputDir: string, documentId: string) {
   console.log("  📄 Exporting all comments...");
   
-  const comments = db.prepare(`
-    SELECT 
-      c.id,
-      c.attributes_json,
-      cc.structured_sections,
-      cc.word_count,
-      GROUP_CONCAT(DISTINCT cte.theme_code) as theme_codes,
-      GROUP_CONCAT(DISTINCT ce.category || '|' || ce.entity_label) as entities,
-      COUNT(DISTINCT a.id) as attachment_count
-    FROM comments c
-    LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
-    LEFT JOIN comment_theme_extracts cte ON c.id = cte.comment_id
-    LEFT JOIN comment_entities ce ON c.id = ce.comment_id
-    LEFT JOIN attachments a ON c.id = a.comment_id
-    GROUP BY c.id
-    ORDER BY c.id
-  `).all();
+  // Check if clustering tables exist AND have data
+  const hasClusteringTables = db.prepare(`
+    SELECT name FROM sqlite_master 
+    WHERE type='table' AND name='comment_cluster_membership'
+  `).get();
+  
+  const hasClusteringData = hasClusteringTables ? db.prepare(`
+    SELECT COUNT(*) as count FROM comment_cluster_membership
+  `).get()?.count > 0 : false;
+  
+  let comments;
+  if (hasClusteringData) {
+    // Include clustering data if tables exist
+    comments = db.prepare(`
+      SELECT 
+        c.id,
+        c.attributes_json,
+        COALESCE(cc.structured_sections, cc_rep.structured_sections) as structured_sections,
+        COALESCE(cc.word_count, cc_rep.word_count) as word_count,
+        GROUP_CONCAT(DISTINCT cte.theme_code) as theme_codes,
+        GROUP_CONCAT(DISTINCT ce.category || '|' || ce.entity_label) as entities,
+        COUNT(DISTINCT a.id) as attachment_count,
+        ccl.cluster_size,
+        ccm.is_representative,
+        ccl.representative_comment_id as cluster_representative_id,
+        CASE WHEN cc.structured_sections IS NULL AND cc_rep.structured_sections IS NOT NULL THEN 1 ELSE 0 END as uses_representative_summary
+      FROM comments c
+      LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
+      LEFT JOIN comment_cluster_membership ccm ON c.id = ccm.comment_id
+      LEFT JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id
+      LEFT JOIN condensed_comments cc_rep ON ccl.representative_comment_id = cc_rep.comment_id
+      LEFT JOIN comment_theme_extracts cte ON c.id = cte.comment_id
+      LEFT JOIN comment_entities ce ON c.id = ce.comment_id
+      LEFT JOIN attachments a ON c.id = a.comment_id
+      GROUP BY c.id
+      ORDER BY c.id
+    `).all();
+  } else {
+    // Fallback query without clustering tables
+    comments = db.prepare(`
+      SELECT 
+        c.id,
+        c.attributes_json,
+        cc.structured_sections,
+        cc.word_count,
+        GROUP_CONCAT(DISTINCT cte.theme_code) as theme_codes,
+        GROUP_CONCAT(DISTINCT ce.category || '|' || ce.entity_label) as entities,
+        COUNT(DISTINCT a.id) as attachment_count,
+        NULL as cluster_size,
+        NULL as is_representative
+      FROM comments c
+      LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
+      LEFT JOIN comment_theme_extracts cte ON c.id = cte.comment_id
+      LEFT JOIN comment_entities ce ON c.id = ce.comment_id
+      LEFT JOIN attachments a ON c.id = a.comment_id
+      GROUP BY c.id
+      ORDER BY c.id
+    `).all();
+  }
   
   // Process comments
   const processedComments = comments.map((c: any) => {
@@ -209,6 +404,10 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
       entities,
       hasAttachments: c.attachment_count > 0,
       wordCount,
+      clusterSize: c.cluster_size || 1,
+      isClusterRepresentative: c.is_representative === 1,
+      clusterRepresentativeId: c.cluster_representative_id || null,
+      isAlignedSummary: c.uses_representative_summary === 1,
     };
   });
   

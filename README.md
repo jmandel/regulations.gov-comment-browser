@@ -29,7 +29,7 @@ This section provides a high-level overview of the main commands. For a detailed
 
 All commands follow the pattern:
 ```bash
-bun run src/cli.ts <command> <document-id> [options]
+bun run cli <command> <document-id> [options]
 ```
 
 ### Step 1: `load` - Load Comments
@@ -38,12 +38,12 @@ Load comments from a CSV file (recommended) or the regulations.gov API.
 
 **From CSV:**
 ```bash
-bun run load CMS-2025-0050-0031.csv --limit 500
+bun run cli load CMS-2025-0050-0031.csv --limit 500
 ```
 
 **From API:**
 ```bash
-bun run load CMS-2025-0050-0031 --limit 100
+bun run cli load CMS-2025-0050-0031 --limit 100
 ```
 
 ### Step 2: `condense` - Create Structured Summaries
@@ -51,7 +51,7 @@ bun run load CMS-2025-0050-0031 --limit 100
 Generate condensed, structured versions of each comment using an AI model.
 
 ```bash
-bun run condense CMS-2025-0050-0031 --limit 100
+bun run cli condense CMS-2025-0050-0031 --limit 100
 ```
 
 ### Step 3: `discover-themes` - Discover Theme Taxonomy
@@ -59,7 +59,7 @@ bun run condense CMS-2025-0050-0031 --limit 100
 Analyze comments to build a hierarchical taxonomy of themes and topics discussed.
 
 ```bash
-bun run discover-themes CMS-2025-0050-0031 --filter-duplicates
+bun run cli discover-themes CMS-2025-0050-0031 --filter-duplicates
 ```
 *   Use `--filter-duplicates` to remove form letters and improve theme quality.
 
@@ -68,7 +68,7 @@ bun run discover-themes CMS-2025-0050-0031 --filter-duplicates
 For each comment, extract the specific sentences and arguments that are relevant to each theme in the taxonomy. This is a critical step for high-quality summaries.
 
 ```bash
-bun run extract-theme-content CMS-2025-0050-0031
+bun run cli extract-theme-content CMS-2025-0050-0031
 ```
 
 ### Step 5: `summarize-themes-v2` - Generate Theme Summaries
@@ -76,7 +76,7 @@ bun run extract-theme-content CMS-2025-0050-0031
 Synthesize all the theme-specific extracts into a comprehensive narrative analysis for each theme.
 
 ```bash
-bun run summarize-themes-v2 CMS-2025-0050-0031 --filter-duplicates
+bun run cli summarize-themes-v2 CMS-2025-0050-0031 --filter-duplicates
 ```
 
 ### Step 6: `discover-entities-v2` - Discover Entities
@@ -84,7 +84,7 @@ bun run summarize-themes-v2 CMS-2025-0050-0031 --filter-duplicates
 Extract named entities (organizations, programs, etc.) from comments and build a taxonomy.
 
 ```bash
-bun run discover-entities-v2 CMS-2025-0050-0031
+bun run cli discover-entities-v2 CMS-2025-0050-0031
 ```
 
 ### Step 7: `build-website` - Build the Dashboard Data
@@ -92,7 +92,7 @@ bun run discover-entities-v2 CMS-2025-0050-0031
 Generate all necessary JSON files for the interactive web dashboard.
 
 ```bash
-bun run build-website CMS-2025-0050-0031
+bun run cli build-website CMS-2025-0050-0031
 ```
 
 ### Step 8: `vacuum-db` - Optimize Database
@@ -100,7 +100,7 @@ bun run build-website CMS-2025-0050-0031
 Clean and optimize the SQLite database to reduce file size.
 
 ```bash
-bun run vacuum-db CMS-2025-0050-0031
+bun run cli vacuum-db CMS-2025-0050-0031
 ```
 
 ## Utility Commands
@@ -111,13 +111,13 @@ Execute the entire 8-step pipeline in sequence with automatic crash recovery.
 
 ```bash
 # Run the complete pipeline with a CSV file
-bun run pipeline CMS-2025-0050-0031.csv
+bun run cli pipeline CMS-2025-0050-0031.csv
 
 # Start from a specific step (e.g., step 4 = extract-theme-content)
-bun run pipeline CMS-2025-0050-0031.csv --start-at 4
+bun run cli pipeline CMS-2025-0050-0031.csv --start-at 4
 
 # Filter duplicates and set a similarity threshold
-bun run pipeline CMS-2025-0050-0031.csv --filter-duplicates --similarity-threshold 0.75
+bun run cli pipeline CMS-2025-0050-0031.csv --filter-duplicates --similarity-threshold 0.75
 ```
 
 ### `generate-landing-page` - Create Main Index
@@ -125,7 +125,7 @@ bun run pipeline CMS-2025-0050-0031.csv --filter-duplicates --similarity-thresho
 Generate the `dist/index.html` landing page that lists all available regulation dashboards.
 
 ```bash
-bun run generate-landing-page
+bun run cli generate-landing-page
 ```
 
 ### `cache` - Manage the LLM Cache
@@ -134,10 +134,10 @@ Inspect and manage the LLM prompt/response cache stored in the database.
 
 ```bash
 # View cache statistics
-bun run cache stats CMS-2025-0050-0031
+bun run cli cache stats CMS-2025-0050-0031
 
 # Clear the entire cache
-bun run cache clear CMS-2025-0050-0031 --all
+bun run cli cache clear CMS-2025-0050-0031 --all
 ```
 
 ## Pipeline Deep Dive: Building Intuition
