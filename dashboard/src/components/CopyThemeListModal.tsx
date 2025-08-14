@@ -21,7 +21,7 @@ function CopyThemeListModal({ isOpen, onClose, themes }: CopyThemeListModalProps
 
   const buildThemeHierarchy = (themes: Theme[], parentCode: string | null = null, depth = 0): string => {
     let content = ''
-    const children = themes.filter(t => t.parent_code === parentCode && t.direct_count > 0)
+    const children = themes.filter(t => t.parent_code === parentCode)
     
     children.forEach(theme => {
       const indent = '  '.repeat(depth)
@@ -46,12 +46,12 @@ function CopyThemeListModal({ isOpen, onClose, themes }: CopyThemeListModalProps
     
     // Stats
     const totalThemes = themes.length
-    const themesWithMentions = themes.filter(t => t.direct_count > 0).length
+    const themesWithMentions = themes.length
     const totalMentions = themes.reduce((sum, t) => sum + t.direct_count, 0)
     
     content += `## Statistics\n`
     content += `- Total Themes: ${totalThemes}\n`
-    content += `- Themes with Direct Mentions: ${themesWithMentions}\n`
+    content += `- Themes: ${themesWithMentions}\n`
     content += `- Total Direct Mentions: ${totalMentions}\n\n`
     
     content += `## Theme Structure\n\n`

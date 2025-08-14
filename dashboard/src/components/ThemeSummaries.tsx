@@ -157,10 +157,13 @@ function ThemeSummaries() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">
                     {theme.code}: {theme.label || theme.description}
                   </h3>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <span>{theme.summary.commentCount} comments analyzed</span>
-                    <span>•</span>
-                    <span>{theme.direct_count} direct mentions</span>
+                  <div className="flex items-center space-x-3 text-sm">
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-medium whitespace-nowrap">
+                      {theme.direct_count.toLocaleString()} comments
+                      {theme.direct_count > theme.summary.commentCount && (
+                        <> ({theme.summary.commentCount.toLocaleString()} clusters)</>
+                      )}
+                    </span>
                   </div>
                 </div>
                 

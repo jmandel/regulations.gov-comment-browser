@@ -22,8 +22,8 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
   const themeTree = useMemo(() => {
     const tree: Record<string, Theme[]> = {}
     
-    // Group by parent - only show themes with direct mentions
-    themes.filter(t => true || t.direct_count > 0).forEach(theme => {
+    // Group by parent - show all themes
+    themes.forEach(theme => {
       const parent = theme.parent_code || 'root'
       if (!tree[parent]) tree[parent] = []
       tree[parent].push(theme)
@@ -111,7 +111,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
   }
   
   const expandAll = () => {
-    const allCodes = themes.filter(t => t.direct_count > 0).map(t => t.code)
+    const allCodes = themes.map(t => t.code)
     setExpandedNodes(new Set(allCodes))
   }
   
@@ -215,7 +215,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
   
   // Get root themes
   const rootThemes = themeTree['root'] || []
-  const visibleThemeCount = themes.filter(t => t.direct_count > 0).length
+  const visibleThemeCount = themes.length
   
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -285,9 +285,9 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-blue-600">
-            {themes.filter(t => t.direct_count > 0).length}
+            {themes.length}
           </div>
-          <div className="text-sm text-gray-600">Themes with Direct Mentions</div>
+          <div className="text-sm text-gray-600">Total Themes</div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-gray-900">

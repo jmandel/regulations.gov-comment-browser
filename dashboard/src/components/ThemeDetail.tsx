@@ -16,7 +16,11 @@ function ThemeDetail() {
   const themeSummary = themeCode ? themeSummaries[themeCode] : undefined
   const { direct } = themeCode ? getCommentsForTheme(themeCode) : { direct: [] }
   
-  const displayedComments = direct
+  // Filter to only show representative comments (or all if no clustering)
+  const displayedComments = direct.filter(c => 
+    c.isClusterRepresentative === true || 
+    c.isClusterRepresentative === undefined // For databases without clustering
+  )
   
   // Build theme hierarchy
   const themeHierarchy = useMemo(() => {
@@ -78,8 +82,11 @@ function ThemeDetail() {
                     <span className="text-gray-700 font-medium ml-3">{theme.label}</span>
                   )}
                 </h2>
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                  {theme.direct_count} {theme.direct_count === 1 ? 'comment' : 'comments'}
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium whitespace-nowrap">
+                  {theme.direct_count.toLocaleString()} {theme.direct_count === 1 ? 'comment' : 'comments'}
+                  {theme.direct_count > displayedComments.length && (
+                    <> ({displayedComments.length} {displayedComments.length === 1 ? 'cluster' : 'clusters'})</>
+                  )}
                 </span>
               </div>
               {theme.detailedDescription && (
@@ -159,7 +166,7 @@ function ThemeDetail() {
       
       {/* Sub-themes */}
       {(() => {
-        const childThemes = themes.filter(t => t.parent_code === theme.code && t.direct_count > 0)
+        const childThemes = themes.filter(t => t.parent_code === theme.code)
         return childThemes.length > 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Sub-themes</h2>
@@ -196,7 +203,11 @@ function ThemeDetail() {
       {/* Comments */}
       <div className="space-y-6">
         <h2 className="text-xl font-semibold text-gray-900">
-          Comments Addressing This Theme ({displayedComments.length})
+          {direct.some(c => c.isClusterRepresentative !== undefined) ? (
+            <>Representative Comments for This Theme ({displayedComments.length} clusters)</>
+          ) : (
+            <>Comments Addressing This Theme ({displayedComments.length})</>
+          )}
         </h2>
         
         {displayedComments.length > 0 ? (

@@ -1,4 +1,4 @@
-import { ExternalLink, Paperclip, Calendar, MapPin, User, Building2, Quote, FileText } from 'lucide-react'
+import { ExternalLink, Paperclip, Calendar, MapPin, User, Building2, Quote, FileText, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -86,6 +86,20 @@ function CommentCard({
           </div>
           
           <div className="flex items-center space-x-3">
+            {/* Cluster Badge */}
+            {comment.clusterSize && comment.clusterSize > 1 && comment.isClusterRepresentative && (
+              <span 
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+                title={`This comment represents ${comment.clusterSize} aligned submissions`}
+              >
+                <Users className="h-3 w-3" />
+                {comment.clusterSize > 100 ? (
+                  <span>{comment.clusterSize} aligned comments</span>
+                ) : (
+                  <span>+{comment.clusterSize - 1} similar</span>
+                )}
+              </span>
+            )}
             {/* ID */}
             <span className="text-xs font-mono text-gray-500 bg-gray-200 px-2 py-1 rounded" title="Comment ID">
               #{comment.id}
@@ -126,6 +140,13 @@ function CommentCard({
       
       {/* Main Content Area */}
       <div className="p-6">
+        {/* Show note if using aligned summary */}
+        {comment.isAlignedSummary && (
+          <div className="mb-3 p-2 bg-purple-50 border border-purple-200 rounded text-xs text-purple-800">
+            <span className="font-semibold">Note:</span> Summary from aligned comment cluster
+          </div>
+        )}
+        
         {/* Condensed Comment Section */}
         {comment.structuredSections ? (
           <>

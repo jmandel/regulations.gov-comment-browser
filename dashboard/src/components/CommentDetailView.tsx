@@ -1,4 +1,4 @@
-import { ExternalLink, Paperclip, Calendar, MapPin, User, Quote } from 'lucide-react'
+import { ExternalLink, Paperclip, Calendar, MapPin, User, Quote, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -12,7 +12,15 @@ interface CommentDetailViewProps {
 
 function CommentDetailView({ comment }: CommentDetailViewProps) {
   const regulationsUrl = getRegulationsGovUrl(comment.documentId || '', comment.id)
-  const { themes } = useStore()
+  const { themes, getCommentById } = useStore()
+  
+  // If this comment is part of a cluster but not the representative, get the representative's summary
+  const representativeComment = comment.clusterRepresentativeId && !comment.isClusterRepresentative
+    ? getCommentById(comment.clusterRepresentativeId)
+    : null
+  
+  // Use representative's structured sections if available, otherwise use the comment's own
+  const displaySections = representativeComment?.structuredSections || comment.structuredSections
   
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -47,6 +55,20 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
           </div>
           
           <div className="flex items-center space-x-3">
+            {/* Cluster Badge */}
+            {comment.clusterSize && comment.clusterSize > 1 && comment.isClusterRepresentative && (
+              <span 
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+                title={`This comment represents ${comment.clusterSize} aligned submissions`}
+              >
+                <Users className="h-3 w-3" />
+                {comment.clusterSize > 100 ? (
+                  <span>{comment.clusterSize} aligned comments</span>
+                ) : (
+                  <span>+{comment.clusterSize - 1} similar</span>
+                )}
+              </span>
+            )}
             <span className="text-xs font-mono text-gray-500 bg-gray-200 px-2 py-1 rounded">
               #{comment.id}
             </span>
@@ -65,22 +87,32 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
       
       {/* Main Content Area */}
       <div className="p-6">
-        {comment.structuredSections ? (
+        {/* Show note if using aligned content from representative */}
+        {(representativeComment || comment.isAlignedSummary) && (
+          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <p className="text-sm text-purple-800">
+              <span className="font-semibold">Note:</span> This comment is part of a cluster of {comment.clusterSize || 'multiple'} aligned submissions. 
+              The summary below is from the representative comment{representativeComment ? ` (#${representativeComment.id})` : ''}.
+            </p>
+          </div>
+        )}
+        
+        {displaySections ? (
           <div className="space-y-6">
             {/* One-line Summary */}
-            {comment.structuredSections.oneLineSummary && (
+            {displaySections.oneLineSummary && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs mr-2">SUMMARY</span>
                 </h5>
                 <p className="text-lg font-medium text-gray-900 italic pl-4 border-l-4 border-indigo-200">
-                  {comment.structuredSections.oneLineSummary}
+                  {displaySections.oneLineSummary}
                 </p>
               </div>
             )}
             
             {/* Commenter Profile */}
-            {comment.structuredSections.commenterProfile && (
+            {displaySections.commenterProfile && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-gray-600 text-white px-2 py-0.5 rounded text-xs mr-2">COMMENTER PROFILE</span>
@@ -94,14 +126,14 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
-                    {comment.structuredSections.commenterProfile}
+                    {displaySections.commenterProfile}
                   </ReactMarkdown>
                 </div>
               </div>
             )}
             
             {/* Core Position */}
-            {comment.structuredSections.corePosition && (
+            {displaySections.corePosition && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-xs mr-2">CORE POSITION</span>
@@ -115,15 +147,15 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
-                    {comment.structuredSections.corePosition}
+                    {displaySections.corePosition}
                   </ReactMarkdown>
                 </div>
               </div>
             )}
             
             {/* Key Quotations */}
-            {comment.structuredSections.keyQuotations && 
-             comment.structuredSections.keyQuotations !== "No standout quotations" && (
+            {displaySections.keyQuotations && 
+             displaySections.keyQuotations !== "No standout quotations" && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                   <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY QUOTATIONS</span>
@@ -153,15 +185,15 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                       }
                     }}
                   >
-                    {comment.structuredSections.keyQuotations}
+                    {displaySections.keyQuotations}
                   </ReactMarkdown>
                 </div>
               </div>
             )}
             
             {/* Key Recommendations */}
-            {comment.structuredSections.keyRecommendations && 
-             comment.structuredSections.keyRecommendations !== "No specific recommendations provided" && (
+            {displaySections.keyRecommendations && 
+             displaySections.keyRecommendations !== "No specific recommendations provided" && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY RECOMMENDATIONS</span>
@@ -175,15 +207,15 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
-                    {comment.structuredSections.keyRecommendations}
+                    {displaySections.keyRecommendations}
                   </ReactMarkdown>
                 </div>
               </div>
             )}
             
             {/* Main Concerns */}
-            {comment.structuredSections.mainConcerns && 
-             comment.structuredSections.mainConcerns !== "No specific concerns raised" && (
+            {displaySections.mainConcerns && 
+             displaySections.mainConcerns !== "No specific concerns raised" && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">MAIN CONCERNS</span>
@@ -197,15 +229,15 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
-                    {comment.structuredSections.mainConcerns}
+                    {displaySections.mainConcerns}
                   </ReactMarkdown>
                 </div>
               </div>
             )}
             
             {/* Notable Experiences */}
-            {comment.structuredSections.notableExperiences && 
-             comment.structuredSections.notableExperiences !== "No distinctive experiences shared" && (
+            {displaySections.notableExperiences && 
+             displaySections.notableExperiences !== "No distinctive experiences shared" && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">NOTABLE INSIGHTS</span>
@@ -219,14 +251,14 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
-                    {comment.structuredSections.notableExperiences}
+                    {displaySections.notableExperiences}
                   </ReactMarkdown>
                 </div>
               </div>
             )}
             
             {/* Detailed Content */}
-            {comment.structuredSections.detailedContent && (
+            {displaySections.detailedContent && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-slate-600 text-white px-2 py-0.5 rounded text-xs mr-2">DETAILED CONTENT</span>
@@ -235,7 +267,7 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                   >
-                    {comment.structuredSections.detailedContent}
+                    {displaySections.detailedContent}
                   </ReactMarkdown>
                 </div>
               </div>

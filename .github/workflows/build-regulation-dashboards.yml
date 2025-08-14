@@ -53,60 +53,8 @@ jobs:
       env:
         REGSGOV_API_KEY: ${{ secrets.REGSGOV_API_KEY }}
       run: |
-        # Create dist directory
-        mkdir -p dist
-        
-                  # Check if any databases were downloaded
-          if [ ! -d "dbs" ] || [ -z "$(ls -A dbs/*.sqlite 2>/dev/null)" ]; then
-            echo "::error::No SQLite databases found in dbs/ directory"
-            echo "Contents of dbs/:"
-            ls -la dbs/ || echo "dbs/ directory not found"
-            exit 1
-          fi
-          
-          # Find all SQLite databases (excluding WAL and SHM files)
-          for db_file in dbs/*.sqlite; do
-            # Skip if no files found
-            [ -e "$db_file" ] || continue
-            
-            # Skip WAL and SHM related files
-            if [[ "$db_file" == *.sqlite-* ]] || [[ "$db_file" == *.sqlite.sqlite ]]; then
-              continue
-            fi
-          
-            # Print SHA256 hash for traceability
-            echo "SHA256 for $db_file:"
-            sha256sum "$db_file"
-          
-            # Extract regulation ID from filename
-            regulation_id=$(basename "$db_file" .sqlite)
-          
-            echo "Building dashboard for $regulation_id..."
-          
-            # Generate data files for this regulation
-            bun run src/cli.ts build-website "$regulation_id" --output "temp-data"
-          
-            # Copy data to dashboard public directory
-            rm -rf dashboard/public/data
-            mkdir -p dashboard/public
-            cp -r temp-data dashboard/public/data
-          
-            # Build the dashboard
-            cd dashboard
-            bun run build
-            cd ..
-          
-            # Copy built dashboard to dist directory
-            mkdir -p "dist/$regulation_id"
-            cp -r dashboard/dist/* "dist/$regulation_id/"
-          
-            # Clean up temp data
-            rm -rf temp-data
-          done
-          
-          # Generate landing page
-          echo "Generating landing page..."
-          bun run src/cli.ts generate-landing-page --db-dir dbs --output dist/index.html
+        # Use the shared build script
+        ./scripts/build-all-dashboards.sh --skip-install
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

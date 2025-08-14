@@ -59,10 +59,18 @@ function OverviewPanel() {
     return Object.entries(breakdown).filter(([, count]) => count >= 5).length
   }, [comments])
 
-  // Calculate condensed percentage
-  const condensedPercentage = stats.totalComments > 0 
-    ? Math.round((stats.condensedComments / stats.totalComments) * 100)
-    : 0
+  // Calculate clustering statistics
+  const clusteringStats = useMemo(() => {
+    const representatives = comments.filter(c => c.isClusterRepresentative)
+    const hasClustering = representatives.length > 0
+    const distinctComments = hasClustering ? representatives.length : stats.totalComments
+    
+    return {
+      hasClustering,
+      distinctComments,
+      totalComments: stats.totalComments
+    }
+  }, [comments, stats.totalComments])
 
   return (
     <div className="space-y-6">
@@ -73,7 +81,9 @@ function OverviewPanel() {
             icon={<MessageSquare className="h-6 w-6" />}
             label="Total Comments"
             value={stats.totalComments || 0}
-            subtext={`${condensedPercentage}% condensed`}
+            subtext={clusteringStats.hasClustering 
+              ? `${clusteringStats.distinctComments.toLocaleString()} clusters`
+              : `${stats.condensedComments || 0} analyzed`}
             color="blue"
             clickable
           />

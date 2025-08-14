@@ -145,7 +145,11 @@ function CommentBrowser() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Browse Comments</h1>
               <p className="text-sm text-gray-500 mt-1">
-                Showing {filteredComments.length} of {comments.length} comments
+                {comments.some(c => c.isClusterRepresentative !== undefined) ? (
+                  <>Showing {filteredComments.length} clusters representing {comments.length} comments</>
+                ) : (
+                  <>Showing {filteredComments.length} of {comments.length} comments</>
+                )}
                 {searchParams.get('submitterType') && ` from ${searchParams.get('submitterType')}`}
               </p>
             </div>

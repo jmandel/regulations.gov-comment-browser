@@ -74,13 +74,36 @@ export function getUniqueValues<T, K extends keyof T>(items: T[], key: K): T[K][
 
 // Parse theme description into label and detailed description
 export function parseThemeDescription(description: string): { label: string; detailedDescription: string } {
+  // Common abbreviations that shouldn't be treated as sentence endings
+  const abbreviations = ['U.S.', 'U.K.', 'Dr.', 'Mr.', 'Mrs.', 'Ms.', 'Prof.', 'Inc.', 'Ltd.', 'Corp.', 'vs.', 'e.g.', 'i.e.', 'etc.']
+  
+  // Replace abbreviations temporarily to avoid false splits
+  let processedDesc = description
+  const replacements: Array<[string, string]> = []
+  abbreviations.forEach((abbr, index) => {
+    const placeholder = `__ABBR${index}__`
+    if (processedDesc.includes(abbr)) {
+      replacements.push([placeholder, abbr])
+      processedDesc = processedDesc.replace(new RegExp(abbr.replace('.', '\\.'), 'g'), placeholder)
+    }
+  })
+  
   // Look for pattern: "Brief Label. Detailed description..."
-  const match = description.match(/^([^.]+)\.\s*(.+)$/)
+  const match = processedDesc.match(/^([^.]+)\.\s*(.+)$/)
   
   if (match) {
+    let label = match[1].trim()
+    let detailedDescription = match[2].trim()
+    
+    // Restore abbreviations
+    replacements.forEach(([placeholder, original]) => {
+      label = label.replace(new RegExp(placeholder, 'g'), original)
+      detailedDescription = detailedDescription.replace(new RegExp(placeholder, 'g'), original)
+    })
+    
     return {
-      label: match[1].trim(),
-      detailedDescription: match[2].trim()
+      label,
+      detailedDescription
     }
   }
   

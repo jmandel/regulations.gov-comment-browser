@@ -118,6 +118,10 @@ export interface Comment {
   hasAttachments: boolean
   documentId?: string
   wordCount?: number
+  clusterSize?: number
+  isClusterRepresentative?: boolean
+  clusterRepresentativeId?: string | null
+  isAlignedSummary?: boolean
 }
 
 export interface ThemeIndex {
