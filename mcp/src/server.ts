@@ -76,70 +76,68 @@ Use this tool first to discover what regulations are available to search and ana
     'searchComments',
     {
       title: 'Search Comments',
-      description: `Search through public comments to access rich, nuanced perspectives from healthcare stakeholders.
+      description: `Search through public comments using LITERAL KEYWORD matching with AND logic (not semantic/conceptual search).
 
-IMPORTANT: The default returnType="fields" provides access to various data fields, but NOT ALL FIELDS ARE EQUAL:
-- detailedContent: The FAITHFUL REPRESENTATION of the original comment text - the most reliable source if you need a deep or nuanced understanding of the content
-- Other fields: AI-generated abstractions that compress and interpret the original
+⚠️ CRITICAL: This is a KEYWORD-BASED search, NOT a semantic/conceptual search engine!
+- Searches for EXACT words/phrases that appear in the text
+- All terms are combined with AND logic (must ALL appear)
+- Cannot understand concepts, synonyms, or natural language questions
+- Cannot perform OR operations between keywords
 
-Reading the detailedContent field reveals:
-- Specific implementation challenges and solutions
-- Personal experiences and case studies  
-- Detailed policy recommendations with rationale
-- Nuanced positions that defy simple categorization
-- Technical details and operational insights
+❌ COMMON MISTAKES TO AVOID:
+- DON'T search for multiple locations like "texas florida georgia" (this requires ALL three states)
+- DON'T use conceptual queries like "rural health concerns in red states" (not semantic)
+- DON'T ask questions like "what are the main concerns about prior authorization" (use keywords only)
+- DON'T use synonyms expecting them to match (e.g., "doctor" won't match "physician")
+- DON'T combine unrelated terms that won't co-occur in single comments
+
+✅ CORRECT SEARCH PATTERNS:
+- DO search for single keywords: "texas" or "florida" or "georgia" (separate searches)
+- DO use exact phrases: "prior authorization" or "administrative burden"
+- DO combine related terms that appear together: "prior authorization delay"
+- DO use filters for structured data: submitterType:Physician theme:2.1
+- DO exclude unwanted terms: "prior authorization" -deny
 
 QUERY SYNTAX:
-- Keywords: Use plain words or "quoted phrases" to search comment text
-  Examples: prior authorization, "nurse staffing", medicare
+- Keywords: Plain words or "quoted phrases" (LITERAL matching only)
+  Examples: medicare, "prior authorization", billing
   
-- Entity filters: Use entity:label to find comments from specific organizations
-  Examples: entity:CMS, entity:"American Medical Association", entity:ANA
-  Note: Entity labels are case-insensitive
+- Entity filters: entity:label for specific organizations
+  Examples: entity:CMS, entity:"American Medical Association"
   
-- Theme filters: Use theme:code to find comments tagged with specific themes
+- Theme filters: theme:code for categorized topics
   Examples: theme:2.1, theme:3.1.2
-  Note: Use listThemes first to discover available theme codes
   
-- Submitter type filters: Use submitterType:type to find comments from specific types of submitters
-  Examples: submitterType:[use getSubmitterTypes to see options]
-  Note: IMPORTANT - Use getSubmitterTypes first to see valid types. Invalid types will return an error.
+- Submitter type: submitterType:type for commenter roles
+  Note: Use getSubmitterTypes first to see valid options
   
-- Exclusions: Use -term to exclude comments containing specific words
+- Exclusions: -term to exclude specific words
   Examples: -deny, -"not support"
   
-- Combinations: All filters use AND logic
-  Example: "prior authorization" entity:AMA theme:2.1
-  This finds comments about prior authorization from the AMA on theme 2.1
+- ALL FILTERS USE AND LOGIC - Everything must match
 
-WHAT SEARCH RETURNS:
-Every result includes these fields for consistent browsing:
-- submitter: Person/organization name
-- submitterType: Their role (Physician, Patient, etc.)
-- date: When submitted
-- oneLineSummary: AI-generated one-line summary
-- commenterProfile: AI-generated background info
-- keyQuotations: Exact quotes from the comment
-- contextSnippet: ~100 words showing your search term in context
+HOW TO SEARCH EFFECTIVELY:
+1. For multiple alternatives, run SEPARATE searches:
+   - Search 1: "texas"
+   - Search 2: "florida"
+   - Search 3: "georgia"
+   
+2. For conceptual topics, use theme filters instead:
+   - Instead of "concerns about costs", use theme:4.2 (if that's the cost theme)
+   
+3. Start with simple keyword searches, then refine:
+   - First: "prior authorization"
+   - Then add: "prior authorization" submitterType:Physician
+   - Or exclude: "prior authorization" -support
 
-IMPORTANT: These are OVERVIEW fields. To read the full original comment text (detailedContent), 
-use getComment with the commentId.
+SEARCH RETURNS:
+Overview fields for browsing (use getComment for full text):
+- submitter, submitterType, date
+- oneLineSummary (AI-generated)
+- contextSnippet (shows keywords in context)
+- keyQuotations (selected quotes)
 
-SEARCH FIELDS (what to search in):
-- detailedContent: The FAITHFUL original comment text (default: true) - most reliable
-- oneLineSummary: AI abstraction - brief summary (lossy compression)
-- corePosition: AI abstraction - extracted stance (oversimplified)
-- keyRecommendations: AI abstraction - extracted suggestions (incomplete list)
-- mainConcerns: AI abstraction - extracted worries (selective)
-- notableExperiences: AI abstraction - extracted stories (lacks context)
-- keyQuotations: AI-selected EXACT QUOTES - preserves original wording but limited selection
-
-BEST PRACTICES:
-1. Search broadly to see overview of many comments
-2. Use contextSnippet to see how your keywords appear
-3. Review oneLineSummary and commenterProfile to identify relevant perspectives
-4. CRUCIAL: Use getComment to read full detailedContent for selected comments
-5. Only detailedContent is faithful - summaries are AI interpretations`,
+REMEMBER: This searches for LITERAL TEXT MATCHES, not concepts or ideas!`,
       inputSchema: {
         docketId: z.string().describe('The full docket ID (e.g., "CMS-2025-0050-0031")'),
         query: z.string().describe('Search query using keywords, entity:label, and theme:code syntax'),
@@ -151,6 +149,7 @@ BEST PRACTICES:
           mainConcerns: z.boolean().optional(),
           notableExperiences: z.boolean().optional(),
           keyQuotations: z.boolean().optional(),
+          commenterProfile: z.boolean().optional(),
         }).optional().describe('Which fields to search in'),
         limit: z.number().optional().describe('Maximum number of results (default: 1000)'),
         offset: z.number().optional().describe('Offset for pagination (default: 0)'),

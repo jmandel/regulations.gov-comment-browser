@@ -244,6 +244,9 @@ export class SearchEngine {
     if (searchFields.keyQuotations && s.keyQuotations) {
       texts.push(...s.keyQuotations);
     }
+    if (searchFields.commenterProfile && s.commenterProfile) {
+      texts.push(s.commenterProfile);
+    }
 
     return texts.filter(t => t && t.length > 0);
   }

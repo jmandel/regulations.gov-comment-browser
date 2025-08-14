@@ -133,6 +133,7 @@ export interface SearchFields {
   mainConcerns?: boolean;
   notableExperiences?: boolean;
   keyQuotations?: boolean;
+  commenterProfile?: boolean;
 }
 
 export interface ReturnFields extends SearchFields {
