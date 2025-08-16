@@ -141,6 +141,7 @@ async function loadFromApi(documentId: string, options: any) {
     `);
     
     let loaded = 0;
+    let skipped = 0;
     
     for (const commentId of idsToLoad) {
       try {
@@ -169,6 +170,7 @@ async function loadFromApi(documentId: string, options: any) {
         };
 
         const attachments: AttachmentRecord[] = [];
+        let attachmentFailures = 0;
 
         const relationshipData: APIAttachment[] = data.data.relationships?.attachments?.data || [];
 
@@ -176,7 +178,8 @@ async function loadFromApi(documentId: string, options: any) {
           const attUrl = `https://api.regulations.gov/v4/attachments/${rel.id}?include=fileFormats`;
           const attResp = await fetch(attUrl, { headers });
           if (!attResp.ok) {
-            debugLog(`Failed to fetch attachment ${rel.id}: ${attResp.status}`);
+            console.error(`\n❌ Failed to fetch attachment metadata ${rel.id}: ${attResp.status}`);
+            attachmentFailures++;
             continue;
           }
 
@@ -201,21 +204,34 @@ async function loadFromApi(documentId: string, options: any) {
                   size = buffer.length;
                   debugLog(`Downloaded ${fileName}: ${size} bytes`);
                 } else {
-                  debugLog(`Failed to download ${fileUrl}: ${binResp.status}`);
+                  console.error(`\n❌ Failed to download attachment ${fileName}: ${binResp.status}`);
+                  attachmentFailures++;
+                  break; // Skip this comment entirely
                 }
               } catch (e) {
-                debugLog(`Error downloading ${fileUrl}:`, e);
+                console.error(`\n❌ Error downloading attachment ${fileName}:`, e);
+                attachmentFailures++;
+                break; // Skip this comment entirely
               }
             }
 
             attachments.push({ id: format.formatId || rel.id, fmt, fileName, url: fileUrl, size, blob });
           }
 
+          // If we had failures, skip this comment
+          if (attachmentFailures > 0) break;
+
           // modest delay to respect rate limits
           await sleep(1000);
         }
 
-        // 3️⃣ Save comment and its attachments together
+        // 3️⃣ Only save comment if all attachments were successfully downloaded (or skipped)
+        if (attachmentFailures > 0 && !options.skipAttachments) {
+          console.error(`\n⚠️  Skipping comment ${commentId} due to ${attachmentFailures} attachment failure(s)`);
+          skipped++;
+          continue;
+        }
+
         withTransaction(db, () => {
           insertComment.run(commentId, JSON.stringify(data.data.attributes));
           for (const att of attachments) {
@@ -241,6 +257,10 @@ async function loadFromApi(documentId: string, options: any) {
     }
     
     console.log(`\n✅ Successfully loaded ${loaded} comments`);
+    if (skipped > 0) {
+      console.log(`⚠️  Skipped ${skipped} comments due to attachment failures`);
+      console.log(`💡 To retry these comments, run the load command again`);
+    }
     
   } finally {
     db.close();
@@ -301,6 +321,7 @@ async function loadFromCsv(csvPath: string, options: any) {
   
   let processed = 0;
   let loaded = 0;
+  let skipped = 0;
   
   try {
     for await (const row of parser) {
@@ -363,6 +384,7 @@ async function loadFromCsv(csvPath: string, options: any) {
       };
 
       const attachments: AttachmentData[] = [];
+      let attachmentFailures = 0;
 
       for (let i = 0; i < urls.length; i++) {
         const url = urls[i];
@@ -382,14 +404,25 @@ async function loadFromCsv(csvPath: string, options: any) {
               size = buffer.length;
               debugLog(`Downloaded ${fileName}: ${size} bytes`);
             } else {
-              debugLog(`Failed to download ${url}: ${resp.status}`);
+              console.error(`❌ Failed to download attachment ${fileName}: ${resp.status}`);
+              attachmentFailures++;
+              break; // Skip this comment entirely
             }
           } catch (e) {
-            debugLog(`Error downloading attachment ${url}:`, e);
+            console.error(`❌ Error downloading attachment ${fileName}:`, e);
+            attachmentFailures++;
+            break; // Skip this comment entirely
           }
         }
 
         attachments.push({ attachId, fmt, fileName, url, size, blob });
+      }
+
+      // Only save comment if all attachments were successfully downloaded (or skipped)
+      if (attachmentFailures > 0 && !options.skipAttachments) {
+        console.error(`⚠️  Skipping comment ${commentId} due to ${attachmentFailures} attachment failure(s)`);
+        skipped++;
+        continue;
       }
 
       // Save comment & attachments inside a single transaction (sync)
@@ -417,6 +450,10 @@ async function loadFromCsv(csvPath: string, options: any) {
     }
     
     console.log(`\n✅ Successfully loaded ${loaded} new comments (${existingCount.count + loaded} total)`);
+    if (skipped > 0) {
+      console.log(`⚠️  Skipped ${skipped} comments due to attachment failures`);
+      console.log(`💡 To retry these comments, run the load command again`);
+    }
     
   } finally {
     db.close();
