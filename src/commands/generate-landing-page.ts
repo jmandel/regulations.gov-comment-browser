@@ -360,6 +360,55 @@ function generateHTML(regulations: RegulationInfo[]): string {
       margin-left: 1rem;
     }
     
+    .floodgate-section {
+      background: linear-gradient(135deg, #0077be 0%, #00a8cc 100%);
+      padding: 2rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 3rem;
+      color: white;
+    }
+    
+    .floodgate-section h2 {
+      font-size: 1.75rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .floodgate-section p {
+      margin-bottom: 1.5rem;
+      opacity: 0.95;
+    }
+    
+    .floodgate-link {
+      display: inline-block;
+      background: white;
+      color: #0077be;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.375rem;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    
+    .floodgate-link:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    .warning-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-left: 1rem;
+    }
+    
     footer {
       text-align: center;
       padding: 2rem 0;
@@ -428,6 +477,25 @@ function generateHTML(regulations: RegulationInfo[]): string {
         <div class="stat-label">Themes Discovered</div>
         <div class="stat-value">${totalThemes.toLocaleString()}</div>
       </div>
+    </div>
+    
+    <div class="floodgate-section">
+      <h2>
+        🌊 FloodGate
+        <span class="warning-badge">Research Demo</span>
+      </h2>
+      <p>
+        <strong>Explore the future of public comment campaigns.</strong> FloodGate demonstrates how AI can generate 
+        thousands of unique, authentic-seeming comments that share core arguments but vary dramatically in expression. 
+        This proof-of-concept tool shows why traditional form letter detection methods may soon become obsolete.
+      </p>
+      <p>
+        Try generating a few comments to see how different they can be while maintaining the same position. 
+        This is a research demonstration only—not for actual submission to government agencies.
+      </p>
+      <a href="./floodgate/" class="floodgate-link">
+        Launch FloodGate Demo →
+      </a>
     </div>
     
     <div class="about-section">

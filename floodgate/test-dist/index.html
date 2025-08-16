@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FloodGate - Open the Floodgates</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(180deg, #003d5c 0%, #00537a 20%, #0077be 50%, #00a8cc 80%, #79d2e6 100%);
+      min-height: 100vh;
+      color: #333;
+    }
+    
+    #root {
+      min-height: 100vh;
+    }
+    
+    .loading {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: white;
+      font-size: 24px;
+      gap: 1rem;
+    }
+    
+    .loading::before {
+      content: '🌊';
+      font-size: 64px;
+      animation: float 2s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+  </style>
+<link rel="stylesheet" crossorigin href="./index-qxbbxjv0.css"><script type="module" crossorigin src="./index-qpwptcb4.js"></script></head>
+<body>
+  <div id="root">
+    <div class="loading">Opening the floodgates...</div>
+  </div>
+  
+</body>
+</html>

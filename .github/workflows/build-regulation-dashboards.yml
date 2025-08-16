@@ -56,6 +56,11 @@ jobs:
         # Use the shared build script
         ./scripts/build-all-dashboards.sh --skip-install
         
+    - name: Build FloodGate app
+      run: |
+        # Build the FloodGate form letter generation app
+        ./scripts/build-floodgate.sh
+        
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:

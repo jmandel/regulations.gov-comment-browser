@@ -1,0 +1,1394 @@
+{
+  "campaignId": "prwora-headstart-2025",
+  "campaignName": "Protect Head Start from PRWORA Redesignation",
+  "targetDocket": "AHRQ-2025-0002",
+  "metadata": {
+    "organizingEntity": "Coalition for Early Childhood Education",
+    "launchDate": "2025-08-01",
+    "targetCommentCount": 10000,
+    "coreTalkingPoints": [
+      "Head Start excluded from federal benefit definition for 30 years",
+      "Bypassed required comment period",
+      "Harms immigrant children and families",
+      "Creates administrative burden for programs",
+      "Threatens program enrollment and funding"
+    ],
+    "oppositionFraming": "HHS Notice reversing 30-year PRWORA interpretation",
+    "regulatoryBackground": {
+      "noticeTitle": "Personal Responsibility and Work Opportunity Reconciliation Act of 1996 (PRWORA); Interpretation of 'Federal Public Benefit'",
+      "federalRegisterNumber": "Doc # 2025-13118",
+      "publishDate": "2025-07-30",
+      "effectiveDate": "2025-07-30",
+      "agencyIssuing": "Department of Health and Human Services",
+      "docketNumber": "AHRQ-2025-0002",
+      "summary": "HHS is reinterpreting the term 'federal public benefit' under PRWORA to include 13 previously excluded programs, including Head Start, Early Head Start, and various health center programs. This reverses a 30-year interpretation that these programs were not subject to PRWORA's immigrant eligibility restrictions.",
+      "keyChanges": [
+        "Classifies Head Start and Early Head Start as 'federal public benefits' requiring citizenship/immigration status verification",
+        "Adds Health Center Program (Section 330) to restricted programs",
+        "Includes Ryan White HIV/AIDS programs in restrictions",
+        "Covers maternal and child health programs under new restrictions",
+        "Applies to 13 total HHS programs previously considered exempt"
+      ],
+      "proceduralIssues": [
+        "No advance notice provided - effective immediately upon publication",
+        "Bypassed required 30-day notice and comment period under APA (5 U.S.C. § 553)",
+        "No consultation with affected programs or stakeholders",
+        "No implementation guidance provided to programs",
+        "No transition period for compliance",
+        "Violates due process under U.S. Const. amend. V & XIV"
+      ],
+      "previousInterpretation": {
+        "description": "1998 HHS PRWORA Notice (63 FR 41658) explicitly excluded Head Start and similar programs from federal public benefit definition",
+        "duration": "27 years (1998-2025)",
+        "keyAspects": [
+          "Head Start never required immigration status verification",
+          "Programs served all eligible children based on income, not citizenship",
+          "Block grants to states were not considered federal public benefits",
+          "Non-postsecondary education explicitly excluded",
+          "Community-based programs not subject to restrictions"
+        ]
+      },
+      "affectedPrograms": [
+        {
+          "name": "Head Start",
+          "impact": "Must now verify immigration status of all enrollees",
+          "beneficiaries": "1.1 million children annually",
+          "budget": "$12 billion annually"
+        },
+        {
+          "name": "Early Head Start",
+          "impact": "Must screen infants and toddlers for citizenship",
+          "beneficiaries": "200,000+ infants and families",
+          "budget": "$2 billion annually"
+        },
+        {
+          "name": "Health Center Program (Section 330)",
+          "impact": "FQHCs must verify status before providing care",
+          "beneficiaries": "30 million patients",
+          "budget": "$7 billion annually"
+        },
+        {
+          "name": "Ryan White HIV/AIDS Program",
+          "impact": "HIV patients must prove citizenship for treatment",
+          "beneficiaries": "550,000+ patients",
+          "budget": "$2.5 billion annually"
+        },
+        {
+          "name": "Title X Family Planning",
+          "impact": "Family planning services now restricted by immigration status",
+          "beneficiaries": "3.9 million patients",
+          "budget": "$286 million annually"
+        }
+      ],
+      "legalFlaws": [
+        {
+          "flawType": "Misinterpretation of statutory text",
+          "explanation": "HHS misreads 'any grant' to include block grants to states, contrary to noscitur a sociis canon",
+          "precedents": [
+            "Gustafson v. Alloyd Co., 513 U.S. 561 (1995)",
+            "Ali v. Fed. Bureau of Prisons, 552 U.S. 214 (2008)"
+          ]
+        },
+        {
+          "flawType": "Ignoring statutory structure",
+          "explanation": "PRWORA Section 401(b)(2) explicitly excludes non-postsecondary education programs",
+          "precedents": [
+            "Russello v. United States, 464 U.S. 16 (1983)",
+            "8 U.S.C. § 1611(b)(2)"
+          ]
+        },
+        {
+          "flawType": "Overreading 'eligibility unit'",
+          "explanation": "HHS creates arbitrary distinctions about eligibility criteria not found in statute",
+          "precedents": [
+            "Poder in Action v. City of Phoenix, 481 F. Supp. 3d 962 (D. Ariz. 2020)",
+            "Microsoft v. i4i Ltd, 564 U.S. 91 (2011)"
+          ]
+        },
+        {
+          "flawType": "Violating APA requirements",
+          "explanation": "Changed 27-year interpretation without notice and comment period",
+          "precedents": [
+            "5 U.S.C. § 553",
+            "F.C.C. v. Fox Television Stations, 556 U.S. 502 (2009)"
+          ]
+        }
+      ],
+      "implementationIssues": [
+        {
+          "category": "Administrative burden",
+          "description": "Programs lack infrastructure to verify immigration status",
+          "burden": "$21 million annually just for Head Start (HHS estimate)"
+        },
+        {
+          "category": "Staff training",
+          "description": "Thousands of staff need training on immigration law",
+          "burden": "Estimated 100,000+ staff hours"
+        },
+        {
+          "category": "System modifications",
+          "description": "Database and enrollment systems need complete overhaul",
+          "burden": "$115-175 million in transition costs (HHS estimate)"
+        },
+        {
+          "category": "No guidance provided",
+          "description": "Programs have no instructions on how to comply",
+          "burden": "Immediate compliance required with zero guidance"
+        }
+      ],
+      "economicImpact": {
+        "totalCost": "$374 million annually (Head Start alone)",
+        "programCosts": {
+          "Head Start": "$374 million",
+          "Health Centers": "Not calculated",
+          "Ryan White": "Not calculated",
+          "Title X": "Not calculated"
+        },
+        "administrativeBurden": "$21 million annually in verification costs",
+        "secondaryEffects": [
+          "Reduced enrollment leading to funding cuts",
+          "Program closures in immigrant communities",
+          "Increased emergency room usage",
+          "Lost economic activity from working parents"
+        ]
+      },
+      "populationHarms": [
+        {
+          "group": "Immigrant children",
+          "harmType": "Loss of early education access",
+          "numberAffected": "Estimated 100,000+ children",
+          "consequences": [
+            "Developmental delays",
+            "Lower school readiness",
+            "Reduced lifetime earnings",
+            "Increased special education needs"
+          ]
+        },
+        {
+          "group": "Mixed-status families",
+          "harmType": "Chilling effect preventing enrollment",
+          "numberAffected": "5.1 million US citizen children with immigrant parents",
+          "consequences": [
+            "US citizen children denied services",
+            "Family separation fears",
+            "Loss of trust in government programs",
+            "Increased poverty"
+          ]
+        },
+        {
+          "group": "Healthcare patients",
+          "harmType": "Loss of preventive care access",
+          "numberAffected": "Millions at FQHCs",
+          "consequences": [
+            "Untreated communicable diseases",
+            "Increased emergency department usage",
+            "Public health risks",
+            "Higher healthcare costs overall"
+          ]
+        }
+      ]
+    }
+  },
+  "conceptualThemes": {
+    "openingIntents": [
+      {"intent": "express concern", "intensity": "deep", "formality": "variable"},
+      {"intent": "declare opposition", "intensity": "strong", "formality": "variable"},
+      {"intent": "request reconsideration", "intensity": "urgent", "formality": "variable"},
+      {"intent": "share personal experience", "intensity": "authentic", "formality": "low"},
+      {"intent": "highlight departure from precedent", "intensity": "analytical", "formality": "high"},
+      {"intent": "communicate distress", "intensity": "emotional", "formality": "variable"},
+      {"intent": "defend vulnerable populations", "intensity": "protective", "formality": "variable"},
+      {"intent": "warn of consequences", "intensity": "serious", "formality": "variable"},
+      {"intent": "appeal to authority", "intensity": "respectful", "formality": "high"},
+      {"intent": "invoke moral imperative", "intensity": "principled", "formality": "variable"}
+    ],
+    "connectionStrategies": [
+      {"purpose": "add related point", "relationship": "parallel"},
+      {"purpose": "escalate severity", "relationship": "intensifying"},
+      {"purpose": "provide evidence", "relationship": "supporting"},
+      {"purpose": "shift perspective", "relationship": "reframing"},
+      {"purpose": "acknowledge complexity", "relationship": "nuancing"},
+      {"purpose": "broaden scope", "relationship": "expanding"},
+      {"purpose": "narrow focus", "relationship": "specifying"},
+      {"purpose": "introduce contrast", "relationship": "opposing"},
+      {"purpose": "build momentum", "relationship": "accumulating"},
+      {"purpose": "create urgency", "relationship": "accelerating"}
+    ],
+    "harmCategories": [
+      {"type": "service access loss", "affected": "families", "severity": "critical"},
+      {"type": "educational deprivation", "affected": "children", "severity": "long-term"},
+      {"type": "health deterioration", "affected": "patients", "severity": "dangerous"},
+      {"type": "family separation", "affected": "households", "severity": "traumatic"},
+      {"type": "economic hardship", "affected": "communities", "severity": "destabilizing"},
+      {"type": "administrative burden", "affected": "programs", "severity": "overwhelming"},
+      {"type": "trust erosion", "affected": "institutions", "severity": "systemic"},
+      {"type": "opportunity loss", "affected": "generations", "severity": "irreversible"},
+      {"type": "safety compromise", "affected": "vulnerable", "severity": "immediate"},
+      {"type": "dignity violation", "affected": "individuals", "severity": "fundamental"}
+    ],
+    "legalPrinciples": [
+      {"principle": "precedent violation", "authority": "judicial", "strength": "established"},
+      {"principle": "statutory misinterpretation", "authority": "legislative", "strength": "clear"},
+      {"principle": "exceeded authority", "authority": "constitutional", "strength": "fundamental"},
+      {"principle": "arbitrary action", "authority": "administrative", "strength": "procedural"},
+      {"principle": "due process violation", "authority": "constitutional", "strength": "fundamental"},
+      {"principle": "notice failure", "authority": "regulatory", "strength": "required"},
+      {"principle": "rational basis lacking", "authority": "judicial review", "strength": "basic"},
+      {"principle": "congressional intent ignored", "authority": "legislative history", "strength": "documented"},
+      {"principle": "equal protection breach", "authority": "constitutional", "strength": "core"},
+      {"principle": "procedural bypass", "authority": "APA", "strength": "mandatory"}
+    ],
+    "actionRequests": [
+      {"action": "withdraw", "timeframe": "immediate", "scope": "complete"},
+      {"action": "reconsider", "timeframe": "prompt", "scope": "thorough"},
+      {"action": "suspend", "timeframe": "temporary", "scope": "implementation"},
+      {"action": "revise", "timeframe": "deliberate", "scope": "substantive"},
+      {"action": "restore", "timeframe": "urgent", "scope": "previous interpretation"},
+      {"action": "follow procedures", "timeframe": "proper", "scope": "legal requirements"},
+      {"action": "protect populations", "timeframe": "ongoing", "scope": "vulnerable groups"},
+      {"action": "respect law", "timeframe": "consistent", "scope": "statutory framework"},
+      {"action": "engage stakeholders", "timeframe": "meaningful", "scope": "affected parties"},
+      {"action": "reverse course", "timeframe": "decisive", "scope": "policy direction"}
+    ],
+    "emotionalResonance": [
+      {"focus": "children's suffering", "appeal": "protective instinct", "approach": "empathetic"},
+      {"focus": "family unity", "appeal": "universal value", "approach": "relatable"},
+      {"focus": "community harm", "appeal": "collective concern", "approach": "inclusive"},
+      {"focus": "individual dignity", "appeal": "human rights", "approach": "principled"},
+      {"focus": "future impact", "appeal": "generational responsibility", "approach": "forward-looking"},
+      {"focus": "present crisis", "appeal": "immediate need", "approach": "urgent"},
+      {"focus": "moral imperative", "appeal": "conscience", "approach": "ethical"},
+      {"focus": "fairness violation", "appeal": "justice", "approach": "equitable"},
+      {"focus": "trust breakdown", "appeal": "institutional faith", "approach": "systemic"},
+      {"focus": "American values", "appeal": "national identity", "approach": "patriotic"}
+    ],
+    "credibilityBases": [
+      {"source": "professional experience", "duration": "years/decades", "relevance": "direct"},
+      {"source": "academic expertise", "type": "research/study", "relevance": "specialized"},
+      {"source": "personal witness", "perspective": "firsthand", "relevance": "authentic"},
+      {"source": "community knowledge", "scope": "collective", "relevance": "grounded"},
+      {"source": "data analysis", "approach": "empirical", "relevance": "objective"},
+      {"source": "historical awareness", "timespan": "longitudinal", "relevance": "contextual"},
+      {"source": "expert consensus", "breadth": "field-wide", "relevance": "authoritative"},
+      {"source": "case documentation", "detail": "specific", "relevance": "concrete"},
+      {"source": "official records", "authority": "governmental", "relevance": "verified"},
+      {"source": "lived reality", "authenticity": "personal", "relevance": "undeniable"}
+    ]
+  },
+  "argumentDimensions": [
+    {
+      "dimension": "legal",
+      "weight": 0.9,
+      "coreConcepts": [
+        {
+          "concept": "congressional intent",
+          "keyFacts": {
+            "statute": "PRWORA",
+            "timeframe": "27 years",
+            "exclusion": "non-postsecondary education",
+            "program": "Head Start",
+            "status": "never classified as federal public benefit"
+          },
+          "strength": "foundational",
+          "approach": ["historical", "precedential", "textual"]
+        },
+        {
+          "concept": "procedural violation",
+          "keyFacts": {
+            "requirement": "30-day notice and comment",
+            "law": "APA Section 553",
+            "violation": "immediate implementation",
+            "harm": "denied public input"
+          },
+          "strength": "mandatory",
+          "approach": ["regulatory", "democratic", "legal process"]
+        },
+        {
+          "concept": "statutory misinterpretation",
+          "keyFacts": {
+            "error": "expanding 'any grant' beyond context",
+            "principle": "noscitur a sociis",
+            "structure": "Section 401(b)(2) exclusions",
+            "precedents": ["Gustafson", "Ali", "Russello"]
+          },
+          "strength": "technical",
+          "approach": ["analytical", "scholarly", "precedential"]
+        }
+      ],
+      "combinableWith": ["moral", "practical", "economic"],
+      "intensity": "high"
+    },
+    {
+      "dimension": "moral",
+      "weight": 0.8,
+      "coreConcepts": [
+        {
+          "concept": "children's rights",
+          "principles": {
+            "universality": "all children deserve education",
+            "innocence": "children bear no responsibility",
+            "development": "early years are critical",
+            "equality": "birthplace shouldn't determine opportunity"
+          },
+          "emotional": "protective",
+          "framing": ["justice", "fairness", "compassion"]
+        },
+        {
+          "concept": "family harm",
+          "impacts": {
+            "separation": "divides families",
+            "fear": "creates climate of terror",
+            "trust": "destroys community bonds",
+            "dignity": "dehumanizes families"
+          },
+          "emotional": "empathetic",
+          "framing": ["human cost", "community damage", "social fabric"]
+        },
+        {
+          "concept": "chilling effect",
+          "dynamics": {
+            "scope": "affects even eligible families",
+            "mechanism": "fear prevents participation",
+            "duration": "generational impact",
+            "breadth": "community-wide harm"
+          },
+          "emotional": "concerned",
+          "framing": ["unintended consequences", "systemic harm", "erosion"]
+        }
+      ],
+      "combinableWith": ["legal", "practical", "personal"],
+      "intensity": "variable"
+    },
+    {
+      "dimension": "practical",
+      "weight": 0.7,
+      "coreConcepts": [
+        {
+          "concept": "administrative burden",
+          "challenges": {
+            "resources": "diverts from education",
+            "training": "staff unprepared for immigration law",
+            "infrastructure": "lacks verification systems",
+            "cost": "unfunded mandate"
+          },
+          "severity": "overwhelming",
+          "stakeholders": ["programs", "staff", "administrators"]
+        },
+        {
+          "concept": "implementation chaos",
+          "problems": {
+            "guidance": "no clear instructions",
+            "timeline": "immediate with no preparation",
+            "consistency": "varied interpretations",
+            "liability": "legal exposure for programs"
+          },
+          "severity": "critical",
+          "stakeholders": ["grantees", "families", "communities"]
+        }
+      ],
+      "combinableWith": ["economic", "legal"],
+      "intensity": "moderate"
+    },
+    {
+      "dimension": "economic",
+      "weight": 0.6,
+      "coreConcepts": [
+        {
+          "concept": "enrollment impact",
+          "effects": {
+            "reduction": "fewer children served",
+            "funding": "budget cuts follow enrollment drops",
+            "closures": "programs shut down",
+            "jobs": "staff layoffs"
+          },
+          "scope": "systemic",
+          "timeframe": ["immediate", "long-term"]
+        },
+        {
+          "concept": "community economics",
+          "impacts": {
+            "workforce": "parents can't work without childcare",
+            "local economy": "reduced spending power",
+            "future costs": "unprepared children cost more later",
+            "multiplier": "ripple effects throughout community"
+          },
+          "scope": "widespread",
+          "stakeholders": ["families", "businesses", "taxpayers"]
+        }
+      ],
+      "combinableWith": ["practical", "personal"],
+      "intensity": "moderate"
+    },
+    {
+      "dimension": "personal",
+      "weight": 0.5,
+      "coreConcepts": [
+        {
+          "concept": "lived experience",
+          "perspectives": {
+            "witness": "seen the program's impact",
+            "beneficiary": "personal or family benefit",
+            "professional": "career dedicated to this work",
+            "community": "neighborhood transformation"
+          },
+          "authenticity": "firsthand",
+          "timeframe": "years of involvement"
+        },
+        {
+          "concept": "professional expertise",
+          "authority": {
+            "education": "relevant degrees/training",
+            "experience": "years in field",
+            "observation": "direct program knowledge",
+            "outcomes": "witnessed success stories"
+          },
+          "credibility": "expert",
+          "perspective": "informed"
+        }
+      ],
+      "combinableWith": ["moral", "economic"],
+      "intensity": "authentic"
+    }
+  ],
+  "personas": [
+    {
+      "personaId": "educator",
+      "label": "Early Childhood Educator",
+      "demographics": {
+        "ageRange": [25, 65],
+        "professions": ["teacher", "preschool teacher", "Head Start teacher", "early childhood educator", "education specialist"],
+        "regions": ["urban", "suburban", "rural"],
+        "familyStatus": ["single", "married", "parent", "grandparent"]
+      },
+      "availableTraits": ["educator", "advocate", "parent"],
+      "introductionTemplates": [
+        "As a {profession} with {years} years of experience,",
+        "I have been teaching in Head Start programs for {years} years,",
+        "As someone who has dedicated their career to early childhood education,",
+        "Having worked with hundreds of Head Start families over {years} years,"
+      ],
+      "credibilityMarkers": [
+        "certified early childhood educator",
+        "master's degree in early childhood development",
+        "decades of classroom experience",
+        "trained in child development"
+      ],
+      "motivations": [
+        "children's wellbeing",
+        "educational equity",
+        "community development",
+        "breaking cycles of poverty"
+      ],
+      "specificConcerns": [
+        "classroom disruption",
+        "loss of trust with families",
+        "administrative burden",
+        "program viability"
+      ]
+    },
+    {
+      "personaId": "parent",
+      "label": "Parent of Head Start Child",
+      "demographics": {
+        "ageRange": [20, 45],
+        "professions": ["various"],
+        "regions": ["urban", "suburban", "rural"],
+        "familyStatus": ["parent", "single parent", "guardian"]
+      },
+      "availableTraits": ["parent", "advocate", "community_member"],
+      "introductionTemplates": [
+        "As a parent of {number} children who attended Head Start,",
+        "My {relationship} currently attends Head Start in {city},",
+        "As a working parent who relies on Head Start,",
+        "I'm writing as a concerned parent whose family has benefited from Head Start,"
+      ],
+      "credibilityMarkers": [
+        "firsthand experience with the program",
+        "active in parent committee",
+        "volunteer at local Head Start",
+        "seen the direct impact on my children"
+      ],
+      "motivations": [
+        "children's future",
+        "family stability",
+        "work-life balance",
+        "educational opportunity"
+      ],
+      "specificConcerns": [
+        "child's education disruption",
+        "finding alternative childcare",
+        "affordability",
+        "trust and safety"
+      ]
+    },
+    {
+      "personaId": "administrator",
+      "label": "Head Start Program Administrator",
+      "demographics": {
+        "ageRange": [35, 65],
+        "professions": ["program director", "executive director", "program coordinator", "administrator"],
+        "regions": ["urban", "suburban", "rural"],
+        "familyStatus": ["various"]
+      },
+      "availableTraits": ["administrator", "program_director", "advocate"],
+      "introductionTemplates": [
+        "As the {title} of a Head Start program serving {number} children,",
+        "I oversee Head Start operations for {number} families in {city},",
+        "Having managed Head Start programs for {years} years,",
+        "In my role directing Head Start services in {region},"
+      ],
+      "credibilityMarkers": [
+        "responsible for program compliance",
+        "manage federal grants",
+        "oversee staff of educators",
+        "direct experience with regulations"
+      ],
+      "motivations": [
+        "program sustainability",
+        "staff retention",
+        "community service",
+        "regulatory compliance"
+      ],
+      "specificConcerns": [
+        "implementation logistics",
+        "staff training requirements",
+        "budget implications",
+        "enrollment impacts"
+      ]
+    },
+    {
+      "personaId": "community_member",
+      "label": "Concerned Community Member",
+      "demographics": {
+        "ageRange": [18, 80],
+        "professions": ["various"],
+        "regions": ["urban", "suburban", "rural"],
+        "familyStatus": ["various"]
+      },
+      "availableTraits": ["advocate", "community_member", "taxpayer"],
+      "introductionTemplates": [
+        "As a lifelong resident of {city},",
+        "As a taxpayer and community member,",
+        "As someone who cares about children in my community,",
+        "I'm writing as a concerned citizen from {state},"
+      ],
+      "credibilityMarkers": [
+        "active in community",
+        "longtime resident",
+        "taxpayer",
+        "voter"
+      ],
+      "motivations": [
+        "community wellbeing",
+        "social justice",
+        "economic development",
+        "children's welfare"
+      ],
+      "specificConcerns": [
+        "community impact",
+        "economic effects",
+        "social cohesion",
+        "future workforce"
+      ]
+    },
+    {
+      "personaId": "healthcare_worker",
+      "label": "Healthcare Professional",
+      "demographics": {
+        "ageRange": [25, 65],
+        "professions": ["pediatrician", "nurse", "social worker", "therapist", "medical assistant"],
+        "regions": ["urban", "suburban", "rural"],
+        "familyStatus": ["various"]
+      },
+      "availableTraits": ["healthcare", "advocate", "professional"],
+      "introductionTemplates": [
+        "As a {profession} who works with Head Start families,",
+        "In my practice as a {profession}, I see many children from Head Start,",
+        "As a healthcare provider serving low-income families,",
+        "Working in pediatric care for {years} years,"
+      ],
+      "credibilityMarkers": [
+        "medical degree",
+        "licensed healthcare provider",
+        "public health expertise",
+        "clinical experience"
+      ],
+      "motivations": [
+        "child health",
+        "preventive care",
+        "health equity",
+        "developmental outcomes"
+      ],
+      "specificConcerns": [
+        "health screening gaps",
+        "developmental delays",
+        "mental health impacts",
+        "healthcare access"
+      ]
+    }
+  ],
+  "styleProfiles": [
+    {
+      "styleId": "professional",
+      "label": "Professional and Formal",
+      "characteristics": {
+        "sentenceLength": "medium",
+        "vocabularyLevel": "professional",
+        "paragraphStyle": "standard",
+        "contractions": "never",
+        "punctuationStyle": "standard"
+      },
+      "tone": {
+        "formality": 9,
+        "emotionality": 3,
+        "urgency": 5,
+        "respectfulness": 9
+      },
+      "signaturePhrases": [
+        "I respectfully urge",
+        "It is imperative that",
+        "I am writing to express my concern",
+        "Thank you for your consideration"
+      ],
+      "transitionWords": ["Furthermore", "Moreover", "Consequently", "Therefore"]
+    },
+    {
+      "styleId": "passionate",
+      "label": "Passionate and Emotional",
+      "characteristics": {
+        "sentenceLength": "varied",
+        "vocabularyLevel": "moderate",
+        "paragraphStyle": "brief",
+        "contractions": "frequently",
+        "punctuationStyle": "emphatic"
+      },
+      "tone": {
+        "formality": 5,
+        "emotionality": 9,
+        "urgency": 9,
+        "respectfulness": 6
+      },
+      "signaturePhrases": [
+        "This is devastating",
+        "How can we allow",
+        "Children will suffer",
+        "This breaks my heart"
+      ],
+      "transitionWords": ["But", "And worse", "What's more", "Even worse"]
+    },
+    {
+      "styleId": "conversational",
+      "label": "Conversational and Direct",
+      "characteristics": {
+        "sentenceLength": "short",
+        "vocabularyLevel": "simple",
+        "paragraphStyle": "brief",
+        "contractions": "frequently",
+        "punctuationStyle": "minimal"
+      },
+      "tone": {
+        "formality": 3,
+        "emotionality": 5,
+        "urgency": 6,
+        "respectfulness": 7
+      },
+      "signaturePhrases": [
+        "I'm writing because",
+        "This doesn't make sense",
+        "Please reconsider",
+        "Thanks for reading"
+      ],
+      "transitionWords": ["Also", "Plus", "And", "So"]
+    },
+    {
+      "styleId": "analytical",
+      "label": "Analytical and Evidence-Based",
+      "characteristics": {
+        "sentenceLength": "long",
+        "vocabularyLevel": "advanced",
+        "paragraphStyle": "detailed",
+        "contractions": "never",
+        "punctuationStyle": "standard"
+      },
+      "tone": {
+        "formality": 8,
+        "emotionality": 2,
+        "urgency": 4,
+        "respectfulness": 8
+      },
+      "signaturePhrases": [
+        "The evidence clearly demonstrates",
+        "Research consistently shows",
+        "Data indicates",
+        "Studies have proven"
+      ],
+      "transitionWords": ["Additionally", "In contrast", "Specifically", "Notably"]
+    }
+  ],
+  "narrativeFrameworks": [
+    {
+      "frameworkId": "standard_opposition",
+      "label": "Standard Opposition Letter",
+      "structure": [
+        {
+          "sectionType": "introduction",
+          "required": true,
+          "orderPreference": 1,
+          "wordCountPercentage": 15,
+          "repeatable": false
+        },
+        {
+          "sectionType": "problem_statement",
+          "required": true,
+          "orderPreference": 2,
+          "wordCountPercentage": 25,
+          "repeatable": false
+        },
+        {
+          "sectionType": "evidence",
+          "required": true,
+          "orderPreference": 3,
+          "wordCountPercentage": 30,
+          "repeatable": true
+        },
+        {
+          "sectionType": "personal_impact",
+          "required": false,
+          "orderPreference": 4,
+          "wordCountPercentage": 15,
+          "repeatable": false
+        },
+        {
+          "sectionType": "call_to_action",
+          "required": true,
+          "orderPreference": 5,
+          "wordCountPercentage": 15,
+          "repeatable": false
+        }
+      ],
+      "wordCountRange": [200, 500],
+      "compatiblePersonas": ["educator", "parent", "administrator", "community_member", "healthcare_worker"]
+    },
+    {
+      "frameworkId": "personal_story",
+      "label": "Personal Story Focus",
+      "structure": [
+        {
+          "sectionType": "personal_impact",
+          "required": true,
+          "orderPreference": 1,
+          "wordCountPercentage": 40,
+          "repeatable": false
+        },
+        {
+          "sectionType": "problem_statement",
+          "required": true,
+          "orderPreference": 2,
+          "wordCountPercentage": 20,
+          "repeatable": false
+        },
+        {
+          "sectionType": "community_impact",
+          "required": true,
+          "orderPreference": 3,
+          "wordCountPercentage": 25,
+          "repeatable": false
+        },
+        {
+          "sectionType": "call_to_action",
+          "required": true,
+          "orderPreference": 4,
+          "wordCountPercentage": 15,
+          "repeatable": false
+        }
+      ],
+      "wordCountRange": [150, 400],
+      "compatiblePersonas": ["parent", "educator"]
+    },
+    {
+      "frameworkId": "brief_concern",
+      "label": "Brief Statement of Concern",
+      "structure": [
+        {
+          "sectionType": "introduction",
+          "required": true,
+          "orderPreference": 1,
+          "wordCountPercentage": 20,
+          "repeatable": false
+        },
+        {
+          "sectionType": "problem_statement",
+          "required": true,
+          "orderPreference": 2,
+          "wordCountPercentage": 50,
+          "repeatable": false
+        },
+        {
+          "sectionType": "call_to_action",
+          "required": true,
+          "orderPreference": 3,
+          "wordCountPercentage": 30,
+          "repeatable": false
+        }
+      ],
+      "wordCountRange": [100, 200],
+      "compatiblePersonas": ["community_member", "parent"]
+    }
+  ],
+  "factBank": {
+    "statistics": [
+      {
+        "value": "30 years",
+        "description": "Length of time Head Start has been excluded from PRWORA",
+        "source": "HHS interpretation",
+        "year": 1998,
+        "presentationVariations": [
+          "nearly 30 years",
+          "almost three decades",
+          "since 1998",
+          "for nearly thirty years"
+        ]
+      },
+      {
+        "value": "1.1 million",
+        "description": "Children served by Head Start annually",
+        "source": "Head Start Program Facts",
+        "year": 2024,
+        "presentationVariations": [
+          "over a million children",
+          "1.1 million kids",
+          "more than one million children",
+          "over 1,000,000 children"
+        ]
+      },
+      {
+        "value": "$12 billion",
+        "description": "Annual Head Start federal funding",
+        "source": "Federal Budget",
+        "year": 2024,
+        "presentationVariations": [
+          "twelve billion dollars",
+          "$12 billion in federal funds",
+          "billions in taxpayer dollars",
+          "$12,000,000,000"
+        ]
+      }
+    ],
+    "historicalFacts": [
+      {
+        "fact": "PRWORA passed with bipartisan support excluding Head Start",
+        "date": "1996",
+        "relevance": "Shows original Congressional intent",
+        "referenceTemplates": [
+          "When PRWORA passed in 1996, Congress deliberately excluded Head Start",
+          "The 1996 welfare reform explicitly left out Head Start",
+          "Congress made clear in 1996 that Head Start was not a federal benefit"
+        ]
+      },
+      {
+        "fact": "HHS issued interpretation excluding Head Start from PRWORA",
+        "date": "1998",
+        "relevance": "Established long-standing precedent",
+        "referenceTemplates": [
+          "HHS's 1998 interpretation has guided programs for decades",
+          "Since HHS clarified this in 1998, programs have operated accordingly",
+          "The 1998 HHS guidance has been the standard for nearly 30 years"
+        ]
+      }
+    ],
+    "legalReferences": [
+      {
+        "name": "Personal Responsibility and Work Opportunity Reconciliation Act",
+        "citation": "PRWORA, Pub. L. 104-193, 110 Stat. 2105 (1996)",
+        "section": "Section 401(b)(2)",
+        "explanation": "Explicitly excludes 'programs, services, or assistance (such as soup kitchens, crisis counseling and intervention, and short-term shelter)' and non-postsecondary education from federal public benefit definition",
+        "invocationTemplates": [
+          "Under PRWORA Section 401(b)(2), Congress explicitly excluded education programs",
+          "The statute at 8 U.S.C. § 1611(b)(2) clearly exempts Head Start",
+          "Congress intentionally carved out non-postsecondary education in PRWORA"
+        ]
+      },
+      {
+        "name": "Administrative Procedure Act",
+        "citation": "5 U.S.C. § 553",
+        "section": "Notice and Comment Requirements",
+        "explanation": "Requires agencies to provide notice of proposed rulemaking and opportunity for public comment before implementing substantive rules",
+        "invocationTemplates": [
+          "The APA at 5 U.S.C. § 553 requires a 30-day notice and comment period",
+          "This violates fundamental administrative law requiring public participation",
+          "HHS failed to comply with basic APA rulemaking procedures"
+        ]
+      },
+      {
+        "name": "Head Start Act",
+        "citation": "42 U.S.C. § 9831 et seq.",
+        "section": "Section 640 - Eligibility Requirements",
+        "explanation": "Head Start Act sets eligibility based on income, not immigration status, and requires serving the entire community",
+        "invocationTemplates": [
+          "The Head Start Act itself at 42 U.S.C. § 9840 makes no immigration restrictions",
+          "Head Start's authorizing statute requires serving all eligible children in the community",
+          "This conflicts with the Head Start Act's mandate to serve low-income families"
+        ]
+      },
+      {
+        "name": "HHS 1998 Interpretation",
+        "citation": "63 Fed. Reg. 41658 (August 4, 1998)",
+        "section": "Interim Guidance on Verification of Citizenship",
+        "explanation": "HHS's longstanding interpretation that Head Start is not a federal public benefit under PRWORA",
+        "invocationTemplates": [
+          "HHS's own 1998 guidance at 63 Fed. Reg. 41658 excluded Head Start",
+          "For 27 years, HHS has consistently interpreted PRWORA to exclude Head Start",
+          "This reverses nearly three decades of settled agency interpretation"
+        ]
+      },
+      {
+        "name": "Constitutional Due Process",
+        "citation": "U.S. Const. amend. V & XIV",
+        "section": "Due Process Clause",
+        "explanation": "Requires fair notice and opportunity to be heard before government deprives individuals of benefits",
+        "invocationTemplates": [
+          "This violates basic due process by changing rules without notice",
+          "Families have a protected interest in continued Head Start enrollment",
+          "The immediate implementation denies constitutional due process"
+        ]
+      }
+    ],
+    "researchCitations": [
+      {
+        "title": "Long-term Benefits of Head Start",
+        "authors": ["Garces, E.", "Thomas, D.", "Currie, J."],
+        "publication": "American Economic Review",
+        "year": 2002,
+        "keyFinding": "Head Start participants more likely to complete high school and attend college",
+        "citationTemplates": [
+          "Research shows Head Start graduates succeed",
+          "Studies prove the long-term benefits",
+          "Academic research demonstrates the value"
+        ]
+      }
+    ],
+    "authorityQuotes": [
+      {
+        "quote": "Head Start gives children from low-income families the foundation they need to succeed",
+        "speaker": "Former HHS Secretary",
+        "speakerTitle": "Cabinet Official",
+        "context": "Congressional testimony on early childhood education",
+        "introductionTemplates": [
+          "As a former HHS Secretary noted",
+          "Federal officials have recognized",
+          "Government leaders have stated"
+        ]
+      }
+    ]
+  },
+  "personalizationPrompts": [
+    {
+      "promptId": "location",
+      "userPrompt": "What city and state are you from?",
+      "inputType": "text",
+      "required": true,
+      "incorporationTemplates": [
+        "from {location}",
+        "in {location}",
+        "here in {location}",
+        "resident of {location}"
+      ],
+      "validation": {
+        "minLength": 3,
+        "maxLength": 50
+      }
+    },
+    {
+      "promptId": "years_experience",
+      "userPrompt": "How many years have you been involved with Head Start? (0 if not directly involved)",
+      "inputType": "number",
+      "required": false,
+      "incorporationTemplates": [
+        "in my {years} years",
+        "over {years} years",
+        "for {years} years",
+        "during my {years} years"
+      ],
+      "validation": {
+        "minLength": 1,
+        "maxLength": 2
+      }
+    },
+    {
+      "promptId": "personal_connection",
+      "userPrompt": "What's your connection to this issue?",
+      "inputType": "select",
+      "options": [
+        "Parent of Head Start child",
+        "Head Start educator",
+        "Program administrator",
+        "Community member",
+        "Healthcare provider",
+        "Former Head Start student",
+        "Grandparent",
+        "Taxpayer"
+      ],
+      "required": true,
+      "incorporationTemplates": [
+        "As a {connection}",
+        "Speaking as a {connection}",
+        "In my role as a {connection}",
+        "From my perspective as a {connection}"
+      ]
+    },
+    {
+      "promptId": "specific_concern",
+      "userPrompt": "What specific aspect concerns you most?",
+      "inputType": "multiselect",
+      "options": [
+        "Impact on children",
+        "Administrative burden",
+        "Program funding",
+        "Immigration screening",
+        "Community trust",
+        "Legal violations",
+        "Economic effects"
+      ],
+      "required": true,
+      "incorporationTemplates": [
+        "I'm particularly concerned about {concern}",
+        "Most troubling is {concern}",
+        "The {concern} is especially worrying",
+        "What bothers me most is {concern}"
+      ]
+    }
+  ],
+  "emotionalHooks": [
+    {
+      "hookId": "child_future",
+      "emotionType": "empathy",
+      "intensity": "moderate",
+      "storyTemplates": [
+        "Imagine a {age}-year-old child losing their only chance at quality early education",
+        "Picture the confusion in a child's eyes when they can't return to their classroom",
+        "Think about the developmental milestones that will be missed",
+        "Consider the lifelong impact on a child denied these critical early years"
+      ],
+      "compatiblePersonas": ["parent", "educator", "healthcare_worker"],
+      "requiredDetails": ["age"]
+    },
+    {
+      "hookId": "community_destruction",
+      "emotionType": "fear",
+      "intensity": "strong",
+      "storyTemplates": [
+        "Entire programs will close, devastating communities",
+        "This will destroy the fabric of our neighborhoods",
+        "Communities that have relied on Head Start for generations will lose everything",
+        "The ripple effects will tear apart our social safety net"
+      ],
+      "compatiblePersonas": ["administrator", "community_member"],
+      "requiredDetails": []
+    },
+    {
+      "hookId": "betrayal",
+      "emotionType": "anger",
+      "intensity": "strong",
+      "storyTemplates": [
+        "After decades of trust, this is a betrayal",
+        "Families who believed in the system are being abandoned",
+        "This breaks faith with millions of American families",
+        "The government is turning its back on vulnerable children"
+      ],
+      "compatiblePersonas": ["parent", "educator"],
+      "requiredDetails": []
+    }
+  ],
+  "closingStrategies": [
+    {
+      "strategyId": "formal_request",
+      "closingType": "call_to_action",
+      "templates": [
+        "I urge HHS to reconsider Head Start's redesignation as a public benefit.",
+        "Please withdraw this harmful reinterpretation immediately.",
+        "I respectfully request that you reverse this decision.",
+        "HHS must maintain the longstanding interpretation that has served families well."
+      ],
+      "compatibleTones": ["professional", "analytical"],
+      "signatureFormats": [
+        "Sincerely,\n{name}\n{location}",
+        "Respectfully,\n{name}\n{title}\n{location}",
+        "Thank you for your consideration,\n{name}"
+      ]
+    },
+    {
+      "strategyId": "emotional_plea",
+      "closingType": "emotional_appeal",
+      "templates": [
+        "Please don't let these children down.",
+        "The future of thousands of children is in your hands.",
+        "Do the right thing for America's children.",
+        "History will judge us by how we treat our most vulnerable."
+      ],
+      "compatibleTones": ["passionate", "conversational"],
+      "signatureFormats": [
+        "{name}\n{location}",
+        "A concerned {role},\n{name}",
+        "With hope,\n{name}"
+      ]
+    },
+    {
+      "strategyId": "warning",
+      "closingType": "warning",
+      "templates": [
+        "The consequences of this action will be catastrophic and irreversible.",
+        "This decision will haunt our communities for generations.",
+        "You are about to destroy a program that works.",
+        "The damage this will cause cannot be undone."
+      ],
+      "compatibleTones": ["passionate"],
+      "signatureFormats": [
+        "{name}",
+        "{name}\n{location}"
+      ]
+    }
+  ],
+  "generationConfig": {
+    "model": "gpt-4-turbo",
+    "temperature": 0.8,
+    "variation": {
+      "minArguments": 2,
+      "maxArguments": 4,
+      "personalStoryProbability": 0.3,
+      "statisticsProbability": 0.4,
+      "legalReferenceProbability": 0.5
+    },
+    "authenticity": {
+      "typoRate": 0.02,
+      "dialectVariation": true,
+      "capitalizationVariance": true,
+      "emotionalInterruptions": true,
+      "grammarImperfectionRate": 0.05
+    },
+    "distribution": {
+      "submissionWindowHours": 336,
+      "peakTimes": ["09:00", "12:00", "17:00", "20:00"],
+      "geographicWeighting": {
+        "California": 0.15,
+        "Texas": 0.12,
+        "New York": 0.10,
+        "Florida": 0.08,
+        "Illinois": 0.06,
+        "Pennsylvania": 0.05,
+        "Ohio": 0.05,
+        "Other": 0.39
+      },
+      "submissionDelayRange": [30, 600]
+    },
+    "antiDetection": {
+      "modelRotation": true,
+      "promptVariation": true,
+      "contradictionRate": 0.01,
+      "currentEventsIntegration": true,
+      "uniqueDetailGeneration": true
+    }
+  },
+  "toneGuidance": [
+    {
+      "dimension": "aggression",
+      "levels": {
+        "1": {
+          "instructions": ["Be extremely gentle and non-confrontational", "Express concerns as questions", "Use hedging language"],
+          "phrases": ["I wonder if", "Perhaps we might consider", "It seems to me", "Might there be"],
+          "keywords": ["perhaps", "possibly", "might", "could", "wonder"],
+          "avoid": ["must", "demand", "unacceptable", "outrageous"]
+        },
+        "3": {
+          "instructions": ["Express mild disagreement", "Use diplomatic language", "Acknowledge other perspectives"],
+          "phrases": ["I respectfully disagree", "While I understand", "I have concerns about", "This raises questions"],
+          "keywords": ["concern", "question", "worry", "problematic"],
+          "avoid": ["attack", "destroy", "terrible"]
+        },
+        "5": {
+          "instructions": ["Be direct and firm", "State opposition clearly", "Use assertive language"],
+          "phrases": ["This is wrong", "I strongly oppose", "This must be reconsidered", "Unacceptable change"],
+          "keywords": ["wrong", "oppose", "reject", "flawed"],
+          "structure": "State position clearly in first paragraph"
+        },
+        "7": {
+          "instructions": ["Use forceful language", "Express strong disapproval", "Challenge directly"],
+          "phrases": ["This is outrageous", "Completely unacceptable", "I demand", "How dare you"],
+          "keywords": ["outrageous", "demand", "unconscionable", "betrayal"],
+          "structure": "Open with strong condemnation"
+        },
+        "10": {
+          "instructions": ["Maximum confrontation", "Use inflammatory language", "Express fury", "Question motives"],
+          "phrases": ["This is a disgrace", "Shameful betrayal", "Destroying lives", "Blood on your hands"],
+          "keywords": ["disgrace", "shameful", "destroying", "betrayal", "corrupt"],
+          "structure": "Every sentence should express outrage",
+          "avoid": ["perhaps", "might", "respectfully"]
+        }
+      }
+    },
+    {
+      "dimension": "sarcasm",
+      "levels": {
+        "1": {
+          "instructions": ["No sarcasm whatsoever", "Be completely sincere"],
+          "phrases": [],
+          "keywords": [],
+          "avoid": ["apparently", "supposedly", "so-called"]
+        },
+        "3": {
+          "instructions": ["Occasional mild irony", "Subtle questioning of logic"],
+          "phrases": ["Interesting timing", "What a coincidence", "How convenient"],
+          "keywords": ["interesting", "curious", "remarkable"]
+        },
+        "5": {
+          "instructions": ["Moderate sarcasm", "Point out absurdities", "Use ironic observations"],
+          "phrases": ["Brilliant plan", "What could go wrong?", "I'm sure that will work perfectly"],
+          "keywords": ["brilliant", "surely", "obviously", "clearly"]
+        },
+        "8": {
+          "instructions": ["Heavy sarcasm", "Mock the proposal", "Use biting irony"],
+          "phrases": ["Congratulations on this masterpiece", "Truly a work of genius", "Because that's worked so well before"],
+          "keywords": ["masterpiece", "genius", "wonderful", "fantastic"],
+          "structure": "Frame serious points with sarcastic observations"
+        },
+        "10": {
+          "instructions": ["Dripping with sarcasm", "Every statement ironic", "Complete mockery"],
+          "phrases": ["Oh yes, destroying programs is definitely the solution", "Thank you SO much for this gift", "What a WONDERFUL idea"],
+          "keywords": ["wonderful", "amazing", "brilliant", "genius", "perfect"],
+          "structure": "Use quotation marks around government claims"
+        }
+      }
+    },
+    {
+      "dimension": "technicality",
+      "levels": {
+        "1": {
+          "instructions": ["Use simple everyday language", "Avoid jargon", "Explain everything simply"],
+          "phrases": ["This will hurt families", "Kids need help", "This is wrong"],
+          "keywords": ["help", "hurt", "kids", "families"],
+          "avoid": ["pursuant to", "statutory", "regulatory framework"]
+        },
+        "5": {
+          "instructions": ["Mix technical and plain language", "Cite some specifics", "Reference key sections"],
+          "phrases": ["Under Section 401", "The regulation states", "According to PRWORA"],
+          "keywords": ["section", "regulation", "provision", "requirement"]
+        },
+        "10": {
+          "instructions": ["Maximum legal/technical detail", "Dense citations", "Professional terminology", "Extensive footnoting"],
+          "phrases": ["Pursuant to 8 U.S.C. § 1611(b)(2)", "The statutory construction", "Chevron deference", "Arbitrary and capricious under APA"],
+          "keywords": ["pursuant", "statutory", "jurisprudence", "precedent", "deference"],
+          "structure": "Include specific legal citations in every paragraph"
+        }
+      }
+    },
+    {
+      "dimension": "empathy",
+      "levels": {
+        "1": {
+          "instructions": ["Focus on rules and law", "Minimal emotional content", "Avoid personal stories"],
+          "phrases": ["The law requires", "Regulations state", "Policy dictates"],
+          "keywords": ["law", "regulation", "requirement", "statute"],
+          "avoid": ["feel", "heart", "suffering", "pain"]
+        },
+        "5": {
+          "instructions": ["Balance emotion and logic", "Include some human impact", "Show understanding"],
+          "phrases": ["Families will be affected", "Children deserve better", "This causes hardship"],
+          "keywords": ["families", "children", "hardship", "concern"]
+        },
+        "10": {
+          "instructions": ["Maximum emotional appeal", "Focus on human suffering", "Tell heartbreaking stories", "Emphasize vulnerability"],
+          "phrases": ["Innocent children crying", "Mothers forced to choose", "Heartbreaking situations", "Tears in their eyes"],
+          "keywords": ["heartbreaking", "suffering", "tears", "desperate", "innocent"],
+          "structure": "Lead with emotional story, include personal anecdotes"
+        }
+      }
+    },
+    {
+      "dimension": "outrage",
+      "levels": {
+        "1": {
+          "instructions": ["Express mild concern", "Stay calm and measured"],
+          "phrases": ["This is concerning", "I have questions about", "This seems problematic"],
+          "keywords": ["concerning", "questions", "problematic"],
+          "avoid": ["outrageous", "scandal", "corrupt"]
+        },
+        "5": {
+          "instructions": ["Express clear indignation", "Show moral objection"],
+          "phrases": ["This is morally wrong", "Deeply troubling", "Fundamentally unjust"],
+          "keywords": ["wrong", "unjust", "troubling", "unethical"]
+        },
+        "10": {
+          "instructions": ["Express maximum moral outrage", "Call it evil/corrupt", "Question humanity"],
+          "phrases": ["This is evil", "Morally bankrupt", "Crimes against children", "Have you no shame?"],
+          "keywords": ["evil", "corrupt", "shame", "crime", "inhuman"],
+          "structure": "Every paragraph should express moral indignation"
+        }
+      }
+    },
+    {
+      "dimension": "patriotism",
+      "levels": {
+        "1": {
+          "instructions": ["Focus on practical/legal issues", "Avoid patriotic appeals"],
+          "phrases": [],
+          "keywords": [],
+          "avoid": ["America", "founding fathers", "constitution", "liberty"]
+        },
+        "5": {
+          "instructions": ["Include some American values", "Reference national ideals"],
+          "phrases": ["American values", "This nation was built on", "Our country stands for"],
+          "keywords": ["American", "nation", "country", "values"]
+        },
+        "10": {
+          "instructions": ["Maximum patriotic appeal", "Invoke founding principles", "Wave the flag", "Quote founders"],
+          "phrases": ["Un-American", "Betrays everything America stands for", "Our founding fathers", "Lady Liberty weeps"],
+          "keywords": ["America", "freedom", "liberty", "constitution", "founders", "patriot"],
+          "structure": "Frame as betrayal of American values"
+        }
+      }
+    },
+    {
+      "dimension": "fear",
+      "levels": {
+        "1": {
+          "instructions": ["Focus on facts", "Avoid dire predictions"],
+          "phrases": ["Changes will occur", "Programs will adjust"],
+          "keywords": ["change", "adjust", "modify"],
+          "avoid": ["catastrophe", "disaster", "crisis"]
+        },
+        "5": {
+          "instructions": ["Express reasonable concerns", "Warn of consequences"],
+          "phrases": ["This could lead to", "Risk of harm", "Potential for damage"],
+          "keywords": ["risk", "concern", "potential", "could"]
+        },
+        "10": {
+          "instructions": ["Paint apocalyptic scenarios", "Emphasize worst outcomes", "Create urgency through fear"],
+          "phrases": ["Catastrophic consequences", "Children will die", "Complete destruction", "Point of no return"],
+          "keywords": ["catastrophe", "disaster", "destruction", "crisis", "emergency"],
+          "structure": "Open with dire warning, escalate throughout"
+        }
+      }
+    },
+    {
+      "dimension": "hope",
+      "levels": {
+        "1": {
+          "instructions": ["Focus on problems", "Pessimistic tone", "No silver lining"],
+          "phrases": ["Irreversible damage", "No going back", "All is lost"],
+          "keywords": ["damage", "lost", "ruined", "destroyed"],
+          "avoid": ["hope", "possible", "together", "rebuild"]
+        },
+        "5": {
+          "instructions": ["Balance concern with possibility", "Suggest solutions"],
+          "phrases": ["We can still fix this", "There's time to reconsider", "Working together"],
+          "keywords": ["still", "together", "reconsider", "possible"]
+        },
+        "10": {
+          "instructions": ["Maximum optimism", "Inspire action", "Paint vision of success"],
+          "phrases": ["We will overcome", "Together we can", "Brighter future ahead", "Hope springs eternal"],
+          "keywords": ["overcome", "together", "future", "hope", "victory"],
+          "structure": "End with inspiring call to action"
+        }
+      }
+    }
+  ]
+}
