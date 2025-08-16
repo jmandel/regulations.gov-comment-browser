@@ -42,7 +42,10 @@ async function buildWebsite(documentId: string, options: any) {
   // 5. Export all comments as single file
   await exportAllComments(db, outputDir, documentId);
   
-  // 6. Generate indexes for efficient lookups
+  // 6. Generate cluster report
+  await generateClusterReport(db, outputDir);
+  
+  // 7. Generate indexes for efficient lookups
   await generateIndexes(db, outputDir);
   
   console.log(`✅ Website data built in ${outputDir}`);
@@ -181,6 +184,7 @@ function getThemeHierarchy(db: any) {
     return {
       ...t,
       description,
+      detailedDescription: t.detailed_guidelines, // Map detailed_guidelines to detailedDescription for frontend
       children: themes.filter((child: any) => child.parent_code === t.code).map((c: any) => c.code)
     };
   });
@@ -413,6 +417,72 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
   
   await writeJson(join(outputDir, "comments.json"), processedComments);
   console.log(`  ✅ Exported ${processedComments.length} comments`);
+}
+
+async function generateClusterReport(db: any, outputDir: string) {
+  console.log("  📊 Generating cluster report...");
+  
+  // Check if clustering exists
+  const hasClusteringData = db.prepare(`
+    SELECT COUNT(*) as count FROM comment_cluster_membership
+  `).get()?.count > 0;
+  
+  if (!hasClusteringData) {
+    console.log("  ⏭️  No clustering data found, skipping cluster report");
+    return;
+  }
+  
+  // Get cluster information
+  const clusters = db.prepare(`
+    SELECT 
+      cc.cluster_id,
+      cc.representative_comment_id,
+      cc.cluster_size,
+      GROUP_CONCAT(ccm.comment_id) as member_ids,
+      json_extract(c.attributes_json, '$.submitterType') as submitter_type,
+      json_extract(c.attributes_json, '$.organization') as organization,
+      substr(json_extract(c.attributes_json, '$.comment'), 1, 200) as snippet
+    FROM comment_clusters cc
+    JOIN comment_cluster_membership ccm ON cc.cluster_id = ccm.cluster_id
+    JOIN comments c ON cc.representative_comment_id = c.id
+    GROUP BY cc.cluster_id
+    ORDER BY cc.cluster_size DESC, cc.cluster_id
+  `).all();
+  
+  // Get cluster size distribution
+  const distribution = db.prepare(`
+    SELECT 
+      cluster_size,
+      COUNT(*) as count
+    FROM comment_clusters
+    GROUP BY cluster_size
+    ORDER BY cluster_size
+  `).all();
+  
+  // Format cluster data
+  const clusterReport = {
+    summary: {
+      totalClusters: clusters.length,
+      totalCommentsClustered: db.prepare("SELECT COUNT(*) as count FROM comment_cluster_membership").get().count,
+      singletons: distribution.find(d => d.cluster_size === 1)?.count || 0,
+      largestClusterSize: Math.max(...distribution.map(d => d.cluster_size)),
+      distribution: distribution
+    },
+    clusters: clusters.map(c => ({
+      id: c.cluster_id,
+      size: c.cluster_size,
+      representative: c.representative_comment_id,
+      members: c.member_ids.split(','),
+      metadata: {
+        submitterType: c.submitter_type,
+        organization: c.organization,
+        snippetPreview: c.snippet ? c.snippet.substring(0, 100) + (c.snippet.length > 100 ? '...' : '') : null
+      }
+    }))
+  };
+  
+  await writeJson(join(outputDir, "cluster-report.json"), clusterReport);
+  console.log(`  ✅ Generated cluster report with ${clusters.length} clusters`);
 }
 
 async function generateIndexes(db: any, outputDir: string) {

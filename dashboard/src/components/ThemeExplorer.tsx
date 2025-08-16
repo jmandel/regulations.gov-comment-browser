@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { ChevronRight, ChevronDown, Search, Info, FileText, Copy } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import useStore from '../store/useStore'
 import type { Theme } from '../types'
 import CopyThemeListModal from './CopyThemeListModal'
@@ -12,7 +12,6 @@ interface ThemeExplorerProps {
 function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) {
   const { themes, themeSummaries } = useStore()
   console.log('Rendering ThemeExplorer with themes:', themes)
-  const navigate = useNavigate()
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set())
@@ -151,9 +150,9 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
             )}
             {!hasChildren && <div className="w-6" />}
             
-            <div 
-              className="flex-1 flex items-center justify-between"
-              onClick={() => navigate(`/themes/${theme.code}`)}
+            <Link 
+              to={`/themes/${theme.code}`}
+              className="flex-1 flex items-center justify-between hover:no-underline"
             >
               <div className="flex-1 flex items-center">
                 <span className="font-medium text-gray-900">{theme.code}</span>
@@ -177,7 +176,10 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
                 )}
                 {theme.detailedDescription && (
                   <button
-                    onClick={(e) => toggleDescription(theme.code, e)}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      toggleDescription(theme.code, e)
+                    }}
                     className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
                     title={isDescriptionExpanded ? "Hide description" : "Show description"}
                   >
@@ -194,7 +196,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
                 )}
                 <ChevronRight className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-            </div>
+            </Link>
           </div>
           
           {/* Inline description */}

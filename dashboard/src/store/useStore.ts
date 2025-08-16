@@ -98,11 +98,12 @@ const useStore = create<StoreState>((set, get) => ({
       
       // Parse theme descriptions
       const parsedThemes = themes.map((theme: Theme) => {
-        const { label, detailedDescription } = parseThemeDescription(theme.description)
+        const { label, detailedDescription: parsedDescription } = parseThemeDescription(theme.description)
         return {
           ...theme,
           label,
-          detailedDescription
+          // Only use parsed description if no detailed description from backend
+          detailedDescription: theme.detailedDescription || parsedDescription
         }
       })
       console.log(parsedThemes);
