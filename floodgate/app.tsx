@@ -58,10 +58,6 @@ function App() {
   // Generation parameters
   const [genParams, setGenParams] = useState({
     wordCount: 350,
-    includeStats: true,
-    includeLegal: true,
-    includePersonalStory: true, // On by default
-    typoRate: 0.02,
     temperature: 0.8
   });
   
@@ -215,13 +211,9 @@ function App() {
       hope: Math.floor(Math.random() * 10) + 1
     });
     
-    // Randomize generation parameters (but keep personal story on)
+    // Randomize generation parameters
     setGenParams({
       wordCount: Math.floor(Math.random() * 500) + 200, // 200-700 words
-      includeStats: Math.random() > 0.5,
-      includeLegal: Math.random() > 0.4,
-      includePersonalStory: true, // Always on by default
-      typoRate: Math.random() * 0.05, // 0-5% typos
       temperature: 0.5 + Math.random() * 1.0 // 0.5-1.5
     });
     // Don't randomize personal story text - keep what user typed
@@ -494,15 +486,12 @@ Approach: ${Array.isArray(concept.approach) ? concept.approach.join(', ') : (con
     promptSections.push(`
 ╔═══ GENERATION PARAMETERS ══════════════════════════════════════════╗
   Target Length:    ${targetWordCount} words
-  Include Stats:    ${genParams.includeStats ? '✓ Yes (1-2 statistics)' : '✗ No'}
-  Legal References: ${genParams.includeLegal ? '✓ Yes (PRWORA/APA)' : '✗ No'}
-  Personal Story:   ${genParams.includePersonalStory && personalStory.trim() ? '✓ Yes' : '✗ No'}
-  Authenticity:     ${genParams.typoRate > 0 ? `✓ ${(genParams.typoRate * 100).toFixed(0)}% typo rate` : '✗ Perfect grammar'}
   Temperature:      ${genParams.temperature.toFixed(1)}
+  Personal Story:   ${personalStory.trim() ? '✓ Yes' : '✗ No'}
 ╚═══════════════════════════════════════════════════════════════════╝`);
 
-    // Personal Story if included
-    if (genParams.includePersonalStory && personalStory.trim()) {
+    // Personal Story - always include if provided
+    if (personalStory.trim()) {
       promptSections.push(`
 ╔═══ PERSONAL STORY ═════════════════════════════════════════════════╗
 ${personalStory}
@@ -837,6 +826,85 @@ Generate the complete comment now:`;
               />
             </div>
           </div>
+          
+          {/* Personal Context & Story */}
+          <div style={{ marginTop: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: '#4a5568' }}>
+              Personal Context & Story (include any relevant details: location, profession, family situation, experiences)
+            </label>
+            <textarea
+              placeholder="Example: I'm a pediatric nurse in Houston, Texas, with 15 years of experience. I have two young children. Last year, my neighbor's 3-year-old daughter was enrolled in Head Start. The program helped her overcome developmental delays and prepared her for kindergarten. Without Head Start, her family wouldn't have been able to afford early education. I've seen firsthand how these programs change lives..."
+              value={personalStory}
+              onChange={(e) => setPersonalStory(e.target.value)}
+              style={{
+                width: '100%',
+                minHeight: '120px',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '2px solid #e2e8f0',
+                fontSize: '0.95rem',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                background: 'rgba(255, 255, 255, 0.8)'
+              }}
+            />
+            <button
+              onClick={() => {
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                  const recognition = new SpeechRecognition();
+                  
+                  const button = document.querySelector('button:focus') as HTMLButtonElement;
+                  if (button) {
+                    button.textContent = '🔴 Recording...';
+                    button.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #f06595 100%)';
+                  }
+                  
+                  recognition.continuous = true;
+                  recognition.interimResults = true;
+                  recognition.lang = 'en-US';
+                  
+                  let fullTranscript = '';
+                  
+                  recognition.onresult = (event: any) => {
+                    fullTranscript = '';
+                    
+                    // Build the complete transcript from all results
+                    for (let i = 0; i < event.results.length; i++) {
+                      fullTranscript += event.results[i][0].transcript;
+                    }
+                    
+                    // Replace the entire content with the complete transcript
+                    setPersonalStory(fullTranscript);
+                  };
+                  
+                  recognition.onend = () => {
+                    if (button) {
+                      button.textContent = '🎤 Dictate Story';
+                      button.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    }
+                  };
+                  
+                  recognition.start();
+                } else {
+                  alert('Speech recognition is not supported in your browser.');
+                }
+              }}
+              style={{
+                marginTop: '0.5rem',
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                fontWeight: 500
+              }}
+            >
+              🎤 Dictate Story
+            </button>
+          </div>
         </div>
         
         {/* Generation Parameters */}
@@ -864,48 +932,6 @@ Generate the complete comment now:`;
             </div>
             
             <div className="param-group">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={genParams.includeStats}
-                  onChange={(e) => setGenParams({
-                    ...genParams,
-                    includeStats: e.target.checked
-                  })}
-                />
-                <span>Include Statistics</span>
-              </label>
-            </div>
-            
-            <div className="param-group">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={genParams.includeLegal}
-                  onChange={(e) => setGenParams({
-                    ...genParams,
-                    includeLegal: e.target.checked
-                  })}
-                />
-                <span>Include Legal References</span>
-              </label>
-            </div>
-            
-            <div className="param-group">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={genParams.includePersonalStory}
-                  onChange={(e) => setGenParams({
-                    ...genParams,
-                    includePersonalStory: e.target.checked
-                  })}
-                />
-                <span>Include Personal Story</span>
-              </label>
-            </div>
-            
-            <div className="param-group">
               <label>Temperature (Creativity)</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <input
@@ -924,128 +950,14 @@ Generate the complete comment now:`;
                 <span className="temp-value">{genParams.temperature.toFixed(1)}</span>
               </div>
             </div>
-            
-            <div className="param-group">
-              <label>Typo Rate</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <input
-                  type="range"
-                  min="0"
-                  max="0.1"
-                  step="0.01"
-                  value={genParams.typoRate}
-                  onChange={(e) => setGenParams({
-                    ...genParams,
-                    typoRate: parseFloat(e.target.value)
-                  })}
-                  className="typo-slider"
-                  style={{ flex: 1 }}
-                />
-                <span className="typo-value">{(genParams.typoRate * 100).toFixed(0)}%</span>
-              </div>
-            </div>
           </div>
-          
-          {/* Personal Context & Story - shows when checkbox is checked */}
-          {genParams.includePersonalStory && (
-            <div style={{ marginTop: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: '#4a5568' }}>
-                Personal Context & Story (include any relevant details: location, profession, family situation, experiences)
-              </label>
-              <textarea
-                placeholder="Example: I'm a pediatric nurse in Houston, Texas, with 15 years of experience. I have two young children. Last year, my neighbor's 3-year-old daughter was enrolled in Head Start. The program helped her overcome developmental delays and prepared her for kindergarten. Without Head Start, her family wouldn't have been able to afford early education. I've seen firsthand how these programs change lives..."
-                value={personalStory}
-                onChange={(e) => setPersonalStory(e.target.value)}
-                style={{
-                  width: '100%',
-                  minHeight: '150px',
-                  padding: '0.75rem',
-                  border: '2px solid #e2e8f0',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  resize: 'vertical',
-                  fontFamily: 'inherit'
-                }}
-              />
-              <button
-                onClick={() => {
-                  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-                    const recognition = new SpeechRecognition();
-                    recognition.continuous = true;
-                    recognition.interimResults = true;
-                    recognition.lang = 'en-US';
-                    
-                    let isRecording = true;
-                    const button = event?.target as HTMLButtonElement;
-                    if (button) {
-                      button.textContent = '⏹️ Stop Recording';
-                      button.style.background = 'linear-gradient(135deg, #ff4444, #cc0000)';
-                    }
-                    
-                    let fullTranscript = '';
-                    
-                    recognition.onresult = (event: any) => {
-                      fullTranscript = '';
-                      
-                      // Build the complete transcript from all results
-                      for (let i = 0; i < event.results.length; i++) {
-                        fullTranscript += event.results[i][0].transcript;
-                      }
-                      
-                      // Replace the entire content with the complete transcript
-                      setPersonalStory(fullTranscript);
-                    };
-                    
-                    recognition.onend = () => {
-                      if (button) {
-                        button.textContent = '🎤 Dictate Story';
-                        button.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                      }
-                    };
-                    
-                    recognition.start();
-                    
-                    button?.addEventListener('click', () => {
-                      if (isRecording) {
-                        recognition.stop();
-                        isRecording = false;
-                      }
-                    }, { once: true });
-                    
-                    // Auto-stop after 60 seconds
-                    setTimeout(() => {
-                      if (isRecording) {
-                        recognition.stop();
-                      }
-                    }, 60000);
-                  } else {
-                    alert('Speech recognition not supported in this browser. Please type your story instead.');
-                  }
-                }}
-                style={{
-                  marginTop: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: 500
-                }}
-              >
-                🎤 Dictate Story
-              </button>
-            </div>
-          )}
         </div>
         
         {/* Prompt Display - Always visible */}
         <div className="control-section prompt" style={{ marginTop: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h3 style={{ margin: 0 }}>Generated Prompt</h3>
-        </div>
+          </div>
         
         {/* Action buttons ABOVE prompt */}
         <div className="prompt-actions" style={{ marginBottom: '1.5rem' }}>
@@ -1086,42 +998,6 @@ Generate the complete comment now:`;
         
         <div className="prompt-display">
           <pre>{generatedPrompt || 'Generating your prompt...'}</pre>
-        </div>
-        
-        <div className="prompt-actions">
-          <button 
-            onClick={() => {
-              navigator.clipboard.writeText(generatedPrompt);
-              // Visual feedback
-              const button = event?.target as HTMLButtonElement;
-              if (button) {
-                const originalText = button.textContent;
-                button.textContent = '✅ Copied!';
-                setTimeout(() => {
-                  button.textContent = originalText;
-                }, 2000);
-              }
-            }}
-            className="copy-button"
-            style={{ fontSize: '1.2rem', padding: '1rem 2rem' }}
-          >
-            📋 Copy to Clipboard
-          </button>
-          
-          <div className="model-links">
-            <a href="https://chat.openai.com" target="_blank" rel="noopener noreferrer" className="model-link">
-              → ChatGPT
-            </a>
-            <a href="https://claude.ai" target="_blank" rel="noopener noreferrer" className="model-link">
-              → Claude
-            </a>
-            <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" className="model-link">
-              → Gemini
-            </a>
-            <a href="https://www.perplexity.ai" target="_blank" rel="noopener noreferrer" className="model-link">
-              → Perplexity
-            </a>
-          </div>
         </div>
       </div>
       {/* End of prompt control-section */}
