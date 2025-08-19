@@ -283,8 +283,8 @@ body {
 /* Grid spanning for sections */
 .control-section.persona { grid-column: span 1; }
 .control-section.style { grid-column: span 2; }
-.control-section.arguments { grid-column: span 2; }
-.control-section.tone { grid-column: span 1; }
+.control-section.arguments { grid-column: span 1; }
+.control-section.tone { grid-column: span 2; }
 .control-section.personal-info { grid-column: span 3; }
 .control-section.generation { grid-column: span 3; }
 .control-section.prompt { grid-column: span 3; }
@@ -433,13 +433,15 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.2rem;
+  width: 100%;
 }
 
 .tone-control {
   display: grid;
-  grid-template-columns: 180px 1fr 50px;
+  grid-template-columns: 140px 1fr 50px;
   align-items: center;
   gap: 1rem;
+  width: 100%;
 }
 
 .tone-control label {
