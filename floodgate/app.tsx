@@ -864,17 +864,27 @@ Generate the complete comment now:`;
                   recognition.interimResults = true;
                   recognition.lang = 'en-US';
                   
+                  let lastProcessedIndex = 0;
                   let fullTranscript = '';
                   
                   recognition.onresult = (event: any) => {
-                    fullTranscript = '';
-                    
-                    // Build the complete transcript from all results
-                    for (let i = 0; i < event.results.length; i++) {
-                      fullTranscript += event.results[i][0].transcript;
+                    // Only process new results that haven't been processed yet
+                    for (let i = lastProcessedIndex; i < event.results.length; i++) {
+                      const result = event.results[i];
+                      if (result.isFinal) {
+                        // Add final results to the transcript
+                        fullTranscript += result[0].transcript;
+                        lastProcessedIndex = i + 1;
+                      } else {
+                        // For interim results, replace the entire content with 
+                        // the accumulated final transcript plus the current interim result
+                        const currentTranscript = fullTranscript + result[0].transcript;
+                        setPersonalStory(currentTranscript);
+                        return; // Don't update fullTranscript with interim results
+                      }
                     }
                     
-                    // Replace the entire content with the complete transcript
+                    // Update the UI with the accumulated final transcript
                     setPersonalStory(fullTranscript);
                   };
                   
