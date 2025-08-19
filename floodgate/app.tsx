@@ -864,36 +864,57 @@ Generate the complete comment now:`;
                   recognition.interimResults = true;
                   recognition.lang = 'en-US';
                   
-                  let lastProcessedIndex = 0;
-                  let fullTranscript = '';
+                  // Session state - persists across events but resets on new start
+                  let finalTranscript = personalStory || ''; // Start with existing text
+                  let lastInterim = '';
                   
                   recognition.onresult = (event: any) => {
-                    // Only process new results that haven't been processed yet
-                    for (let i = lastProcessedIndex; i < event.results.length; i++) {
+                    // Process only new results starting from event.resultIndex (MDN recommended pattern)
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
                       const result = event.results[i];
-                      if (result.isFinal) {
-                        // Add final results to the transcript
-                        fullTranscript += result[0].transcript;
-                        lastProcessedIndex = i + 1;
+                      const text = result[0].transcript;
+                      
+                      if (result.isFinal && (result[0].confidence ?? 1) > 0) {
+                        // Append final text and clear interim
+                        finalTranscript += text;
+                        lastInterim = '';
                       } else {
-                        // For interim results, replace the entire content with 
-                        // the accumulated final transcript plus the current interim result
-                        const currentTranscript = fullTranscript + result[0].transcript;
-                        setPersonalStory(currentTranscript);
-                        return; // Don't update fullTranscript with interim results
+                        // Update interim text (don't append, just replace)
+                        lastInterim = text;
                       }
                     }
                     
-                    // Update the UI with the accumulated final transcript
-                    setPersonalStory(fullTranscript);
+                    // Display finals + current interim
+                    setPersonalStory(finalTranscript + lastInterim);
                   };
                   
                   recognition.onend = () => {
+                    // Lock in only the final transcript (no interims)
+                    setPersonalStory(finalTranscript);
                     if (button) {
                       button.textContent = '🎤 Dictate Story';
                       button.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
                     }
                   };
+                  
+                  recognition.onerror = (e: any) => {
+                    console.warn('Speech recognition error:', e.error);
+                    // Common Android errors: 'no-speech', 'aborted', 'network'
+                    if (button) {
+                      button.textContent = '🎤 Dictate Story';
+                      button.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    }
+                  };
+                  
+                  // Handle tab/app backgrounding (common source of Android issues)
+                  const handleVisibilityChange = () => {
+                    if (document.hidden) {
+                      try { 
+                        recognition.stop(); 
+                      } catch {}
+                    }
+                  };
+                  document.addEventListener('visibilitychange', handleVisibilityChange, { once: true });
                   
                   recognition.start();
                 } else {
