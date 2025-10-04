@@ -1,0 +1,1432 @@
+{
+  "Clinical and Administrative Processes": [
+    {
+      "label": "Value-Based Care",
+      "definition": "A healthcare delivery model where providers are paid based on patient health outcomes, not just services delivered.",
+      "terms": [
+        "Value-Based Care",
+        "value-based care",
+        "value based care",
+        "VBC"
+      ],
+      "mentionCount": 392
+    },
+    {
+      "label": "Care Coordination",
+      "definition": "Organizing patient care activities and sharing information among all participants concerned with a patient's care.",
+      "terms": [
+        "Care Coordination",
+        "care coordination"
+      ],
+      "mentionCount": 351
+    },
+    {
+      "label": "Prior Authorization",
+      "definition": "A process required by some health insurers before they will cover specific services, medications, or durable medical equipment.",
+      "terms": [
+        "Prior Authorization",
+        "prior authorization",
+        "prior-authorization",
+        "PA",
+        "pre-authorization",
+        "preauthorization"
+      ],
+      "mentionCount": 308
+    },
+    {
+      "label": "Quality Measurement",
+      "definition": "The process of using data to evaluate the performance of health care providers against recognized quality standards.",
+      "terms": [
+        "Quality Measurement",
+        "quality measurement",
+        "quality reporting",
+        "clinical quality measurement"
+      ],
+      "mentionCount": 302
+    },
+    {
+      "label": "Information Blocking",
+      "definition": "A practice by a health IT developer, HIE, HIN, or provider that is likely to interfere with the access of EHI.",
+      "terms": [
+        "Information Blocking",
+        "information blocking"
+      ],
+      "mentionCount": 272
+    },
+    {
+      "label": "Telehealth",
+      "definition": "The use of electronic information and telecommunication technologies to support long-distance clinical health care.",
+      "terms": [
+        "Telehealth",
+        "telehealth",
+        "Telemedicine",
+        "telemedicine"
+      ],
+      "mentionCount": 170
+    },
+    {
+      "label": "Credentialing",
+      "definition": "The process of obtaining, verifying, and assessing the qualifications of a healthcare practitioner.",
+      "terms": [
+        "Credentialing",
+        "credentialing"
+      ],
+      "mentionCount": 147
+    },
+    {
+      "label": "Patient Matching",
+      "definition": "The process of accurately linking a patient's data across different health IT systems and encounters.",
+      "terms": [
+        "Patient Matching",
+        "patient matching"
+      ],
+      "mentionCount": 104
+    },
+    {
+      "label": "Remote Patient Monitoring",
+      "definition": "A method of healthcare delivery that uses technology to monitor patient health outside of a traditional clinical setting.",
+      "terms": [
+        "Remote Patient Monitoring",
+        "remote patient monitoring",
+        "RPM"
+      ],
+      "mentionCount": 103
+    },
+    {
+      "label": "Risk Adjustment",
+      "definition": "A statistical process that accounts for underlying health status when comparing outcomes or costs among patient populations.",
+      "terms": [
+        "Risk Adjustment",
+        "risk adjustment"
+      ],
+      "mentionCount": 97
+    },
+    {
+      "label": "Patient-Centered Care",
+      "definition": "Providing care that is respectful of and responsive to individual patient preferences, needs, and values.",
+      "terms": [
+        "patient-centered care",
+        "patient centered care",
+        "person-centered care",
+        "person centered care"
+      ],
+      "mentionCount": 88
+    },
+    {
+      "label": "Claims Processing",
+      "definition": "The system used by insurance companies to manage requests for payment for healthcare services.",
+      "terms": [
+        "Claims Processing",
+        "claims processing"
+      ],
+      "mentionCount": 47
+    },
+    {
+      "label": "Digital Therapeutics",
+      "definition": "Evidence-based therapeutic interventions driven by software to prevent, manage, or treat a medical disorder or disease.",
+      "terms": [
+        "Digital Therapeutics",
+        "digital therapeutics",
+        "DTx"
+      ],
+      "mentionCount": 41
+    },
+    {
+      "label": "Remote Therapeutic Monitoring",
+      "definition": "Monitoring of non-physiological patient data, such as medication adherence, therapy response, and pain levels.",
+      "terms": [
+        "Remote Therapeutic Monitoring",
+        "remote therapeutic monitoring",
+        "RTM"
+      ],
+      "mentionCount": 28
+    },
+    {
+      "label": "Informed Consent",
+      "definition": "The process where a patient receives information and gives permission before medical treatment or participation in research.",
+      "terms": [
+        "Informed Consent",
+        "informed consent"
+      ],
+      "mentionCount": 24
+    },
+    {
+      "label": "e-Prescribing",
+      "definition": "The electronic generation and transmission of a prescription order from a provider to a pharmacy.",
+      "terms": [
+        "e-prescribing",
+        "ePrescribing"
+      ],
+      "mentionCount": 23
+    }
+  ],
+  "Data Standards and Vocabularies": [
+    {
+      "label": "FHIR",
+      "definition": "Fast Healthcare Interoperability Resources, a standard for exchanging healthcare information electronically.",
+      "terms": [
+        "FHIR",
+        "Fast Healthcare Interoperability Resources"
+      ],
+      "mentionCount": 464
+    },
+    {
+      "label": "USCDI",
+      "definition": "The United States Core Data for Interoperability, a standardized set of health data classes and elements for nationwide interoperability.",
+      "terms": [
+        "USCDI",
+        "United States Core Data for Interoperability"
+      ],
+      "mentionCount": 267
+    },
+    {
+      "label": "HL7",
+      "definition": "Health Level Seven, a set of international standards for transfer of clinical and administrative data between software applications.",
+      "terms": [
+        "HL7",
+        "Health Level Seven"
+      ],
+      "mentionCount": 208
+    },
+    {
+      "label": "Bulk FHIR",
+      "definition": "A standard for exporting large volumes of FHIR data from a server.",
+      "terms": [
+        "Bulk FHIR",
+        "Bulk FHIR API",
+        "Bulk Data"
+      ],
+      "mentionCount": 175
+    },
+    {
+      "label": "SMART on FHIR",
+      "definition": "A set of open specifications to integrate apps with EHRs, portals, HIEs, and other health IT systems.",
+      "terms": [
+        "SMART on FHIR"
+      ],
+      "mentionCount": 118
+    },
+    {
+      "label": "NPI",
+      "definition": "National Provider Identifier, a unique 10-digit identification number issued to health care providers in the United States.",
+      "terms": [
+        "NPI",
+        "National Provider Identifier"
+      ],
+      "mentionCount": 102
+    },
+    {
+      "label": "OpenID Connect",
+      "definition": "A simple identity layer on top of the OAuth 2.0 protocol, allowing clients to verify the identity of the end-user.",
+      "terms": [
+        "OpenID Connect",
+        "OIDC"
+      ],
+      "mentionCount": 100
+    },
+    {
+      "label": "OAuth 2.0",
+      "definition": "An open standard for access delegation, commonly used as a way for users to grant websites or applications access to their information.",
+      "terms": [
+        "OAuth 2.0",
+        "OAuth2"
+      ],
+      "mentionCount": 70
+    },
+    {
+      "label": "CPT",
+      "definition": "Current Procedural Terminology, a medical code set maintained by the AMA to report medical, surgical, and diagnostic procedures.",
+      "terms": [
+        "CPT",
+        "Current Procedural Terminology"
+      ],
+      "mentionCount": 69
+    },
+    {
+      "label": "SNOMED CT",
+      "definition": "Systematized Nomenclature of Medicine - Clinical Terms, a comprehensive, multilingual clinical healthcare terminology.",
+      "terms": [
+        "SNOMED CT",
+        "SNOMED"
+      ],
+      "mentionCount": 67
+    },
+    {
+      "label": "C-CDA",
+      "definition": "Consolidated Clinical Document Architecture, a standard for creating electronic clinical documents.",
+      "terms": [
+        "C-CDA",
+        "CCDA",
+        "Consolidated Clinical Document Architecture"
+      ],
+      "mentionCount": 65
+    },
+    {
+      "label": "CDS Hooks",
+      "definition": "A standard for invoking external clinical decision support services from within an EHR workflow.",
+      "terms": [
+        "CDS Hooks",
+        "CDS-Hooks"
+      ],
+      "mentionCount": 57
+    },
+    {
+      "label": "LOINC",
+      "definition": "Logical Observation Identifiers Names and Codes, a standard for identifying medical laboratory observations.",
+      "terms": [
+        "LOINC",
+        "Logical Observation Identifiers Names and Codes"
+      ],
+      "mentionCount": 52
+    },
+    {
+      "label": "ICD-10",
+      "definition": "International Classification of Diseases, 10th Revision, a medical classification list for diagnoses.",
+      "terms": [
+        "ICD-10",
+        "ICD 10"
+      ],
+      "mentionCount": 36
+    },
+    {
+      "label": "X12",
+      "definition": "A standard for electronic data interchange (EDI) for business transactions, including healthcare claims.",
+      "terms": [
+        "X12"
+      ],
+      "mentionCount": 34
+    },
+    {
+      "label": "DICOM",
+      "definition": "Digital Imaging and Communications in Medicine, the standard for communicating and managing medical imaging information and related data.",
+      "terms": [
+        "DICOM",
+        "Digital Imaging and Communications in Medicine"
+      ],
+      "mentionCount": 32
+    },
+    {
+      "label": "HCPCS",
+      "definition": "Healthcare Common Procedure Coding System, a set of health care procedure codes based on the CPT.",
+      "terms": [
+        "HCPCS",
+        "Healthcare Common Procedure Coding System"
+      ],
+      "mentionCount": 25
+    },
+    {
+      "label": "NCPDP",
+      "definition": "National Council for Prescription Drug Programs, a standards development organization for the pharmacy services industry.",
+      "terms": [
+        "NCPDP"
+      ],
+      "mentionCount": 25
+    },
+    {
+      "label": "QRDA",
+      "definition": "Quality Reporting Document Architecture, a standard format for communicating health care quality measurement information.",
+      "terms": [
+        "QRDA",
+        "Quality Reporting Document Architecture"
+      ],
+      "mentionCount": 25
+    },
+    {
+      "label": "RxNorm",
+      "definition": "A standardized nomenclature for clinical drugs and a tool for supporting semantic interoperation between drug terminologies.",
+      "terms": [
+        "RxNorm"
+      ],
+      "mentionCount": 17
+    }
+  ],
+  "Government Agencies and Bodies": [
+    {
+      "label": "ONC",
+      "definition": "The Office of the National Coordinator for Health Information Technology, an entity within HHS to promote a national health IT infrastructure.",
+      "terms": [
+        "ONC",
+        "Office of the National Coordinator for Health Information Technology",
+        "Office of the National Coordinator"
+      ],
+      "mentionCount": 454
+    },
+    {
+      "label": "ASTP",
+      "definition": "The Assistant Secretary for Technology Policy, an office within HHS responsible for health technology policy.",
+      "terms": [
+        "ASTP",
+        "Assistant Secretary for Technology Policy"
+      ],
+      "mentionCount": 378
+    },
+    {
+      "label": "HHS",
+      "definition": "The U.S. Department of Health and Human Services, the U.S. government's principal agency for protecting American health.",
+      "terms": [
+        "HHS",
+        "Department of Health and Human Services",
+        "U.S. Department of Health and Human Services"
+      ],
+      "mentionCount": 236
+    },
+    {
+      "label": "NIST",
+      "definition": "The National Institute of Standards and Technology, a non-regulatory agency of the U.S. Department of Commerce.",
+      "terms": [
+        "NIST",
+        "National Institute of Standards and Technology"
+      ],
+      "mentionCount": 141
+    },
+    {
+      "label": "FDA",
+      "definition": "The Food and Drug Administration, a federal agency responsible for protecting public health by regulating drugs, medical devices, and food.",
+      "terms": [
+        "FDA",
+        "Food and Drug Administration"
+      ],
+      "mentionCount": 123
+    },
+    {
+      "label": "CMMI",
+      "definition": "The Center for Medicare & Medicaid Innovation, a CMS entity that tests new payment and service delivery models.",
+      "terms": [
+        "CMMI",
+        "Center for Medicare & Medicaid Innovation",
+        "Innovation Center"
+      ],
+      "mentionCount": 97
+    },
+    {
+      "label": "VA",
+      "definition": "The U.S. Department of Veterans Affairs, providing healthcare services to eligible military veterans.",
+      "terms": [
+        "VA",
+        "Department of Veterans Affairs",
+        "Veterans Administration",
+        "Veterans Health Administration",
+        "VHA"
+      ],
+      "mentionCount": 83
+    },
+    {
+      "label": "CDC",
+      "definition": "The Centers for Disease Control and Prevention, the national public health agency of the United States.",
+      "terms": [
+        "CDC",
+        "Centers for Disease Control and Prevention"
+      ],
+      "mentionCount": 65
+    },
+    {
+      "label": "OCR",
+      "definition": "The Office for Civil Rights, an agency within HHS responsible for enforcing HIPAA and other civil rights laws.",
+      "terms": [
+        "OCR",
+        "Office for Civil Rights"
+      ],
+      "mentionCount": 51
+    },
+    {
+      "label": "NIH",
+      "definition": "The National Institutes of Health, the primary U.S. agency responsible for biomedical and public health research.",
+      "terms": [
+        "NIH",
+        "National Institutes of Health"
+      ],
+      "mentionCount": 49
+    },
+    {
+      "label": "SSA",
+      "definition": "The Social Security Administration, an independent agency of the U.S. government that administers Social Security.",
+      "terms": [
+        "SSA",
+        "Social Security Administration",
+        "Social Security"
+      ],
+      "mentionCount": 43
+    },
+    {
+      "label": "OIG",
+      "definition": "The Office of Inspector General for HHS, responsible for combating fraud, waste, and abuse in HHS programs.",
+      "terms": [
+        "OIG",
+        "Office of Inspector General"
+      ],
+      "mentionCount": 38
+    },
+    {
+      "label": "FTC",
+      "definition": "The Federal Trade Commission, an independent agency responsible for promoting consumer protection and preventing anticompetitive business practices.",
+      "terms": [
+        "FTC",
+        "Federal Trade Commission"
+      ],
+      "mentionCount": 27
+    },
+    {
+      "label": "HRSA",
+      "definition": "The Health Resources and Services Administration, an agency of HHS for improving health care to geographically isolated or vulnerable populations.",
+      "terms": [
+        "HRSA",
+        "Health Resources and Services Administration"
+      ],
+      "mentionCount": 22
+    },
+    {
+      "label": "NLM",
+      "definition": "The National Library of Medicine, the world's largest biomedical library, which maintains and distributes key health data standards.",
+      "terms": [
+        "NLM",
+        "National Library of Medicine"
+      ],
+      "mentionCount": 21
+    },
+    {
+      "label": "AHRQ",
+      "definition": "The Agency for Healthcare Research and Quality, a federal agency focused on producing evidence to make healthcare safer and higher quality.",
+      "terms": [
+        "AHRQ",
+        "Agency for Healthcare Research and Quality"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "FCC",
+      "definition": "The Federal Communications Commission, an independent U.S. government agency that regulates interstate and international communications.",
+      "terms": [
+        "FCC",
+        "Federal Communications Commission"
+      ],
+      "mentionCount": 15
+    },
+    {
+      "label": "HHS OIG",
+      "definition": "The Office of Inspector General for the U.S. Department of Health and Human Services.",
+      "terms": [
+        "HHS OIG",
+        "HHS Office of Inspector General"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "MedPAC",
+      "definition": "The Medicare Payment Advisory Commission, a non-partisan agency that advises the U.S. Congress on the Medicare program.",
+      "terms": [
+        "MedPAC",
+        "Medicare Payment Advisory Commission"
+      ],
+      "mentionCount": 8
+    }
+  ],
+  "Health Conditions and Concepts": [
+    {
+      "label": "Interoperability",
+      "definition": "The ability of different information technology systems and software applications to communicate, exchange data, and use the information.",
+      "terms": [
+        "interoperability"
+      ],
+      "mentionCount": 528
+    },
+    {
+      "label": "Provider Burden",
+      "definition": "The administrative, regulatory, and cognitive workload placed on healthcare providers that can detract from patient care.",
+      "terms": [
+        "provider burden",
+        "administrative burden",
+        "clinician burden",
+        "physician burden"
+      ],
+      "mentionCount": 335
+    },
+    {
+      "label": "Chronic Condition",
+      "definition": "A human health condition or disease that is persistent or otherwise long-lasting in its effects.",
+      "terms": [
+        "chronic condition",
+        "chronic conditions",
+        "chronic disease",
+        "chronic diseases"
+      ],
+      "mentionCount": 255
+    },
+    {
+      "label": "SDOH",
+      "definition": "Social Determinants of Health, non-medical factors that influence health outcomes, like economic stability and education.",
+      "terms": [
+        "Social Determinants of Health",
+        "SDOH",
+        "SDoH",
+        "social risk factors"
+      ],
+      "mentionCount": 156
+    },
+    {
+      "label": "Behavioral Health",
+      "definition": "The connection between behaviors and the health and well-being of the body, mind, and spirit.",
+      "terms": [
+        "behavioral health"
+      ],
+      "mentionCount": 144
+    },
+    {
+      "label": "Patient Safety",
+      "definition": "The prevention of errors and adverse effects to patients associated with health care.",
+      "terms": [
+        "patient safety"
+      ],
+      "mentionCount": 120
+    },
+    {
+      "label": "Mental Health",
+      "definition": "A person’s condition with regard to their psychological and emotional well-being.",
+      "terms": [
+        "mental health"
+      ],
+      "mentionCount": 112
+    },
+    {
+      "label": "Diabetes",
+      "definition": "A chronic disease that occurs when the pancreas does not produce enough insulin or when the body cannot effectively use it.",
+      "terms": [
+        "Diabetes",
+        "diabetes"
+      ],
+      "mentionCount": 107
+    },
+    {
+      "label": "Cancer",
+      "definition": "A disease in which some of the body's cells grow uncontrollably and spread to other parts of the body.",
+      "terms": [
+        "cancer"
+      ],
+      "mentionCount": 75
+    },
+    {
+      "label": "Health Equity",
+      "definition": "The state in which everyone has a fair and just opportunity to attain their highest level of health.",
+      "terms": [
+        "Health Equity",
+        "health equity"
+      ],
+      "mentionCount": 73
+    },
+    {
+      "label": "Health Literacy",
+      "definition": "The degree to which individuals have the ability to find, understand, and use information to inform health-related decisions.",
+      "terms": [
+        "health literacy"
+      ],
+      "mentionCount": 56
+    },
+    {
+      "label": "Hypertension",
+      "definition": "A condition in which the force of the blood against the artery walls is too high; also known as high blood pressure.",
+      "terms": [
+        "Hypertension",
+        "hypertension",
+        "high blood pressure"
+      ],
+      "mentionCount": 35
+    },
+    {
+      "label": "Dementia",
+      "definition": "A general term for loss of memory, language, problem-solving and other thinking abilities that are severe enough to interfere with daily life.",
+      "terms": [
+        "Dementia",
+        "dementia"
+      ],
+      "mentionCount": 24
+    },
+    {
+      "label": "Heart Failure",
+      "definition": "A chronic condition in which the heart doesn't pump blood as well as it should.",
+      "terms": [
+        "heart failure",
+        "congestive heart failure",
+        "CHF"
+      ],
+      "mentionCount": 22
+    },
+    {
+      "label": "Stroke",
+      "definition": "A medical condition in which poor blood flow to the brain results in cell death.",
+      "terms": [
+        "stroke"
+      ],
+      "mentionCount": 19
+    },
+    {
+      "label": "Substance Use Disorder",
+      "definition": "A disease that affects a person's brain and behavior and leads to an inability to control the use of a legal or illegal drug.",
+      "terms": [
+        "Substance Use Disorder",
+        "SUD"
+      ],
+      "mentionCount": 17
+    },
+    {
+      "label": "Opioid Use Disorder",
+      "definition": "A problematic pattern of opioid use that causes significant impairment or distress.",
+      "terms": [
+        "Opioid Use Disorder",
+        "OUD"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "Alzheimer's Disease",
+      "definition": "A brain disorder that slowly destroys memory and thinking skills, and eventually the ability to carry out the simplest tasks.",
+      "terms": [
+        "Alzheimer's",
+        "Alzheimer's disease"
+      ],
+      "mentionCount": 5
+    }
+  ],
+  "Health Information Technology and Systems": [
+    {
+      "label": "Electronic Health Record",
+      "definition": "A digital version of a patient's paper chart, containing the medical and treatment history of a patient.",
+      "terms": [
+        "Electronic Health Record",
+        "Electronic Health Records",
+        "EHR",
+        "EHRs",
+        "EHR system",
+        "EHR systems",
+        "electronic medical record",
+        "electronic medical records",
+        "EMR",
+        "EMRs",
+        "EMR system",
+        "EMR systems"
+      ],
+      "mentionCount": 574
+    },
+    {
+      "label": "API",
+      "definition": "An Application Programming Interface, a set of rules allowing different software applications to communicate with each other.",
+      "terms": [
+        "API",
+        "APIs",
+        "Application Programming Interface",
+        "Application Programming Interfaces"
+      ],
+      "mentionCount": 532
+    },
+    {
+      "label": "Artificial Intelligence",
+      "definition": "The simulation of human intelligence in machines that are programmed to think and learn, used in healthcare for various tasks.",
+      "terms": [
+        "Artificial Intelligence",
+        "AI",
+        "A.I."
+      ],
+      "mentionCount": 439
+    },
+    {
+      "label": "Digital Identity Credential",
+      "definition": "A digital representation of an individual's identity used for authentication and access to online services.",
+      "terms": [
+        "Digital Identity",
+        "digital identity",
+        "digital ID",
+        "digital identity credential",
+        "digital identity credentials"
+      ],
+      "mentionCount": 315
+    },
+    {
+      "label": "Health IT",
+      "definition": "Health Information Technology, the application of information processing involving both computer hardware and software that deals with health information.",
+      "terms": [
+        "Health IT",
+        "Health Information Technology",
+        "HIT"
+      ],
+      "mentionCount": 278
+    },
+    {
+      "label": "Provider Directory",
+      "definition": "A list of doctors, hospitals, and other healthcare providers that a health plan has contracted with to provide medical care.",
+      "terms": [
+        "Provider Directory",
+        "provider directory",
+        "provider directories"
+      ],
+      "mentionCount": 272
+    },
+    {
+      "label": "Health Info Exchange",
+      "definition": "A system that enables the electronic movement of health-related information among organizations according to nationally recognized standards.",
+      "terms": [
+        "Health Information Exchange",
+        "Health Information Exchanges",
+        "HIE",
+        "HIEs"
+      ],
+      "mentionCount": 270
+    },
+    {
+      "label": "QHIN",
+      "definition": "A Qualified Health Information Network, an entity designated by ONC to connect to other QHINs for nationwide data exchange.",
+      "terms": [
+        "QHIN",
+        "QHINs",
+        "Qualified Health Information Network",
+        "Qualified Health Information Networks"
+      ],
+      "mentionCount": 200
+    },
+    {
+      "label": "Patient Portal",
+      "definition": "A secure online website that gives patients convenient, 24-hour access to personal health information from anywhere with an internet connection.",
+      "terms": [
+        "Patient Portal",
+        "patient portal",
+        "patient portals"
+      ],
+      "mentionCount": 182
+    },
+    {
+      "label": "CEHRT",
+      "definition": "Certified Electronic Health Record Technology that meets standards set by the ONC Health IT Certification Program.",
+      "terms": [
+        "CEHRT",
+        "Certified Electronic Health Record Technology",
+        "certified EHR"
+      ],
+      "mentionCount": 162
+    },
+    {
+      "label": "Clinical Decision Support",
+      "definition": "Health IT functionality that provides clinicians with knowledge and person-specific information to enhance health and health care.",
+      "terms": [
+        "Clinical Decision Support",
+        "CDS",
+        "clinical decision support tool",
+        "clinical decision support tools"
+      ],
+      "mentionCount": 115
+    },
+    {
+      "label": "Large Language Model",
+      "definition": "A type of artificial intelligence model trained on vast amounts of text data to understand and generate human-like language.",
+      "terms": [
+        "Large Language Model",
+        "Large Language Models",
+        "LLM",
+        "LLMs"
+      ],
+      "mentionCount": 79
+    },
+    {
+      "label": "Machine Learning",
+      "definition": "A subset of artificial intelligence that involves training algorithms to learn patterns from data without being explicitly programmed.",
+      "terms": [
+        "Machine Learning",
+        "ML",
+        "M.L."
+      ],
+      "mentionCount": 73
+    },
+    {
+      "label": "Natural Language Processing",
+      "definition": "A field of AI that enables computers to understand, interpret, and manipulate human language from text or speech.",
+      "terms": [
+        "Natural Language Processing",
+        "NLP"
+      ],
+      "mentionCount": 73
+    },
+    {
+      "label": "eCQM",
+      "definition": "Electronic Clinical Quality Measures, which use data from EHRs to track the quality of healthcare services.",
+      "terms": [
+        "eCQM",
+        "eCQMs",
+        "electronic clinical quality measure",
+        "electronic clinical quality measures"
+      ],
+      "mentionCount": 66
+    },
+    {
+      "label": "dQM",
+      "definition": "Digital Quality Measures, an evolution of eCQMs that use digital data sources and standards for quality measurement.",
+      "terms": [
+        "dQM",
+        "dQMs",
+        "digital quality measure",
+        "digital quality measures"
+      ],
+      "mentionCount": 54
+    },
+    {
+      "label": "Data Registry",
+      "definition": "An organized system that uses observational study methods to collect uniform data to evaluate specified outcomes for a population.",
+      "terms": [
+        "data registry",
+        "data registries",
+        "clinical data registry",
+        "clinical data registries"
+      ],
+      "mentionCount": 46
+    },
+    {
+      "label": "Personal Health Record",
+      "definition": "An electronic application through which individuals can maintain and manage their health information in a private, secure environment.",
+      "terms": [
+        "Personal Health Record",
+        "Personal Health Records",
+        "PHR",
+        "PHRs"
+      ],
+      "mentionCount": 38
+    }
+  ],
+  "Healthcare Data and Documents": [
+    {
+      "label": "Claims Data",
+      "definition": "Information submitted by providers to insurance companies for payment of services.",
+      "terms": [
+        "claims data"
+      ],
+      "mentionCount": 226
+    },
+    {
+      "label": "EHI",
+      "definition": "Electronic Health Information, which is electronic protected health information (ePHI) in a designated record set.",
+      "terms": [
+        "EHI",
+        "Electronic Health Information"
+      ],
+      "mentionCount": 184
+    },
+    {
+      "label": "Care Plan",
+      "definition": "A document that outlines a patient's health goals and the actions required to meet them.",
+      "terms": [
+        "care plan",
+        "care plans"
+      ],
+      "mentionCount": 178
+    },
+    {
+      "label": "Clinical Note",
+      "definition": "A written record made by a healthcare professional detailing a patient's clinical status or course of treatment.",
+      "terms": [
+        "clinical note",
+        "clinical notes",
+        "progress note",
+        "progress notes"
+      ],
+      "mentionCount": 98
+    },
+    {
+      "label": "PHI",
+      "definition": "Protected Health Information, any information in a medical record that can be used to identify an individual.",
+      "terms": [
+        "PHI",
+        "Protected Health Information"
+      ],
+      "mentionCount": 89
+    },
+    {
+      "label": "ADT Data",
+      "definition": "Admission, Discharge, and Transfer data, which tracks patient movements within and between healthcare facilities.",
+      "terms": [
+        "ADT",
+        "Admission, Discharge, and Transfer",
+        "ADT data",
+        "ADT notifications"
+      ],
+      "mentionCount": 85
+    },
+    {
+      "label": "Biometric Data",
+      "definition": "Physical or behavioral human characteristics that can be used to digitally identify a person to grant access to systems.",
+      "terms": [
+        "biometric data",
+        "biometrics"
+      ],
+      "mentionCount": 81
+    },
+    {
+      "label": "Encounter Data",
+      "definition": "Data from patient-provider interactions, used particularly in managed care settings like Medicare Advantage.",
+      "terms": [
+        "encounter data"
+      ],
+      "mentionCount": 60
+    },
+    {
+      "label": "Operative Report",
+      "definition": "A report written by a surgeon that details a surgical procedure.",
+      "terms": [
+        "operative report",
+        "operative reports"
+      ],
+      "mentionCount": 48
+    },
+    {
+      "label": "Patient-Reported Outcome",
+      "definition": "Health outcomes reported directly by the patient, without interpretation by a clinician.",
+      "terms": [
+        "Patient-Reported Outcome",
+        "Patient-Reported Outcomes",
+        "PRO",
+        "PROs"
+      ],
+      "mentionCount": 37
+    },
+    {
+      "label": "Discharge Summary",
+      "definition": "A clinical report prepared by a healthcare professional at the conclusion of a hospital stay or series of treatments.",
+      "terms": [
+        "discharge summary",
+        "discharge summaries"
+      ],
+      "mentionCount": 31
+    },
+    {
+      "label": "EOB",
+      "definition": "An Explanation of Benefits, a statement sent by a health insurance company explaining what medical treatments were paid for.",
+      "terms": [
+        "EOB",
+        "Explanation of Benefits",
+        "AEOB",
+        "Advanced Explanation of Benefits"
+      ],
+      "mentionCount": 28
+    },
+    {
+      "label": "PII",
+      "definition": "Personally Identifiable Information, any data that could potentially identify a specific individual.",
+      "terms": [
+        "PII",
+        "Personally Identifiable Information"
+      ],
+      "mentionCount": 28
+    },
+    {
+      "label": "Patient-Generated Data",
+      "definition": "Health-related data created, recorded, or gathered by or from patients to help address a health concern.",
+      "terms": [
+        "Patient-Generated Health Data",
+        "PGHD"
+      ],
+      "mentionCount": 25
+    },
+    {
+      "label": "Advance Directive",
+      "definition": "A legal document that specifies what actions should be taken for a person's health if they are no longer able to make decisions.",
+      "terms": [
+        "advance directive",
+        "advance directives",
+        "Advanced Care Plan",
+        "Advanced Care Planning"
+      ],
+      "mentionCount": 18
+    }
+  ],
+  "Healthcare Programs and Initiatives": [
+    {
+      "label": "Medicare",
+      "definition": "A federal health insurance program for people 65 or older and certain younger people with disabilities.",
+      "terms": [
+        "Medicare",
+        "Medicare program"
+      ],
+      "mentionCount": 543
+    },
+    {
+      "label": "Medicaid",
+      "definition": "A joint federal and state program that provides health coverage to millions of Americans with limited income and resources.",
+      "terms": [
+        "Medicaid",
+        "Medicaid program"
+      ],
+      "mentionCount": 353
+    },
+    {
+      "label": "TEFCA",
+      "definition": "The Trusted Exchange Framework and Common Agreement, a national policy and technical framework for health information exchange.",
+      "terms": [
+        "TEFCA",
+        "Trusted Exchange Framework and Common Agreement"
+      ],
+      "mentionCount": 333
+    },
+    {
+      "label": "Blue Button",
+      "definition": "A CMS initiative allowing beneficiaries to securely download their health information from their Medicare account.",
+      "terms": [
+        "Blue Button",
+        "Blue Button 2.0",
+        "Blue Button API"
+      ],
+      "mentionCount": 256
+    },
+    {
+      "label": "Medicare Advantage",
+      "definition": "An 'all in one' alternative to Original Medicare, offered by private companies. Also known as Part C.",
+      "terms": [
+        "Medicare Advantage",
+        "Medicare Advantage plan",
+        "Medicare Advantage plans",
+        "MA",
+        "MA plan",
+        "MA plans",
+        "Part C",
+        "Medicare Part C"
+      ],
+      "mentionCount": 224
+    },
+    {
+      "label": "MIPS",
+      "definition": "The Merit-based Incentive Payment System, a program that determines Medicare payment adjustments for eligible clinicians.",
+      "terms": [
+        "MIPS",
+        "Merit-based Incentive Payment System",
+        "Merit-based Incentive Program"
+      ],
+      "mentionCount": 111
+    },
+    {
+      "label": "MSSP",
+      "definition": "The Medicare Shared Savings Program, an Alternative Payment Model that offers providers financial incentives to coordinate care for Medicare beneficiaries.",
+      "terms": [
+        "MSSP",
+        "Medicare Shared Savings Program",
+        "Shared Savings Program"
+      ],
+      "mentionCount": 109
+    },
+    {
+      "label": "Promoting Interoperability",
+      "definition": "A CMS program that encourages eligible professionals and hospitals to adopt, implement, upgrade, and demonstrate meaningful use of CEHRT.",
+      "terms": [
+        "Promoting Interoperability",
+        "Promoting Interoperability Program",
+        "Meaningful Use"
+      ],
+      "mentionCount": 87
+    },
+    {
+      "label": "Data at Point of Care",
+      "definition": "A CMS pilot program that provides clinicians with access to their patients' Medicare claims data at the point of care.",
+      "terms": [
+        "Data at the Point of Care",
+        "DPC"
+      ],
+      "mentionCount": 64
+    },
+    {
+      "label": "Medicare Part D",
+      "definition": "The part of Medicare that provides outpatient prescription drug coverage.",
+      "terms": [
+        "Medicare Part D",
+        "Part D",
+        "Part D plan",
+        "Part D plans",
+        "prescription drug plan",
+        "prescription drug plans",
+        "PDP"
+      ],
+      "mentionCount": 52
+    },
+    {
+      "label": "Medicare Part A",
+      "definition": "The part of Medicare that covers inpatient hospital stays, care in a skilled nursing facility, hospice care, and home health care.",
+      "terms": [
+        "Medicare Part A",
+        "Part A"
+      ],
+      "mentionCount": 50
+    },
+    {
+      "label": "CHIP",
+      "definition": "The Children's Health Insurance Program, providing low-cost health coverage to children in families who earn too much to qualify for Medicaid.",
+      "terms": [
+        "CHIP",
+        "Children's Health Insurance Program"
+      ],
+      "mentionCount": 39
+    },
+    {
+      "label": "ACO REACH Model",
+      "definition": "An Alternative Payment Model testing a new payment approach to better support care for Medicare beneficiaries in ACOs.",
+      "terms": [
+        "ACO REACH",
+        "ACO REACH model",
+        "Accountable Care Organization Realizing Equity, Access, and Community Health"
+      ],
+      "mentionCount": 31
+    },
+    {
+      "label": "QPP",
+      "definition": "The Quality Payment Program, which rewards high-value, high-quality Medicare clinicians with payment increases.",
+      "terms": [
+        "QPP",
+        "Quality Payment Program"
+      ],
+      "mentionCount": 31
+    },
+    {
+      "label": "Medicare DPP",
+      "definition": "The Medicare Diabetes Prevention Program, a health behavior change program to help prevent type 2 diabetes in at-risk beneficiaries.",
+      "terms": [
+        "MDPP",
+        "Medicare Diabetes Prevention Program"
+      ],
+      "mentionCount": 13
+    },
+    {
+      "label": "Medicare Part B",
+      "definition": "The part of Medicare that covers certain doctors' services, outpatient care, medical supplies, and preventive services.",
+      "terms": [
+        "Medicare Part B",
+        "Part B"
+      ],
+      "mentionCount": 12
+    },
+    {
+      "label": "TCET Pathway",
+      "definition": "The Transitional Coverage for Emerging Technologies pathway to expedite Medicare coverage of new, innovative medical devices.",
+      "terms": [
+        "TCET",
+        "Transitional Coverage for Emerging Technologies"
+      ],
+      "mentionCount": 10
+    }
+  ],
+  "Laws and Regulations": [
+    {
+      "label": "HIPAA",
+      "definition": "The Health Insurance Portability and Accountability Act of 1996, a federal law protecting sensitive patient health information.",
+      "terms": [
+        "HIPAA",
+        "Health Insurance Portability and Accountability Act",
+        "Health Information Portability and Accountability Act"
+      ],
+      "mentionCount": 265
+    },
+    {
+      "label": "Cures Act",
+      "definition": "The 21st Century Cures Act, a 2016 law designed to accelerate medical product development and bring innovations to patients faster.",
+      "terms": [
+        "21st Century Cures Act",
+        "Cures Act"
+      ],
+      "mentionCount": 184
+    },
+    {
+      "label": "Information Blocking Rule",
+      "definition": "A rule implementing provisions of the 21st Century Cures Act to prevent interference with access to electronic health information.",
+      "terms": [
+        "Information Blocking Rule",
+        "information blocking regulations",
+        "information blocking disincentives"
+      ],
+      "mentionCount": 68
+    },
+    {
+      "label": "HITECH Act",
+      "definition": "The Health Information Technology for Economic and Clinical Health Act of 2009, promoting the adoption and meaningful use of health IT.",
+      "terms": [
+        "HITECH Act",
+        "HITECH"
+      ],
+      "mentionCount": 67
+    },
+    {
+      "label": "Conditions of Participation",
+      "definition": "Health and safety regulations that healthcare organizations must meet to participate in Medicare and Medicaid programs.",
+      "terms": [
+        "Conditions of Participation",
+        "CoP"
+      ],
+      "mentionCount": 38
+    },
+    {
+      "label": "Affordable Care Act",
+      "definition": "A comprehensive healthcare reform law enacted in 2010, also known as Obamacare.",
+      "terms": [
+        "Affordable Care Act",
+        "ACA"
+      ],
+      "mentionCount": 37
+    },
+    {
+      "label": "Patient Access Final Rule",
+      "definition": "A CMS rule requiring payers to build APIs to improve patient and provider access to health information.",
+      "terms": [
+        "Patient Access Final Rule",
+        "Patient Access rule",
+        "Interoperability and Patient Access final rule"
+      ],
+      "mentionCount": 25
+    },
+    {
+      "label": "42 CFR Part 2",
+      "definition": "A federal regulation protecting the confidentiality of substance use disorder patient records.",
+      "terms": [
+        "42 CFR Part 2"
+      ],
+      "mentionCount": 22
+    },
+    {
+      "label": "No Surprises Act",
+      "definition": "A federal law that protects people covered under group and individual health plans from surprise medical bills.",
+      "terms": [
+        "No Surprises Act"
+      ],
+      "mentionCount": 22
+    }
+  ],
+  "Roles and Organization Types": [
+    {
+      "label": "Payer",
+      "definition": "An entity, other than the patient, that finances or reimburses the cost of health services.",
+      "terms": [
+        "payer",
+        "payers"
+      ],
+      "mentionCount": 448
+    },
+    {
+      "label": "Beneficiary",
+      "definition": "A person enrolled in a health insurance plan, such as Medicare or Medicaid.",
+      "terms": [
+        "beneficiary",
+        "beneficiaries"
+      ],
+      "mentionCount": 438
+    },
+    {
+      "label": "Caregiver",
+      "definition": "A person who provides direct care for children, elderly people, or people with chronic illness or disability.",
+      "terms": [
+        "caregiver",
+        "caregivers",
+        "care giver",
+        "care givers"
+      ],
+      "mentionCount": 411
+    },
+    {
+      "label": "Physician",
+      "definition": "A medical doctor who has completed graduate training and is licensed to practice medicine.",
+      "terms": [
+        "physician",
+        "physicians",
+        "doctor",
+        "doctors"
+      ],
+      "mentionCount": 342
+    },
+    {
+      "label": "Clinician",
+      "definition": "A healthcare professional qualified in the clinical practice of medicine, such as a doctor, nurse, or therapist.",
+      "terms": [
+        "clinician",
+        "clinicians"
+      ],
+      "mentionCount": 282
+    },
+    {
+      "label": "Health Plan",
+      "definition": "An organization that provides or pays the cost of medical care, also known as an insurer.",
+      "terms": [
+        "health plan",
+        "health plans",
+        "insurer",
+        "insurers"
+      ],
+      "mentionCount": 233
+    },
+    {
+      "label": "ACO",
+      "definition": "An Accountable Care Organization, a group of healthcare providers who agree to be accountable for the quality and cost of care.",
+      "terms": [
+        "ACO",
+        "ACOs",
+        "Accountable Care Organization",
+        "Accountable Care Organizations"
+      ],
+      "mentionCount": 205
+    },
+    {
+      "label": "Physician Assistant",
+      "definition": "A licensed medical professional who holds an advanced degree and is able to provide direct patient care.",
+      "terms": [
+        "Physician Assistant",
+        "physician assistant",
+        "PA",
+        "PAs"
+      ],
+      "mentionCount": 152
+    },
+    {
+      "label": "FQHC",
+      "definition": "A Federally Qualified Health Center, a community-based healthcare provider that receives funds from HRSA to provide primary care in underserved areas.",
+      "terms": [
+        "FQHC",
+        "FQHCs",
+        "Federally Qualified Health Center"
+      ],
+      "mentionCount": 41
+    },
+    {
+      "label": "Pharmacist",
+      "definition": "A healthcare professional who specializes in the right way to use, store, preserve, and provide medication.",
+      "terms": [
+        "pharmacist",
+        "pharmacists"
+      ],
+      "mentionCount": 40
+    },
+    {
+      "label": "PBM",
+      "definition": "A Pharmacy Benefit Manager, a third-party administrator of prescription drug programs for commercial health plans, self-insured employers, and government programs.",
+      "terms": [
+        "PBM",
+        "PBMs",
+        "Pharmacy Benefit Manager"
+      ],
+      "mentionCount": 36
+    },
+    {
+      "label": "SNF",
+      "definition": "A Skilled Nursing Facility, an inpatient healthcare facility with the staff and equipment to provide skilled nursing care.",
+      "terms": [
+        "SNF",
+        "SNFs",
+        "Skilled Nursing Facility"
+      ],
+      "mentionCount": 35
+    },
+    {
+      "label": "MAC",
+      "definition": "A Medicare Administrative Contractor, a private health care insurer that has been awarded a contract to process Medicare claims.",
+      "terms": [
+        "MAC",
+        "MACs",
+        "Medicare Administrative Contractor"
+      ],
+      "mentionCount": 27
+    },
+    {
+      "label": "CBO",
+      "definition": "A Community-Based Organization, a public or private non-profit that is representative of a community or a significant segment of a community.",
+      "terms": [
+        "CBO",
+        "CBOs",
+        "Community-Based Organization"
+      ],
+      "mentionCount": 23
+    }
+  ]
+}

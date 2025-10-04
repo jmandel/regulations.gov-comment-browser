@@ -1,0 +1,1434 @@
+{
+  "Government Agencies and Bodies": [
+    {
+      "label": "CMS",
+      "definition": "The Centers for Medicare & Medicaid Services, an agency within HHS.",
+      "terms": [
+        "CMS",
+        "Centers for Medicare & Medicaid Services",
+        "Centers for Medicare and Medicaid Services"
+      ],
+      "mentionCount": 172
+    },
+    {
+      "label": "FDA",
+      "definition": "The Food and Drug Administration, an agency within HHS.",
+      "terms": [
+        "FDA",
+        "Food and Drug Administration",
+        "U.S. Food and Drug Administration",
+        "U.S Food and Drug Administration"
+      ],
+      "mentionCount": 168
+    },
+    {
+      "label": "Congress",
+      "definition": "The legislative branch of the U.S. federal government.",
+      "terms": [
+        "Congress",
+        "U.S. Congress"
+      ],
+      "mentionCount": 123
+    },
+    {
+      "label": "AHRQ",
+      "definition": "The Agency for Healthcare Research and Quality, an agency within HHS.",
+      "terms": [
+        "AHRQ",
+        "Agency for Healthcare Research and Quality"
+      ],
+      "mentionCount": 68
+    },
+    {
+      "label": "DEA",
+      "definition": "The Drug Enforcement Administration, responsible for enforcing controlled substances laws.",
+      "terms": [
+        "DEA",
+        "Drug Enforcement Administration"
+      ],
+      "mentionCount": 45
+    },
+    {
+      "label": "CDC",
+      "definition": "The Centers for Disease Control and Prevention, a national public health agency.",
+      "terms": [
+        "CDC",
+        "Centers for Disease Control and Prevention"
+      ],
+      "mentionCount": 38
+    },
+    {
+      "label": "OMB",
+      "definition": "The Office of Management and Budget, which oversees the implementation of the President's vision across the Executive Branch.",
+      "terms": [
+        "OMB",
+        "Office of Management and Budget"
+      ],
+      "mentionCount": 37
+    },
+    {
+      "label": "MAC",
+      "definition": "Medicare Administrative Contractor, a private health care insurer that has been awarded a geographic jurisdiction to process Medicare Part A and Part B medical claims.",
+      "terms": [
+        "MAC",
+        "Medicare Administrative Contractor",
+        "Medicare Administrative Contractors"
+      ],
+      "mentionCount": 33
+    },
+    {
+      "label": "OIG",
+      "definition": "The Office of Inspector General for the Department of Health and Human Services.",
+      "terms": [
+        "OIG",
+        "Office of Inspector General"
+      ],
+      "mentionCount": 29
+    },
+    {
+      "label": "NIH",
+      "definition": "The National Institutes of Health, the primary agency for biomedical and public health research.",
+      "terms": [
+        "NIH",
+        "National Institutes of Health"
+      ],
+      "mentionCount": 28
+    },
+    {
+      "label": "OHS",
+      "definition": "The Office of Head Start, within the Administration for Children and Families.",
+      "terms": [
+        "OHS",
+        "Office of Head Start"
+      ],
+      "mentionCount": 24
+    },
+    {
+      "label": "CMMI",
+      "definition": "The Center for Medicare and Medicaid Innovation, a division within CMS that tests innovative payment and service delivery models.",
+      "terms": [
+        "CMMI",
+        "Center for Medicare and Medicaid Innovation",
+        "CMS Innovation Center"
+      ],
+      "mentionCount": 21
+    },
+    {
+      "label": "OCR",
+      "definition": "The Office for Civil Rights within HHS, responsible for enforcing civil rights laws.",
+      "terms": [
+        "OCR",
+        "Office for Civil Rights"
+      ],
+      "mentionCount": 20
+    },
+    {
+      "label": "CDER",
+      "definition": "The Center for Drug Evaluation and Research, a center within the FDA.",
+      "terms": [
+        "CDER",
+        "Center for Drug Evaluation and Research"
+      ],
+      "mentionCount": 19
+    },
+    {
+      "label": "DOJ",
+      "definition": "The U.S. Department of Justice, a federal executive department responsible for the enforcement of the law and administration of justice.",
+      "terms": [
+        "DOJ",
+        "Department of Justice",
+        "U.S. Department of Justice"
+      ],
+      "mentionCount": 19
+    },
+    {
+      "label": "VA",
+      "definition": "The U.S. Department of Veterans Affairs, which provides healthcare services to eligible military veterans.",
+      "terms": [
+        "VA",
+        "Department of Veterans Affairs",
+        "Veterans Affairs"
+      ],
+      "mentionCount": 19
+    },
+    {
+      "label": "ASTP / ONC",
+      "definition": "The Assistant Secretary for Technology Policy (formerly the Office of the National Coordinator for Health Information Technology), responsible for nationwide health information technology efforts.",
+      "terms": [
+        "ASTP",
+        "Assistant Secretary for Technology Policy",
+        "ONC",
+        "Office of the National Coordinator for Health Information Technology"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "SAMHSA",
+      "definition": "The Substance Abuse and Mental Health Services Administration, an agency within HHS.",
+      "terms": [
+        "SAMHSA",
+        "Substance Abuse and Mental Health Services Administration"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "CBER",
+      "definition": "The Center for Biologics Evaluation and Research, a center within the FDA.",
+      "terms": [
+        "CBER",
+        "Center for Biologics Evaluation and Research"
+      ],
+      "mentionCount": 15
+    },
+    {
+      "label": "ACF",
+      "definition": "The Administration for Children and Families, a division of HHS.",
+      "terms": [
+        "ACF",
+        "Administration for Children and Families"
+      ],
+      "mentionCount": 14
+    },
+    {
+      "label": "CDRH",
+      "definition": "The Center for Devices and Radiological Health, a center within the FDA.",
+      "terms": [
+        "CDRH",
+        "Center for Devices and Radiological Health"
+      ],
+      "mentionCount": 14
+    },
+    {
+      "label": "HRSA",
+      "definition": "The Health Resources and Services Administration, an agency of HHS for improving health care to people who are geographically isolated, economically or medically vulnerable.",
+      "terms": [
+        "HRSA",
+        "Health Resources and Services Administration"
+      ],
+      "mentionCount": 14
+    },
+    {
+      "label": "FTC",
+      "definition": "The Federal Trade Commission, an independent agency that administers antitrust and consumer protection legislation.",
+      "terms": [
+        "FTC",
+        "Federal Trade Commission"
+      ],
+      "mentionCount": 13
+    },
+    {
+      "label": "MedPAC",
+      "definition": "The Medicare Payment Advisory Commission, an independent congressional agency advising the U.S. Congress on issues affecting the Medicare program.",
+      "terms": [
+        "MedPAC",
+        "Medicare Payment Advisory Commission"
+      ],
+      "mentionCount": 10
+    },
+    {
+      "label": "CTP",
+      "definition": "The Center for Tobacco Products, a center within the FDA.",
+      "terms": [
+        "CTP",
+        "Center for Tobacco Products"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "NIST",
+      "definition": "The National Institute of Standards and Technology, a non-regulatory agency of the U.S. Department of Commerce.",
+      "terms": [
+        "NIST",
+        "National Institute of Standards and Technology"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "CVM",
+      "definition": "The Center for Veterinary Medicine, a center within the FDA.",
+      "terms": [
+        "CVM",
+        "Center for Veterinary Medicine"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "IHS",
+      "definition": "The Indian Health Service, an operating division within HHS.",
+      "terms": [
+        "IHS",
+        "Indian Health Service"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "OSHA",
+      "definition": "The Occupational Safety and Health Administration, a regulatory agency of the U.S. Department of Labor.",
+      "terms": [
+        "OSHA",
+        "Occupational Safety and Health Administration"
+      ],
+      "mentionCount": 5
+    }
+  ],
+  "Healthcare Entities and Providers": [
+    {
+      "label": "Pharmacy Benefit Manager",
+      "definition": "A third-party administrator of prescription drug programs for commercial health plans, self-insured employers, Medicare Part D plans, and government employee plans.",
+      "terms": [
+        "Pharmacy Benefit Manager",
+        "PBM",
+        "PBMs"
+      ],
+      "mentionCount": 20
+    },
+    {
+      "label": "Skilled Nursing Facility",
+      "definition": "A health-care institution that meets federal criteria for accreditation and is staffed with trained medical professionals.",
+      "terms": [
+        "Skilled Nursing Facility",
+        "SNF",
+        "SNFs"
+      ],
+      "mentionCount": 17
+    },
+    {
+      "label": "Critical Access Hospital",
+      "definition": "A designation given to eligible rural hospitals by CMS to reduce the financial vulnerability of rural hospitals and improve access to healthcare.",
+      "terms": [
+        "Critical Access Hospital",
+        "CAH",
+        "CAHs"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "FQHC",
+      "definition": "Federally Qualified Health Center, a community-based health care provider that receives funds from the HRSA Health Center Program.",
+      "terms": [
+        "FQHC",
+        "Federally Qualified Health Center",
+        "FQHCs"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "Advanced Practice Registered Nurse",
+      "definition": "A nurse who has obtained at least a master's degree in nursing, including CNPs, CNSs, CNMs, and CRNAs.",
+      "terms": [
+        "Advanced Practice Registered Nurse",
+        "APRN",
+        "APRNs"
+      ],
+      "mentionCount": 13
+    },
+    {
+      "label": "Long-Term Care Facility",
+      "definition": "A facility that provides rehabilitative, restorative, and/or ongoing skilled nursing care to patients or residents in need of assistance with activities of daily living.",
+      "terms": [
+        "Long-term care",
+        "LTC",
+        "long-term care facility"
+      ],
+      "mentionCount": 12
+    },
+    {
+      "label": "Direct Support Professional",
+      "definition": "A person who works directly with people with physical and/or intellectual disabilities with the aim of assisting the individual to become integrated into their community.",
+      "terms": [
+        "Direct Support Professional",
+        "DSP",
+        "DSPs"
+      ],
+      "mentionCount": 10
+    },
+    {
+      "label": "Certified Registered Nurse Anesthetist",
+      "definition": "An advanced practice registered nurse who administers anesthesia for surgery or other medical procedures.",
+      "terms": [
+        "certified registered nurse anesthetist",
+        "CRNA",
+        "CRNAs"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "Rural Emergency Hospital",
+      "definition": "A new Medicare provider type intended to maintain access to emergency and outpatient services in rural areas.",
+      "terms": [
+        "Rural Emergency Hospital",
+        "REH"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "Rural Health Clinic",
+      "definition": "A clinic certified to receive special Medicare and Medicaid reimbursement to encourage the delivery of primary care services in underserved rural areas.",
+      "terms": [
+        "Rural Health Clinic",
+        "RHC",
+        "RHCs"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "QIDP",
+      "definition": "Qualified Intellectual Disability Professional, a staff member responsible for integrating, coordinating, and monitoring individuals' active treatment programs in an ICF/IID.",
+      "terms": [
+        "Qualified Intellectual Disability Professional",
+        "QIDP"
+      ],
+      "mentionCount": 6
+    }
+  ],
+  "Healthcare Programs and Systems": [
+    {
+      "label": "Medicaid",
+      "definition": "A joint federal and state program that helps with medical costs for some people with limited income and resources.",
+      "terms": [
+        "Medicaid"
+      ],
+      "mentionCount": 519
+    },
+    {
+      "label": "Head Start",
+      "definition": "A federal program that promotes school readiness of children from birth to age five from low-income families.",
+      "terms": [
+        "Head Start",
+        "Head Start Program",
+        "Head Start Programming"
+      ],
+      "mentionCount": 469
+    },
+    {
+      "label": "Early Head Start",
+      "definition": "A federal program serving infants, toddlers, and pregnant women and their families who have incomes below the Federal poverty level.",
+      "terms": [
+        "Early Head Start"
+      ],
+      "mentionCount": 441
+    },
+    {
+      "label": "Medicare",
+      "definition": "A federal health insurance program for people 65 or older, certain younger people with disabilities, and people with End-Stage Renal Disease.",
+      "terms": [
+        "Medicare"
+      ],
+      "mentionCount": 158
+    },
+    {
+      "label": "Medicare Advantage",
+      "definition": "A type of Medicare health plan (Part C) offered by a private company that contracts with Medicare to provide Part A and Part B benefits.",
+      "terms": [
+        "Medicare Advantage",
+        "MA",
+        "MA plan",
+        "MA plans",
+        "Medicare Advantage plan",
+        "Medicare Advantage plans"
+      ],
+      "mentionCount": 66
+    },
+    {
+      "label": "Home Health Benefit",
+      "definition": "A range of health care services that can be given in a patient's home for an illness or injury.",
+      "terms": [
+        "Home Health",
+        "home health",
+        "Home Health benefit"
+      ],
+      "mentionCount": 34
+    },
+    {
+      "label": "Medicare Part D",
+      "definition": "The part of Medicare that helps cover the cost of prescription drugs.",
+      "terms": [
+        "Medicare Part D",
+        "Part D"
+      ],
+      "mentionCount": 34
+    },
+    {
+      "label": "MIPS",
+      "definition": "The Merit-based Incentive Payment System, one of two tracks under the Quality Payment Program.",
+      "terms": [
+        "MIPS",
+        "Merit-based Incentive Payment System"
+      ],
+      "mentionCount": 30
+    },
+    {
+      "label": "Medicare Part B",
+      "definition": "The part of Medicare that covers certain doctors' services, outpatient care, medical supplies, and preventive services.",
+      "terms": [
+        "Medicare Part B",
+        "Part B"
+      ],
+      "mentionCount": 29
+    },
+    {
+      "label": "Physician Fee Schedule",
+      "definition": "A complete listing of fees used by Medicare to pay doctors or other suppliers/providers.",
+      "terms": [
+        "Physician Fee Schedule",
+        "PFS",
+        "Medicare Physician Fee Schedule",
+        "MPFS"
+      ],
+      "mentionCount": 28
+    },
+    {
+      "label": "Promoting Interoperability",
+      "definition": "A performance category within MIPS that promotes patient engagement and electronic exchange of health information using certified EHR technology.",
+      "terms": [
+        "Promoting Interoperability",
+        "PI"
+      ],
+      "mentionCount": 22
+    },
+    {
+      "label": "CHIP",
+      "definition": "The Children's Health Insurance Program, providing low-cost health coverage to children in families who earn too much money to qualify for Medicaid.",
+      "terms": [
+        "CHIP",
+        "Children’s Health Insurance Program"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "Medicare FFS",
+      "definition": "The traditional Medicare program where the government pays directly for healthcare services.",
+      "terms": [
+        "Medicare Fee-For Service",
+        "Medicare Fee for Service",
+        "FFS",
+        "fee-for-service Medicare"
+      ],
+      "mentionCount": 15
+    },
+    {
+      "label": "Quality Payment Program",
+      "definition": "A CMS program that rewards high-value, high-quality Medicare clinicians with payment increases.",
+      "terms": [
+        "Quality Payment Program",
+        "QPP"
+      ],
+      "mentionCount": 14
+    },
+    {
+      "label": "Star Ratings Program",
+      "definition": "A quality rating system used by CMS to measure the performance of Medicare Advantage and Part D plans.",
+      "terms": [
+        "Star Ratings",
+        "Star Ratings Program",
+        "Star Rating"
+      ],
+      "mentionCount": 14
+    },
+    {
+      "label": "Medicare Shared Savings",
+      "definition": "A program that encourages groups of doctors, hospitals, and other health care providers to come together as an ACO to give coordinated, high-quality care to their Medicare beneficiaries.",
+      "terms": [
+        "Medicare Shared Savings Program",
+        "MSSP"
+      ],
+      "mentionCount": 12
+    },
+    {
+      "label": "340B Program",
+      "definition": "A federal drug pricing program that requires drug manufacturers to provide outpatient drugs to eligible health care organizations at significantly reduced prices.",
+      "terms": [
+        "340B Program",
+        "340B"
+      ],
+      "mentionCount": 11
+    },
+    {
+      "label": "Alternative Payment Model",
+      "definition": "A payment approach that gives added incentive payments to provide high-quality and cost-efficient care.",
+      "terms": [
+        "Alternative Payment Model",
+        "APM",
+        "Alternative Payment Models",
+        "APMs"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "ESRD PPS",
+      "definition": "The End-Stage Renal Disease Prospective Payment System, a bundled payment system for Medicare dialysis services.",
+      "terms": [
+        "ESRD PPS",
+        "End Stage Renal Disease Prospective Payment System",
+        "ESRD bundle",
+        "ESRD bundle payment"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "WIC",
+      "definition": "The Special Supplemental Nutrition Program for Women, Infants, and Children, a federal assistance program.",
+      "terms": [
+        "WIC",
+        "Special Supplemental Nutrition Program for Women, Infants, and Children"
+      ],
+      "mentionCount": 5
+    }
+  ],
+  "Key Concepts and Principles": [
+    {
+      "label": "Interoperability",
+      "definition": "The ability of different information systems, devices, and applications to access, exchange, integrate, and cooperatively use data in a coordinated manner.",
+      "terms": [
+        "Interoperability",
+        "interoperability"
+      ],
+      "mentionCount": 39
+    },
+    {
+      "label": "Value-Based Care",
+      "definition": "A healthcare delivery model in which providers are paid based on patient health outcomes, rather than the quantity of services delivered.",
+      "terms": [
+        "value-based care",
+        "value-based"
+      ],
+      "mentionCount": 35
+    },
+    {
+      "label": "Home and Community-Based Services",
+      "definition": "Services and supports provided to people in their own homes or other residential settings, rather than in institutions.",
+      "terms": [
+        "Home and Community-Based Services",
+        "HCBS"
+      ],
+      "mentionCount": 25
+    },
+    {
+      "label": "Scope of Practice",
+      "definition": "The procedures, actions, and processes that a healthcare practitioner is permitted to undertake in keeping with the terms of their professional license.",
+      "terms": [
+        "scope of practice",
+        "SOP"
+      ],
+      "mentionCount": 24
+    },
+    {
+      "label": "Information Blocking",
+      "definition": "A practice that is likely to interfere with, prevent, or materially discourage access, exchange, or use of electronic health information.",
+      "terms": [
+        "Information Blocking",
+        "information blocking"
+      ],
+      "mentionCount": 17
+    },
+    {
+      "label": "Health Equity",
+      "definition": "The state in which everyone has a fair and just opportunity to attain their highest level of health.",
+      "terms": [
+        "Health Equity",
+        "health equity"
+      ],
+      "mentionCount": 14
+    },
+    {
+      "label": "Drug Shortage",
+      "definition": "A period when the demand or projected demand for a drug within the United States exceeds the supply of the drug.",
+      "terms": [
+        "drug shortage",
+        "drug shortages"
+      ],
+      "mentionCount": 13
+    },
+    {
+      "label": "Price Transparency",
+      "definition": "The practice of making pricing information available to consumers, intended to allow them to shop for care and make informed decisions.",
+      "terms": [
+        "Price Transparency",
+        "price transparency"
+      ],
+      "mentionCount": 13
+    },
+    {
+      "label": "Full Practice Authority",
+      "definition": "The authorization of nurse practitioners to evaluate patients, diagnose, order and interpret diagnostic tests, and initiate and manage treatments under the exclusive licensure authority of the state board of nursing.",
+      "terms": [
+        "full practice authority",
+        "FPA"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "Surprise Billing",
+      "definition": "An unexpected bill from an out-of-network provider or facility.",
+      "terms": [
+        "surprise billing",
+        "surprise medical bills"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "Essential Health Benefits",
+      "definition": "A set of 10 categories of services that health insurance plans must cover under the Affordable Care Act.",
+      "terms": [
+        "Essential Health Benefits",
+        "EHB",
+        "EHBs"
+      ],
+      "mentionCount": 5
+    }
+  ],
+  "Medical Conditions and Diseases": [
+    {
+      "label": "ADHD",
+      "definition": "Attention-Deficit/Hyperactivity Disorder, a chronic condition including attention difficulty, hyperactivity, and impulsiveness.",
+      "terms": [
+        "ADHD",
+        "Attention-Deficit/Hyperactivity Disorder"
+      ],
+      "mentionCount": 109
+    },
+    {
+      "label": "Substance Use Disorder",
+      "definition": "A disease that affects a person's brain and behavior and leads to an inability to control the use of a legal or illegal drug or medicine.",
+      "terms": [
+        "Substance Use Disorder",
+        "SUD",
+        "addiction"
+      ],
+      "mentionCount": 61
+    },
+    {
+      "label": "COVID-19",
+      "definition": "A contagious disease caused by the SARS-CoV-2 virus.",
+      "terms": [
+        "COVID-19"
+      ],
+      "mentionCount": 47
+    },
+    {
+      "label": "Cancer",
+      "definition": "A disease in which some of the body's cells grow uncontrollably and spread to other parts of the body.",
+      "terms": [
+        "Cancer",
+        "cancer"
+      ],
+      "mentionCount": 44
+    },
+    {
+      "label": "Insomnia",
+      "definition": "A common sleep disorder that can make it hard to fall asleep, hard to stay asleep, or cause you to wake up too early and not be able to get back to sleep.",
+      "terms": [
+        "Insomnia",
+        "insomnia"
+      ],
+      "mentionCount": 41
+    },
+    {
+      "label": "Diabetes",
+      "definition": "A chronic health condition that affects how the body turns food into energy.",
+      "terms": [
+        "Diabetes",
+        "diabetes"
+      ],
+      "mentionCount": 35
+    },
+    {
+      "label": "Obesity",
+      "definition": "A complex disease involving an excessive amount of body fat.",
+      "terms": [
+        "Obesity",
+        "obesity"
+      ],
+      "mentionCount": 21
+    },
+    {
+      "label": "Depression",
+      "definition": "A mood disorder causing a persistent feeling of sadness and loss of interest.",
+      "terms": [
+        "Depression",
+        "depression"
+      ],
+      "mentionCount": 19
+    },
+    {
+      "label": "Intellectual/Developmental Disability",
+      "definition": "Disorders that are usually present at birth and that uniquely affect the trajectory of the individual’s physical, intellectual, and/or emotional development.",
+      "terms": [
+        "intellectual and developmental disabilities",
+        "I/DD",
+        "intellectual/developmental disabilities"
+      ],
+      "mentionCount": 17
+    },
+    {
+      "label": "Influenza",
+      "definition": "A viral infection that attacks the respiratory system.",
+      "terms": [
+        "Influenza",
+        "influenza",
+        "flu"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "RSV",
+      "definition": "Respiratory Syncytial Virus, a common respiratory virus that usually causes mild, cold-like symptoms.",
+      "terms": [
+        "RSV",
+        "Respiratory syncytial virus"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "Havana Syndrome",
+      "definition": "A set of medical signs and symptoms reported by U.S. and Canadian embassy staff, also known as Anomalous Health Incidents.",
+      "terms": [
+        "Havana Syndrome",
+        "Havana syndrom",
+        "Anomalous Health Incidents",
+        "AHI"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "Opioid Use Disorder",
+      "definition": "A problematic pattern of opioid use that causes significant impairment or distress.",
+      "terms": [
+        "Opioid Use Disorder",
+        "OUD"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "Chronic Kidney Disease",
+      "definition": "A condition characterized by a gradual loss of kidney function over time.",
+      "terms": [
+        "chronic kidney disease",
+        "CKD"
+      ],
+      "mentionCount": 7
+    },
+    {
+      "label": "ESRD",
+      "definition": "End-Stage Renal Disease, the last stage of chronic kidney disease when kidneys can no longer support the body's needs.",
+      "terms": [
+        "ESRD",
+        "End Stage Renal Disease",
+        "End-Stage Renal Disease"
+      ],
+      "mentionCount": 7
+    },
+    {
+      "label": "PTSD",
+      "definition": "Post-Traumatic Stress Disorder, a mental health condition that's triggered by a terrifying event.",
+      "terms": [
+        "PTSD",
+        "Post-Traumatic Stress Disorder"
+      ],
+      "mentionCount": 7
+    }
+  ],
+  "Medical Devices and Equipment": [
+    {
+      "label": "Medical Device",
+      "definition": "An instrument, apparatus, or other article intended for use in the diagnosis, cure, mitigation, treatment, or prevention of disease.",
+      "terms": [
+        "medical device",
+        "medical devices",
+        "medical-device"
+      ],
+      "mentionCount": 40
+    },
+    {
+      "label": "Durable Medical Equipment",
+      "definition": "Equipment that can withstand repeated use, is primarily used for a medical reason, and is appropriate for use in the home.",
+      "terms": [
+        "Durable Medical Equipment",
+        "DME"
+      ],
+      "mentionCount": 15
+    },
+    {
+      "label": "Device Classification",
+      "definition": "A three-tiered system (Class I, II, III) used by the FDA to categorize medical devices based on their risk to the patient.",
+      "terms": [
+        "Class I",
+        "Class II",
+        "Class III"
+      ],
+      "mentionCount": 13
+    },
+    {
+      "label": "In Vitro Diagnostic",
+      "definition": "Tests done on samples such as blood or tissue that have been taken from the human body.",
+      "terms": [
+        "In Vitro Diagnostic",
+        "IVD",
+        "in vitro diagnostic"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "Software as a Medical Device",
+      "definition": "Software intended to be used for one or more medical purposes that perform these purposes without being part of a hardware medical device.",
+      "terms": [
+        "Software as a Medical Device",
+        "SaMD"
+      ],
+      "mentionCount": 5
+    }
+  ],
+  "Medications and Treatments": [
+    {
+      "label": "Telehealth",
+      "definition": "The use of electronic information and telecommunications technologies to support long-distance clinical health care.",
+      "terms": [
+        "telehealth",
+        "telemedicine",
+        "remote care",
+        "virtual care"
+      ],
+      "mentionCount": 153
+    },
+    {
+      "label": "Drug Schedules",
+      "definition": "A classification system for drugs based on their abuse potential, established by the Controlled Substances Act.",
+      "terms": [
+        "Schedule II",
+        "Schedule III",
+        "Schedule IV"
+      ],
+      "mentionCount": 74
+    },
+    {
+      "label": "Generic Drug",
+      "definition": "A medication created to be the same as an already marketed brand-name drug in dosage form, safety, strength, route of administration, quality, performance characteristics, and intended use.",
+      "terms": [
+        "generic drug",
+        "generic drugs",
+        "generic"
+      ],
+      "mentionCount": 63
+    },
+    {
+      "label": "Opioids",
+      "definition": "A class of drugs used to reduce pain, which can be highly addictive.",
+      "terms": [
+        "opioids",
+        "opioid"
+      ],
+      "mentionCount": 37
+    },
+    {
+      "label": "Controlled Substance",
+      "definition": "A drug or chemical whose manufacture, possession, or use is regulated by a government.",
+      "terms": [
+        "controlled substance",
+        "controlled substances",
+        "Controlled Substance",
+        "Controlled Substances"
+      ],
+      "mentionCount": 31
+    },
+    {
+      "label": "Stimulants",
+      "definition": "A class of drugs that increase activity in the brain, often used to treat ADHD.",
+      "terms": [
+        "stimulants",
+        "stimulant"
+      ],
+      "mentionCount": 27
+    },
+    {
+      "label": "Biosimilar",
+      "definition": "A biologic medical product that is almost an identical copy of an original product that is manufactured by a different company.",
+      "terms": [
+        "biosimilar"
+      ],
+      "mentionCount": 11
+    },
+    {
+      "label": "Cell and Gene Therapy",
+      "definition": "Overlapping fields of biomedical research and treatment with the goals of repairing or replacing damaged cells or correcting genetic disorders.",
+      "terms": [
+        "cell and gene therapies",
+        "CGTs",
+        "gene therapy",
+        "cell therapy"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "Compounded Medication",
+      "definition": "A drug that is made by a licensed pharmacist to meet the unique needs of an individual patient.",
+      "terms": [
+        "compounded medication",
+        "compounded medications",
+        "compounded drug",
+        "compounded drugs"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "GLP-1 Agonists",
+      "definition": "A class of medications used in the treatment of type 2 diabetes and obesity.",
+      "terms": [
+        "GLP-1",
+        "GLP-1 medications",
+        "GLP-1s",
+        "GLP-1 agonist"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "DSMT",
+      "definition": "Diabetes self-management training, an evidence-based program to help people with diabetes manage their condition.",
+      "terms": [
+        "DSMT",
+        "Diabetes Self-Management Training"
+      ],
+      "mentionCount": 5
+    }
+  ],
+  "Regulations, Acts, and Policies": [
+    {
+      "label": "Executive Order",
+      "definition": "A signed, written, and published directive from the President of the United States that manages operations of the federal government.",
+      "terms": [
+        "Executive Order",
+        "E.O.",
+        "EO"
+      ],
+      "mentionCount": 117
+    },
+    {
+      "label": "HIPAA",
+      "definition": "The Health Insurance Portability and Accountability Act of 1996, which sets standards for protecting sensitive patient health information.",
+      "terms": [
+        "HIPAA",
+        "Health Insurance Portability and Accountability Act"
+      ],
+      "mentionCount": 49
+    },
+    {
+      "label": "Affordable Care Act",
+      "definition": "The Patient Protection and Affordable Care Act, a comprehensive health care reform law enacted in 2010.",
+      "terms": [
+        "Affordable Care Act",
+        "ACA",
+        "Patient Protection and Affordable Care Act"
+      ],
+      "mentionCount": 44
+    },
+    {
+      "label": "FD&C Act",
+      "definition": "The Federal Food, Drug, and Cosmetic Act, a set of laws giving authority to the FDA to oversee the safety of food, drugs, medical devices, and cosmetics.",
+      "terms": [
+        "FD&C Act",
+        "Federal Food, Drug, and Cosmetic Act",
+        "FDCA",
+        "Food, Drug, and Cosmetic Act"
+      ],
+      "mentionCount": 43
+    },
+    {
+      "label": "Social Security Act",
+      "definition": "The 1935 law that created the Social Security program and has been amended to form the basis of many health and human services programs.",
+      "terms": [
+        "Social Security Act",
+        "SS Act"
+      ],
+      "mentionCount": 37
+    },
+    {
+      "label": "21st Century Cures Act",
+      "definition": "A 2016 act designed to help accelerate medical product development and bring new innovations and advances to patients who need them faster and more efficiently.",
+      "terms": [
+        "21st Century Cures Act"
+      ],
+      "mentionCount": 25
+    },
+    {
+      "label": "Anti-Kickback Statute",
+      "definition": "A federal statute that prohibits the exchange of remuneration for referrals for services payable by a federal healthcare program.",
+      "terms": [
+        "Anti-Kickback Statute",
+        "AKS",
+        "anti-kickback"
+      ],
+      "mentionCount": 19
+    },
+    {
+      "label": "Stark Law",
+      "definition": "A set of U.S. federal laws that prohibit physician self-referral for designated health services payable by Medicare or Medicaid.",
+      "terms": [
+        "Stark Law"
+      ],
+      "mentionCount": 14
+    },
+    {
+      "label": "No Surprises Act",
+      "definition": "A federal law that protects people covered under group and individual health plans from receiving surprise medical bills.",
+      "terms": [
+        "No Surprises Act",
+        "NSA"
+      ],
+      "mentionCount": 12
+    },
+    {
+      "label": "FSMA",
+      "definition": "The Food Safety Modernization Act, which aims to ensure the U.S. food supply is safe by shifting the focus from responding to contamination to preventing it.",
+      "terms": [
+        "FSMA",
+        "Food Safety Modernization Act"
+      ],
+      "mentionCount": 11
+    },
+    {
+      "label": "CARES Act",
+      "definition": "The Coronavirus Aid, Relief, and Economic Security Act, a 2020 law intended to address the economic fallout of the COVID-19 pandemic.",
+      "terms": [
+        "CARES Act"
+      ],
+      "mentionCount": 10
+    },
+    {
+      "label": "80/20 Rule",
+      "definition": "A mandate requiring at least 80% of Medicaid payments for certain HCBS services be spent on compensation for direct care workers.",
+      "terms": [
+        "80/20 rule"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "Common Rule",
+      "definition": "A rule of ethics in the United States regarding biomedical and behavioral research involving human subjects (45 CFR 46).",
+      "terms": [
+        "Common Rule",
+        "45 CFR 46",
+        "45 CFR Part 46"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "MHPAEA",
+      "definition": "The Mental Health Parity and Addiction Equity Act of 2008, a federal law that prevents group health plans and health insurance issuers that provide mental health or substance use disorder benefits from imposing less favorable benefit limitations on those benefits than on medical/surgical benefits.",
+      "terms": [
+        "MHPAEA",
+        "Mental Health Parity and Addiction Equity Act"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "Controlled Substances Act",
+      "definition": "The federal U.S. drug policy under which the manufacture, importation, possession, use, and distribution of certain substances is regulated.",
+      "terms": [
+        "Controlled Substances Act"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "DSHEA",
+      "definition": "The Dietary Supplement Health and Education Act of 1994, which defines and regulates dietary supplements.",
+      "terms": [
+        "DSHEA",
+        "Dietary Supplement Health and Education Act"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "NBPP",
+      "definition": "The annual Notice of Benefit and Payment Parameters rule, which finalizes regulations for the ACA marketplaces.",
+      "terms": [
+        "NBPP",
+        "Notice of Benefit and Payment Parameters"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "42 CFR Part 2",
+      "definition": "A federal regulation that protects the confidentiality of substance use disorder patient records.",
+      "terms": [
+        "42 CFR Part 2"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "DQSA",
+      "definition": "The Drug Quality and Security Act, which outlines steps to build a system to identify and trace certain prescription drugs as they are distributed in the United States.",
+      "terms": [
+        "DQSA",
+        "Drug Quality and Security Act"
+      ],
+      "mentionCount": 5
+    }
+  ],
+  "Regulatory and Administrative Processes": [
+    {
+      "label": "Rulemaking",
+      "definition": "The process that executive and independent agencies use to create, or promulgate, regulations.",
+      "terms": [
+        "rulemaking",
+        "notice-and-comment rulemaking",
+        "notice and comment rulemaking"
+      ],
+      "mentionCount": 95
+    },
+    {
+      "label": "Prior Authorization",
+      "definition": "A process requiring providers to obtain approval from a payer before a specific service or medication is covered.",
+      "terms": [
+        "Prior Authorization",
+        "prior authorization",
+        "prior-authorization",
+        "PA",
+        "prior auth"
+      ],
+      "mentionCount": 66
+    },
+    {
+      "label": "Audits",
+      "definition": "An official inspection of an organization's accounts, typically by an independent body, to ensure compliance with regulations.",
+      "terms": [
+        "audit",
+        "Audits",
+        "audits"
+      ],
+      "mentionCount": 52
+    },
+    {
+      "label": "Clinical Trials",
+      "definition": "Research studies performed in people that are aimed at evaluating a medical, surgical, or behavioral intervention.",
+      "terms": [
+        "Clinical Trial",
+        "clinical trial",
+        "Clinical Trials",
+        "clinical trials"
+      ],
+      "mentionCount": 52
+    },
+    {
+      "label": "Credentialing",
+      "definition": "The process of verifying a healthcare provider's qualifications to ensure they have the required licenses, certifications, and skills.",
+      "terms": [
+        "credentialing",
+        "recredentialing",
+        "re-credentialing"
+      ],
+      "mentionCount": 25
+    },
+    {
+      "label": "New Drug Application",
+      "definition": "A formal proposal that a sponsor submits to the FDA to request approval for the sale and marketing of a new drug.",
+      "terms": [
+        "New Drug Application",
+        "NDA",
+        "505(b)(2) NDA"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "Risk Adjustment",
+      "definition": "A statistical process that takes into account the underlying health status and health spending of enrollees in an insurance plan when looking at their health care outcomes or costs.",
+      "terms": [
+        "Risk Adjustment",
+        "risk adjustment"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "Coverage with Evidence Development",
+      "definition": "A CMS process that allows for Medicare coverage of items and services on the condition that they are furnished in the context of approved clinical studies or with the collection of additional clinical data.",
+      "terms": [
+        "Coverage with Evidence Development",
+        "CED"
+      ],
+      "mentionCount": 11
+    },
+    {
+      "label": "Price Negotiation",
+      "definition": "The process established by the Inflation Reduction Act for Medicare to negotiate prices for certain high-cost drugs.",
+      "terms": [
+        "Price Negotiation",
+        "Medicare Drug Price Negotiation",
+        "Drug Price Negotiation"
+      ],
+      "mentionCount": 11
+    },
+    {
+      "label": "Independent Dispute Resolution",
+      "definition": "A process under the No Surprises Act to resolve payment disputes between providers and health plans for out-of-network services.",
+      "terms": [
+        "Independent Dispute Resolution",
+        "IDR"
+      ],
+      "mentionCount": 10
+    },
+    {
+      "label": "Premarket Approval",
+      "definition": "The FDA process of scientific and regulatory review to evaluate the safety and effectiveness of Class III medical devices.",
+      "terms": [
+        "Premarket Approval",
+        "PMA"
+      ],
+      "mentionCount": 10
+    },
+    {
+      "label": "Electronic Visit Verification",
+      "definition": "A technology system that verifies when provider visits occur and documents the precise time services begin and end.",
+      "terms": [
+        "Electronic Visit Verification",
+        "EVV"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "Abbreviated New Drug Application",
+      "definition": "An application for a generic drug approval, containing data that is submitted to FDA for the review and potential approval of a generic drug product.",
+      "terms": [
+        "Abbreviated New Drug Application",
+        "ANDA"
+      ],
+      "mentionCount": 7
+    },
+    {
+      "label": "Step Therapy",
+      "definition": "A type of prior authorization where a patient must try a lower-cost drug before a plan will cover a more expensive one.",
+      "terms": [
+        "step therapy"
+      ],
+      "mentionCount": 7
+    },
+    {
+      "label": "RADV Audits",
+      "definition": "Risk Adjustment Data Validation audits, which CMS uses to verify the accuracy of diagnosis data submitted by Medicare Advantage organizations.",
+      "terms": [
+        "RADV Audits",
+        "RADV",
+        "Risk Adjustment Data Validation"
+      ],
+      "mentionCount": 5
+    }
+  ],
+  "Standards, Guidelines, and Data Systems": [
+    {
+      "label": "EHR / EMR",
+      "definition": "Electronic Health Record or Electronic Medical Record, a digital version of a patient's paper chart.",
+      "terms": [
+        "EHR",
+        "Electronic Health Record",
+        "EMR",
+        "Electronic Medical Record"
+      ],
+      "mentionCount": 40
+    },
+    {
+      "label": "Guidance for Industry",
+      "definition": "Documents prepared by the FDA to provide their current thinking on a regulatory issue.",
+      "terms": [
+        "Guidance for Industry",
+        "GFI"
+      ],
+      "mentionCount": 34
+    },
+    {
+      "label": "CPT Codes",
+      "definition": "Current Procedural Terminology, a medical code set that is used to report medical, surgical, and diagnostic procedures and services.",
+      "terms": [
+        "CPT",
+        "Current Procedural Terminology",
+        "CPT®"
+      ],
+      "mentionCount": 30
+    },
+    {
+      "label": "HCPCS",
+      "definition": "The Healthcare Common Procedure Coding System, a collection of standardized codes that represent medical procedures, supplies, products and services.",
+      "terms": [
+        "HCPCS"
+      ],
+      "mentionCount": 13
+    },
+    {
+      "label": "National Provider Identifier",
+      "definition": "A unique 10-digit identification number issued to health care providers in the United States by CMS.",
+      "terms": [
+        "National Provider Identifier",
+        "NPI"
+      ],
+      "mentionCount": 13
+    },
+    {
+      "label": "NHSN",
+      "definition": "The National Healthcare Safety Network, a healthcare-associated infection tracking system from the CDC.",
+      "terms": [
+        "NHSN",
+        "National Healthcare Safety Network"
+      ],
+      "mentionCount": 11
+    },
+    {
+      "label": "FHIR",
+      "definition": "Fast Healthcare Interoperability Resources, a standard for exchanging healthcare information electronically.",
+      "terms": [
+        "FHIR",
+        "Fast Healthcare Interoperability Resources"
+      ],
+      "mentionCount": 10
+    },
+    {
+      "label": "CLASS Scoring System",
+      "definition": "The Classroom Assessment Scoring System, an observational tool that assesses classroom quality in preschool through third grade.",
+      "terms": [
+        "CLASS",
+        "Classroom Assessment Scoring System"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "OASIS Data Set",
+      "definition": "The Outcome and Assessment Information Set, a group of standard data elements home health agencies must collect and report to CMS.",
+      "terms": [
+        "OASIS",
+        "Outcome and Assessment Information Set"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "TEFCA",
+      "definition": "The Trusted Exchange Framework and Common Agreement, a unified approach to national-level health information exchange.",
+      "terms": [
+        "TEFCA",
+        "Trusted Exchange Framework and Common Agreement"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "USP",
+      "definition": "The U.S. Pharmacopeia, a scientific nonprofit organization that sets standards for the identity, strength, quality, and purity of medicines, food ingredients, and dietary supplements.",
+      "terms": [
+        "U.S. Pharmacopeia",
+        "USP"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "CEHRT",
+      "definition": "Certified Electronic Health Record Technology, an EHR that meets functionality standards set by the Office of the National Coordinator for Health IT.",
+      "terms": [
+        "CEHRT",
+        "Certified Electronic Health Record Technology"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "Federal Poverty Line",
+      "definition": "A measure of income issued every year by the Department of Health and Human Services, used to determine eligibility for certain programs and benefits.",
+      "terms": [
+        "Federal Poverty Line",
+        "FPL"
+      ],
+      "mentionCount": 6
+    }
+  ]
+}

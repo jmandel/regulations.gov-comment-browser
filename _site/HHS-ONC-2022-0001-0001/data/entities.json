@@ -1,0 +1,1057 @@
+{
+  "Administrative & Clinical Processes": [
+    {
+      "label": "Utilization Management",
+      "definition": "Techniques used by health plans to manage healthcare costs by influencing patient care decision-making through case-by-case assessments.",
+      "terms": [
+        "Utilization Management",
+        "utilization management",
+        "UM",
+        "utilization review"
+      ],
+      "mentionCount": 38
+    },
+    {
+      "label": "Appeals Process",
+      "definition": "The formal procedure for a patient or provider to request a review of a denied health insurance claim or prior authorization.",
+      "terms": [
+        "Appeals Process",
+        "appeal",
+        "appeals"
+      ],
+      "mentionCount": 36
+    },
+    {
+      "label": "Peer-to-Peer Review",
+      "definition": "A conversation between a treating physician and a medical reviewer from a health plan, typically following a denied prior authorization.",
+      "terms": [
+        "Peer-to-Peer",
+        "peer-to-peer",
+        "peer to peer",
+        "peer-to-peer review",
+        "peer-to-peer discussion",
+        "peer-to-peer discussions"
+      ],
+      "mentionCount": 18
+    },
+    {
+      "label": "Electronic Prescribing",
+      "definition": "The electronic generation and transmission of a prescription order from a provider to a pharmacy.",
+      "terms": [
+        "Electronic Prescribing",
+        "electronic prescribing",
+        "e-prescribing",
+        "ePrescribing",
+        "e-Rx",
+        "eRx"
+      ],
+      "mentionCount": 17
+    },
+    {
+      "label": "Gold Carding",
+      "definition": "A policy that exempts high-performing clinicians from prior authorization requirements for certain services.",
+      "terms": [
+        "Gold Carding",
+        "gold carding",
+        "gold card"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "Value-Based Care",
+      "definition": "A healthcare delivery model where providers are paid based on patient health outcomes rather than the volume of services provided.",
+      "terms": [
+        "Value-Based Care",
+        "value-based care",
+        "VBC",
+        "value-based payment"
+      ],
+      "mentionCount": 12
+    },
+    {
+      "label": "Information Blocking",
+      "definition": "A practice by a health IT developer, HIE, or provider that is likely to interfere with the access or use of electronic health information.",
+      "terms": [
+        "Information Blocking",
+        "information blocking",
+        "data blocking"
+      ],
+      "mentionCount": 10
+    },
+    {
+      "label": "Step Therapy",
+      "definition": "A type of prior authorization where a patient must try one or more lower-cost medications before a more expensive drug is covered.",
+      "terms": [
+        "Step Therapy",
+        "step therapy",
+        "fail first"
+      ],
+      "mentionCount": 7
+    },
+    {
+      "label": "Revenue Cycle Management",
+      "definition": "The financial process using medical billing software that healthcare facilities use to track patient care episodes from registration to final payment.",
+      "terms": [
+        "Revenue Cycle Management",
+        "revenue cycle management",
+        "RCM"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "Real-Time Benefit Check",
+      "definition": "A process that allows providers to view patient-specific drug benefit and cost information at the point of care.",
+      "terms": [
+        "Real-Time Benefit Check",
+        "RTBC",
+        "real-time benefit tool",
+        "RTBT",
+        "Real-Time Prescription Benefit"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "Concurrent Review",
+      "definition": "A utilization management process that occurs during a patient's hospital stay to determine if continued care is medically necessary.",
+      "terms": [
+        "Concurrent Review",
+        "concurrent review"
+      ],
+      "mentionCount": 2
+    },
+    {
+      "label": "Medical Necessity Review",
+      "definition": "The process of determining if a healthcare service or supply is reasonable and necessary for the diagnosis or treatment of illness.",
+      "terms": [
+        "Medical Necessity Review",
+        "medical necessity review"
+      ],
+      "mentionCount": 1
+    }
+  ],
+  "Data & Document Types": [
+    {
+      "label": "Healthcare Attachment",
+      "definition": "Supplemental information, such as clinical documentation, provided to support an administrative healthcare transaction.",
+      "terms": [
+        "Healthcare Attachment",
+        "healthcare attachments",
+        "attachment",
+        "attachments",
+        "electronic attachment",
+        "electronic attachments"
+      ],
+      "mentionCount": 63
+    },
+    {
+      "label": "C-CDA",
+      "definition": "Consolidated Clinical Document Architecture, an HL7 standard for creating clinical documents like discharge summaries and progress notes.",
+      "terms": [
+        "Consolidated Clinical Document Architecture",
+        "C-CDA",
+        "CCDA",
+        "Clinical Document Architecture",
+        "CDA"
+      ],
+      "mentionCount": 44
+    },
+    {
+      "label": "FHIR Document",
+      "definition": "A self-contained package of FHIR resources that represents a snapshot in time of a clinical document.",
+      "terms": [
+        "FHIR Document",
+        "FHIR Documents"
+      ],
+      "mentionCount": 27
+    },
+    {
+      "label": "Certified EHR Technology",
+      "definition": "An Electronic Health Record that meets the technological capability, functionality, and security requirements adopted by HHS.",
+      "terms": [
+        "Certified Electronic Health Record Technology",
+        "CEHRT",
+        "Certified EHR Technology",
+        "certified EHR"
+      ],
+      "mentionCount": 26
+    },
+    {
+      "label": "Formulary",
+      "definition": "A list of prescription drugs covered by a prescription drug plan or another insurance plan offering prescription drug benefits.",
+      "terms": [
+        "Formulary",
+        "formularies",
+        "formulary information",
+        "preferred drug list",
+        "preferred drug lists"
+      ],
+      "mentionCount": 12
+    },
+    {
+      "label": "Advanced EOB",
+      "definition": "An Advanced Explanation of Benefits, provided to a patient in advance of a scheduled service.",
+      "terms": [
+        "Advanced Explanation of Benefits",
+        "AEOB"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "Protected Health Information",
+      "definition": "Individually identifiable health information that is transmitted or maintained in any form or medium.",
+      "terms": [
+        "Protected Health Information",
+        "PHI"
+      ],
+      "mentionCount": 2
+    },
+    {
+      "label": "Good Faith Estimate",
+      "definition": "An estimate of the cost of medical services for uninsured or self-pay individuals.",
+      "terms": [
+        "Good Faith Estimate",
+        "GFE"
+      ],
+      "mentionCount": 1
+    },
+    {
+      "label": "Patient-Generated Health Data",
+      "definition": "Health-related data created, recorded, or gathered by or from patients to help address a health concern.",
+      "terms": [
+        "Patient-Generated Health Data",
+        "PGHD"
+      ],
+      "mentionCount": 1
+    }
+  ],
+  "Government Agencies & Bodies": [
+    {
+      "label": "HHS",
+      "definition": "The U.S. Department of Health and Human Services, a federal agency protecting the health of all Americans.",
+      "terms": [
+        "Department of Health and Human Services",
+        "HHS",
+        "Health and Human Services"
+      ],
+      "mentionCount": 59
+    },
+    {
+      "label": "HITAC",
+      "definition": "The Health Information Technology Advisory Committee, which advises ONC on health IT policies, standards, and implementation specifications.",
+      "terms": [
+        "Health Information Technology Advisory Committee",
+        "HITAC"
+      ],
+      "mentionCount": 12
+    },
+    {
+      "label": "OIG",
+      "definition": "The Office of Inspector General for HHS, which combats waste, fraud, and abuse in HHS programs.",
+      "terms": [
+        "Office of Inspector General",
+        "OIG"
+      ],
+      "mentionCount": 4
+    },
+    {
+      "label": "FDA",
+      "definition": "The Food and Drug Administration, a federal agency responsible for protecting public health by regulating food and drug products.",
+      "terms": [
+        "Food and Drug Administration",
+        "FDA",
+        "U.S. Food and Drug Administration"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "NCI",
+      "definition": "The National Cancer Institute, the U.S. government's principal agency for cancer research and training.",
+      "terms": [
+        "National Cancer Institute",
+        "NCI"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "NCVHS",
+      "definition": "The National Committee on Vital and Health Statistics, a federal advisory body to HHS on health data and statistics.",
+      "terms": [
+        "National Committee on Vital and Health Statistics",
+        "NCVHS"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "AHRQ",
+      "definition": "The Agency for Healthcare Research and Quality, a federal agency focused on improving healthcare quality, safety, and efficiency.",
+      "terms": [
+        "Agency for Healthcare Research and Quality",
+        "AHRQ"
+      ],
+      "mentionCount": 2
+    },
+    {
+      "label": "NIST",
+      "definition": "The National Institute of Standards and Technology, a federal agency promoting U.S. innovation by advancing measurement science and standards.",
+      "terms": [
+        "National Institute of Standards and Technology",
+        "NIST"
+      ],
+      "mentionCount": 2
+    }
+  ],
+  "Healthcare Programs & Plans": [
+    {
+      "label": "Medicare",
+      "definition": "A federal health insurance program for people 65 or older, and younger people with certain disabilities.",
+      "terms": [
+        "Medicare",
+        "Medicare program"
+      ],
+      "mentionCount": 54
+    },
+    {
+      "label": "Medicaid",
+      "definition": "A joint federal and state program that helps with medical costs for some people with limited income and resources.",
+      "terms": [
+        "Medicaid",
+        "Medicaid program"
+      ],
+      "mentionCount": 43
+    },
+    {
+      "label": "Medicare Advantage",
+      "definition": "A type of Medicare health plan offered by a private company that contracts with Medicare to provide Part A and Part B benefits.",
+      "terms": [
+        "Medicare Advantage",
+        "MA",
+        "MA plan",
+        "MA plans"
+      ],
+      "mentionCount": 27
+    },
+    {
+      "label": "Medicare Part D",
+      "definition": "The part of Medicare that provides prescription drug coverage.",
+      "terms": [
+        "Medicare Part D"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "Medicaid MCO",
+      "definition": "A Medicaid Managed Care Organization, a private health plan that contracts with state Medicaid agencies.",
+      "terms": [
+        "Medicaid Managed Care Organization",
+        "Medicaid MCO",
+        "Medicaid MCOs",
+        "Medicaid Managed Care"
+      ],
+      "mentionCount": 7
+    },
+    {
+      "label": "CHIP",
+      "definition": "The Children's Health Insurance Program, providing low-cost health coverage to children in families who earn too much for Medicaid.",
+      "terms": [
+        "Children's Health Insurance Program",
+        "CHIP"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "Prescription Drug Plan",
+      "definition": "A standalone plan that provides prescription drug coverage, typically associated with Medicare Part D.",
+      "terms": [
+        "Prescription Drug Plan",
+        "PDP",
+        "PDPs",
+        "Part D plan",
+        "Part D plans"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "Medicare Part B",
+      "definition": "The part of Medicare that covers medical services and supplies, including outpatient care and durable medical equipment.",
+      "terms": [
+        "Medicare Part B"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "Qualified Health Plan",
+      "definition": "An insurance plan that is certified by the Health Insurance Marketplace, provides essential health benefits, and follows established limits.",
+      "terms": [
+        "Qualified Health Plan",
+        "QHP",
+        "QHPs"
+      ],
+      "mentionCount": 1
+    }
+  ],
+  "Legislation & Regulations": [
+    {
+      "label": "HIPAA",
+      "definition": "The Health Insurance Portability and Accountability Act, setting national standards for protecting sensitive patient health information.",
+      "terms": [
+        "Health Insurance Portability and Accountability Act",
+        "HIPAA"
+      ],
+      "mentionCount": 64
+    },
+    {
+      "label": "21st Century Cures Act",
+      "definition": "A U.S. law designed to accelerate medical product development and bring new innovations to patients faster and more efficiently.",
+      "terms": [
+        "21st Century Cures Act",
+        "Cures Act"
+      ],
+      "mentionCount": 12
+    },
+    {
+      "label": "Affordable Care Act",
+      "definition": "A comprehensive healthcare reform law enacted in 2010 to make affordable health insurance available to more people.",
+      "terms": [
+        "Affordable Care Act",
+        "ACA"
+      ],
+      "mentionCount": 10
+    },
+    {
+      "label": "PAMA",
+      "definition": "The Protecting Access to Medicare Act, which includes provisions for appropriate use criteria for advanced diagnostic imaging.",
+      "terms": [
+        "Protecting Access to Medicare Act",
+        "PAMA"
+      ],
+      "mentionCount": 4
+    },
+    {
+      "label": "HITECH Act",
+      "definition": "The Health Information Technology for Economic and Clinical Health Act, promoting the adoption and meaningful use of health IT.",
+      "terms": [
+        "Health Information Technology for Economic and Clinical Health Act",
+        "HITECH Act",
+        "HITECH"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "ERISA",
+      "definition": "The Employee Retirement Income Security Act, a federal law setting minimum standards for most voluntarily established retirement and health plans.",
+      "terms": [
+        "Employee Retirement Income Security Act",
+        "ERISA"
+      ],
+      "mentionCount": 2
+    },
+    {
+      "label": "SUPPORT Act",
+      "definition": "A law aimed at addressing the opioid crisis, including requirements for electronic prior authorization for Medicare Part D.",
+      "terms": [
+        "SUPPORT Act"
+      ],
+      "mentionCount": 2
+    },
+    {
+      "label": "42 CFR Part 2",
+      "definition": "A federal regulation that provides strict confidentiality protections for patient records related to substance use disorder treatment.",
+      "terms": [
+        "42 CFR Part 2"
+      ],
+      "mentionCount": 1
+    },
+    {
+      "label": "Medicare Modernization Act",
+      "definition": "A 2003 law that introduced prescription drug benefits (Part D) and Medicare Advantage plans.",
+      "terms": [
+        "Medicare Modernization Act",
+        "MMA"
+      ],
+      "mentionCount": 1
+    }
+  ],
+  "Medical Conditions & Diseases": [
+    {
+      "label": "Cancer",
+      "definition": "A disease in which some of the body's cells grow uncontrollably and spread to other parts of the body.",
+      "terms": [
+        "Cancer",
+        "cancer"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "Chronic Condition",
+      "definition": "A health condition or disease that is persistent or otherwise long-lasting in its effects.",
+      "terms": [
+        "Chronic Condition",
+        "chronic condition",
+        "chronic conditions"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "Prostate Cancer",
+      "definition": "Cancer that occurs in the prostate — a small walnut-shaped gland in males.",
+      "terms": [
+        "Prostate Cancer",
+        "prostate cancer"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "Diabetes",
+      "definition": "A chronic health condition that affects how your body turns food into energy.",
+      "terms": [
+        "Diabetes",
+        "diabetes"
+      ],
+      "mentionCount": 4
+    },
+    {
+      "label": "HIV",
+      "definition": "Human immunodeficiency virus, a virus that attacks the body's immune system.",
+      "terms": [
+        "HIV"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "Cardiovascular Disease",
+      "definition": "A general term for conditions affecting the heart or blood vessels.",
+      "terms": [
+        "Cardiovascular Disease",
+        "cardiovascular disease"
+      ],
+      "mentionCount": 1
+    },
+    {
+      "label": "Inflammatory Bowel Disease",
+      "definition": "A term for two conditions (Crohn's disease and ulcerative colitis) that are characterized by chronic inflammation of the gastrointestinal tract.",
+      "terms": [
+        "Inflammatory Bowel Disease",
+        "IBD"
+      ],
+      "mentionCount": 1
+    },
+    {
+      "label": "Parkinson's Disease",
+      "definition": "A progressive disorder that affects the nervous system and the parts of the body controlled by the nerves.",
+      "terms": [
+        "Parkinson's Disease",
+        "Parkinson's",
+        "PD"
+      ],
+      "mentionCount": 1
+    }
+  ],
+  "Medical Items & Services": [
+    {
+      "label": "Imaging Services",
+      "definition": "Medical tests that produce pictures of the inside of the body.",
+      "terms": [
+        "Imaging Services",
+        "imaging",
+        "advanced imaging",
+        "diagnostic imaging",
+        "radiology",
+        "MRI",
+        "CT",
+        "PET Scan"
+      ],
+      "mentionCount": 30
+    },
+    {
+      "label": "Outpatient Services",
+      "definition": "Medical care that does not require an overnight stay in a hospital or facility.",
+      "terms": [
+        "Outpatient Services",
+        "outpatient",
+        "outpatient services"
+      ],
+      "mentionCount": 20
+    },
+    {
+      "label": "Inpatient Services",
+      "definition": "Medical services that require a patient to be admitted to a hospital or other facility for at least one night.",
+      "terms": [
+        "Inpatient Services",
+        "inpatient",
+        "inpatient services"
+      ],
+      "mentionCount": 15
+    },
+    {
+      "label": "Durable Medical Equipment",
+      "definition": "Equipment and supplies ordered by a health care provider for everyday or extended use.",
+      "terms": [
+        "Durable Medical Equipment",
+        "DME",
+        "DMEPOS",
+        "durable medical equipment"
+      ],
+      "mentionCount": 11
+    },
+    {
+      "label": "Post-Acute Care",
+      "definition": "A range of medical care services that support an individual's continued recovery from an illness or management of a chronic condition.",
+      "terms": [
+        "Post-Acute Care",
+        "post-acute care",
+        "LTPAC",
+        "long-term care"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "Chemotherapy",
+      "definition": "A type of cancer treatment that uses one or more anti-cancer drugs as part of a standardized regimen.",
+      "terms": [
+        "Chemotherapy",
+        "chemotherapy"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "Specialty Medication",
+      "definition": "High-cost prescription medications used to treat complex or chronic conditions.",
+      "terms": [
+        "Specialty Medication",
+        "specialty medications",
+        "specialty drug",
+        "specialty drugs"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "Radiation Therapy",
+      "definition": "A type of cancer treatment that uses high doses of radiation to kill cancer cells and shrink tumors.",
+      "terms": [
+        "Radiation Therapy",
+        "radiation therapy"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "Inpatient Rehabilitation Facility",
+      "definition": "A facility that provides intensive rehabilitation services to patients after an injury, illness, or surgery.",
+      "terms": [
+        "Inpatient Rehabilitation Facility",
+        "IRF",
+        "IRFs",
+        "inpatient rehabilitation"
+      ],
+      "mentionCount": 4
+    }
+  ],
+  "Medical Specialties & Roles": [
+    {
+      "label": "Specialist",
+      "definition": "A physician who concentrates on a specific area of medicine.",
+      "terms": [
+        "Specialist",
+        "specialist",
+        "specialists",
+        "specialty physician",
+        "specialty physicians"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "Oncologist",
+      "definition": "A physician who treats cancer and provides medical care for a person diagnosed with cancer.",
+      "terms": [
+        "Oncologist",
+        "oncologist",
+        "oncologists"
+      ],
+      "mentionCount": 4
+    },
+    {
+      "label": "Pharmacist",
+      "definition": "A healthcare professional who specializes in the right way to use, store, preserve, and provide medicine.",
+      "terms": [
+        "Pharmacist",
+        "pharmacist",
+        "pharmacists"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "Physical Therapist",
+      "definition": "A healthcare professional who diagnoses and treats individuals with medical problems that limit their abilities to move and function.",
+      "terms": [
+        "Physical Therapist",
+        "physical therapist",
+        "physical therapists",
+        "PT"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "Radiologist",
+      "definition": "A medical doctor that specializes in diagnosing and treating injuries and diseases using medical imaging procedures.",
+      "terms": [
+        "Radiologist",
+        "radiologist",
+        "radiologists"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "Occupational Therapist",
+      "definition": "A healthcare professional who helps people with injuries or disabilities participate in the things they want and need to do.",
+      "terms": [
+        "Occupational Therapist",
+        "occupational therapist",
+        "occupational therapy",
+        "OT"
+      ],
+      "mentionCount": 1
+    },
+    {
+      "label": "Primary Care Physician",
+      "definition": "A physician who provides both the first contact for a person with an undiagnosed health concern and continuing care.",
+      "terms": [
+        "Primary Care Physician",
+        "primary care physician",
+        "PCP"
+      ],
+      "mentionCount": 1
+    }
+  ],
+  "Organizations & Alliances (Non-Governmental)": [
+    {
+      "label": "HL7",
+      "definition": "Health Level Seven International, a not-for-profit, standards-developing organization for electronic health information.",
+      "terms": [
+        "Health Level Seven International",
+        "HL7",
+        "Health Level 7"
+      ],
+      "mentionCount": 52
+    },
+    {
+      "label": "AMA",
+      "definition": "The American Medical Association, a professional association and lobbying group for physicians and medical students.",
+      "terms": [
+        "American Medical Association",
+        "AMA"
+      ],
+      "mentionCount": 31
+    },
+    {
+      "label": "Da Vinci Project",
+      "definition": "An HL7 FHIR Accelerator project that helps payers and providers implement value-based care data exchange.",
+      "terms": [
+        "Da Vinci Project",
+        "DaVinci Project"
+      ],
+      "mentionCount": 23
+    },
+    {
+      "label": "NCPDP",
+      "definition": "The National Council for Prescription Drug Programs, a standards development organization for the pharmacy services sector.",
+      "terms": [
+        "National Council for Prescription Drug Programs",
+        "NCPDP"
+      ],
+      "mentionCount": 22
+    },
+    {
+      "label": "CAQH",
+      "definition": "The Council for Affordable Quality Healthcare, a non-profit alliance that creates shared initiatives to streamline healthcare administration.",
+      "terms": [
+        "Council for Affordable Quality Healthcare",
+        "CAQH"
+      ],
+      "mentionCount": 17
+    },
+    {
+      "label": "PBM",
+      "definition": "A Pharmacy Benefit Manager, a third-party administrator of prescription drug programs for commercial health plans and other payers.",
+      "terms": [
+        "Pharmacy Benefit Manager",
+        "PBM",
+        "PBMs"
+      ],
+      "mentionCount": 12
+    },
+    {
+      "label": "CodeX",
+      "definition": "An HL7 FHIR Accelerator focused on improving cancer care and research through interoperable data standards.",
+      "terms": [
+        "CodeX"
+      ],
+      "mentionCount": 7
+    },
+    {
+      "label": "WEDI",
+      "definition": "The Workgroup for Electronic Data Interchange, an association that is an advisor to HHS on healthcare information technology.",
+      "terms": [
+        "Workgroup for Electronic Data Interchange",
+        "WEDI"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "CARIN Alliance",
+      "definition": "A multi-sector alliance working to advance consumer-directed exchange of health information.",
+      "terms": [
+        "CARIN Alliance"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "Accredited Standards Committee X12",
+      "definition": "The organization that develops and maintains the X12 EDI standards for administrative healthcare transactions.",
+      "terms": [
+        "Accredited Standards Committee X12",
+        "ASC X12"
+      ],
+      "mentionCount": 4
+    },
+    {
+      "label": "HIE",
+      "definition": "A Health Information Exchange, which allows doctors, nurses, and other health care providers to securely share patient medical information.",
+      "terms": [
+        "Health Information Exchange",
+        "HIE",
+        "HIEs"
+      ],
+      "mentionCount": 3
+    },
+    {
+      "label": "ACO",
+      "definition": "An Accountable Care Organization, a group of healthcare providers who agree to be accountable for the quality, cost, and experience of care.",
+      "terms": [
+        "Accountable Care Organization",
+        "ACO",
+        "ACOs"
+      ],
+      "mentionCount": 2
+    }
+  ],
+  "Standards & Technologies": [
+    {
+      "label": "FHIR",
+      "definition": "Fast Healthcare Interoperability Resources, a standard for exchanging healthcare information electronically.",
+      "terms": [
+        "Fast Healthcare Interoperability Resources",
+        "FHIR",
+        "HL7 FHIR"
+      ],
+      "mentionCount": 75
+    },
+    {
+      "label": "X12 Standard",
+      "definition": "A set of standards for electronic data interchange (EDI) for administrative health care transactions.",
+      "terms": [
+        "ASC X12",
+        "X12",
+        "X12 standard",
+        "X12 standards"
+      ],
+      "mentionCount": 57
+    },
+    {
+      "label": "X12 278",
+      "definition": "The HIPAA-mandated transaction standard for healthcare service review requests and responses, including prior authorizations.",
+      "terms": [
+        "X12 278",
+        "278 transaction",
+        "ASC X12 278",
+        "X12N 278"
+      ],
+      "mentionCount": 31
+    },
+    {
+      "label": "Da Vinci PAS IG",
+      "definition": "The Da Vinci Project's FHIR Implementation Guide for submitting prior authorization requests and receiving responses.",
+      "terms": [
+        "Prior Authorization Support Implementation Guide",
+        "PAS IG",
+        "Da Vinci PAS",
+        "Da Vinci Prior Authorization Support"
+      ],
+      "mentionCount": 30
+    },
+    {
+      "label": "Da Vinci CRD IG",
+      "definition": "The Da Vinci Project's FHIR Implementation Guide for discovering payer coverage requirements for services and medications.",
+      "terms": [
+        "Coverage Requirements Discovery Implementation Guide",
+        "CRD IG",
+        "Da Vinci CRD",
+        "Da Vinci Coverage Requirements Discovery"
+      ],
+      "mentionCount": 29
+    },
+    {
+      "label": "CDS Hooks",
+      "definition": "An HL7 specification for invoking external clinical decision support services from within an electronic health record workflow.",
+      "terms": [
+        "CDS Hooks",
+        "CDSHooks"
+      ],
+      "mentionCount": 21
+    },
+    {
+      "label": "NCPDP SCRIPT",
+      "definition": "A standard from the National Council for Prescription Drug Programs for transmitting prescription information electronically.",
+      "terms": [
+        "NCPDP SCRIPT",
+        "SCRIPT Standard",
+        "SCRIPT",
+        "NCPDP SCRIPT Standard",
+        "NCPDP Script"
+      ],
+      "mentionCount": 17
+    },
+    {
+      "label": "CQL",
+      "definition": "Clinical Quality Language, a high-level, domain-specific language focused on the expression of clinical quality measures.",
+      "terms": [
+        "Clinical Quality Language",
+        "CQL"
+      ],
+      "mentionCount": 16
+    },
+    {
+      "label": "SMART on FHIR",
+      "definition": "A set of open specifications to integrate third-party applications with electronic health records and other health IT systems.",
+      "terms": [
+        "SMART on FHIR",
+        "SMART App",
+        "SMART Apps"
+      ],
+      "mentionCount": 15
+    },
+    {
+      "label": "X12 275",
+      "definition": "The HIPAA transaction standard for electronically transmitting additional information, or attachments, to support a healthcare claim.",
+      "terms": [
+        "X12 275",
+        "275 transaction",
+        "ASC X12 275"
+      ],
+      "mentionCount": 14
+    },
+    {
+      "label": "CPT Codes",
+      "definition": "Current Procedural Terminology codes used to report medical, surgical, and diagnostic procedures and services.",
+      "terms": [
+        "Current Procedural Terminology",
+        "CPT",
+        "CPT code",
+        "CPT codes"
+      ],
+      "mentionCount": 10
+    },
+    {
+      "label": "Da Vinci DTR IG",
+      "definition": "The Da Vinci Project's FHIR Implementation Guide for retrieving payer documentation templates and rules.",
+      "terms": [
+        "Documentation Templates and Rules Implementation Guide",
+        "DTR IG",
+        "Da Vinci DTR",
+        "Da Vinci Documentation Templates and Rules"
+      ],
+      "mentionCount": 9
+    },
+    {
+      "label": "USCDI",
+      "definition": "The United States Core Data for Interoperability, a standardized set of health data classes and elements for nationwide exchange.",
+      "terms": [
+        "United States Core Data for Interoperability",
+        "USCDI"
+      ],
+      "mentionCount": 8
+    },
+    {
+      "label": "mCODE",
+      "definition": "The minimal Common Oncology Data Elements, a FHIR implementation guide for a standard oncology data language.",
+      "terms": [
+        "minimal Common Oncology Data Elements",
+        "mCODE"
+      ],
+      "mentionCount": 7
+    },
+    {
+      "label": "ICD-10",
+      "definition": "International Classification of Diseases, Tenth Revision, a medical classification list for diagnoses.",
+      "terms": [
+        "International Classification of Diseases, Tenth Revision",
+        "ICD-10"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "LOINC",
+      "definition": "Logical Observation Identifiers Names and Codes, a standard for identifying medical laboratory observations.",
+      "terms": [
+        "Logical Observation Identifiers Names and Codes",
+        "LOINC"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "US Core IG",
+      "definition": "An HL7 FHIR implementation guide defining the minimum conformance requirements for accessing patient data in the U.S.",
+      "terms": [
+        "US Core Implementation Guide",
+        "US Core IG",
+        "FHIR US Core"
+      ],
+      "mentionCount": 6
+    },
+    {
+      "label": "Da Vinci CDex IG",
+      "definition": "The Da Vinci Project's FHIR Implementation Guide for exchanging clinical data between payers and providers.",
+      "terms": [
+        "Clinical Data Exchange Implementation Guide",
+        "CDex IG",
+        "Da Vinci CDex",
+        "Da Vinci Clinical Data Exchange"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "NPI",
+      "definition": "National Provider Identifier, a unique 10-digit identification number issued to health care providers in the United States.",
+      "terms": [
+        "National Provider Identifier",
+        "NPI"
+      ],
+      "mentionCount": 5
+    },
+    {
+      "label": "HCPCS",
+      "definition": "Healthcare Common Procedure Coding System, a set of codes representing procedures, products, and services.",
+      "terms": [
+        "Healthcare Common Procedure Coding System",
+        "HCPCS"
+      ],
+      "mentionCount": 2
+    },
+    {
+      "label": "NDC",
+      "definition": "National Drug Code, a unique product identifier for human drugs in the United States.",
+      "terms": [
+        "National Drug Code",
+        "NDC"
+      ],
+      "mentionCount": 1
+    },
+    {
+      "label": "SNOMED CT",
+      "definition": "Systematized Nomenclature of Medicine - Clinical Terms, a comprehensive, multilingual clinical healthcare terminology.",
+      "terms": [
+        "Systematized Nomenclature of Medicine - Clinical Terms",
+        "SNOMED CT"
+      ],
+      "mentionCount": 1
+    }
+  ]
+}

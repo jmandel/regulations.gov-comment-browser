@@ -1,0 +1,757 @@
+{
+  "Administrative & Regulatory Processes": [
+    {
+      "label": "Eligibility Determination",
+      "definition": "The process of assessing whether an individual or family meets the criteria for a program or benefit.",
+      "terms": [
+        "Eligibility Determination",
+        "eligibility",
+        "eligibility requirements",
+        "eligibility criteria"
+      ],
+      "mentionCount": 7144
+    },
+    {
+      "label": "Enrollment",
+      "definition": "The formal process of registering an individual or family for a program or service.",
+      "terms": [
+        "enrollment",
+        "enrolling",
+        "enroll"
+      ],
+      "mentionCount": 6859
+    },
+    {
+      "label": "Notice and Comment",
+      "definition": "A public rulemaking process where a proposed rule is published and the public is invited to comment.",
+      "terms": [
+        "notice and comment",
+        "notice-and-comment",
+        "public comment",
+        "public comment period",
+        "comment period",
+        "public feedback"
+      ],
+      "mentionCount": 6822
+    },
+    {
+      "label": "Grant Funding",
+      "definition": "The financial assistance awarded by a government entity to a recipient to carry out a public purpose.",
+      "terms": [
+        "grant funding",
+        "federal funding",
+        "federal funds"
+      ],
+      "mentionCount": 6693
+    },
+    {
+      "label": "Immigration Status Verification",
+      "definition": "The process of confirming an individual's legal status in the country for eligibility purposes.",
+      "terms": [
+        "immigration status verification",
+        "verify immigration status",
+        "verifying eligibility",
+        "citizenship verification",
+        "immigration screening",
+        "proof of immigration status",
+        "proof of eligibility"
+      ],
+      "mentionCount": 350
+    },
+    {
+      "label": "Uncompensated Care",
+      "definition": "Healthcare services provided by hospitals or other providers that do not receive reimbursement.",
+      "terms": [
+        "uncompensated care",
+        "uncompensated care costs"
+      ],
+      "mentionCount": 336
+    }
+  ],
+  "Core Concepts & Principles": [
+    {
+      "label": "Public Health",
+      "definition": "The science and art of preventing disease, prolonging life, and promoting health through organized community efforts.",
+      "terms": [
+        "public health",
+        "population health"
+      ],
+      "mentionCount": 931
+    },
+    {
+      "label": "Federal Public Benefit",
+      "definition": "A specific set of federally funded benefits defined under PRWORA, generally restricted to qualified aliens.",
+      "terms": [
+        "Federal public benefit",
+        "Federal public benefits",
+        "federal public benefits"
+      ],
+      "mentionCount": 712
+    },
+    {
+      "label": "Safety Net",
+      "definition": "A collection of services provided by the state or other institutions to prevent individuals from falling into poverty or crisis.",
+      "terms": [
+        "safety net",
+        "safety-net",
+        "social safety net",
+        "healthcare safety net"
+      ],
+      "mentionCount": 494
+    },
+    {
+      "label": "Administrative Burden",
+      "definition": "The time, effort, and costs incurred by individuals and providers to comply with government regulations.",
+      "terms": [
+        "administrative burden",
+        "administrative hurdles",
+        "red tape",
+        "bureaucratic overload"
+      ],
+      "mentionCount": 359
+    },
+    {
+      "label": "Chilling Effect",
+      "definition": "The inhibition or discouragement of the legitimate exercise of a right by the threat of legal sanction or other negative consequences.",
+      "terms": [
+        "chilling effect"
+      ],
+      "mentionCount": 307
+    },
+    {
+      "label": "Health Equity",
+      "definition": "The principle that everyone has a fair and just opportunity to be as healthy as possible.",
+      "terms": [
+        "health equity"
+      ],
+      "mentionCount": 186
+    }
+  ],
+  "Federal Programs & Grants": [
+    {
+      "label": "Head Start",
+      "definition": "A federal program providing comprehensive early childhood education, health, nutrition, and parent involvement services to low-income children and families.",
+      "terms": [
+        "Head Start",
+        "HeadStart",
+        "Head Start program",
+        "Head Start programs"
+      ],
+      "mentionCount": 7635
+    },
+    {
+      "label": "Health Center Program",
+      "definition": "A federal grant program under Section 330 of the PHS Act funding Community Health Centers to serve medically underserved populations.",
+      "terms": [
+        "Health Center Program",
+        "Health Center Program grants",
+        "H80 grant",
+        "330 grant"
+      ],
+      "mentionCount": 598
+    },
+    {
+      "label": "Title X Program",
+      "definition": "The only federal grant program dedicated solely to providing individuals with comprehensive family planning and related preventive health services.",
+      "terms": [
+        "Title X Family Planning Program",
+        "Title X program",
+        "Title X",
+        "Title X grants",
+        "Title X clinics",
+        "Title X Family Planning"
+      ],
+      "mentionCount": 432
+    },
+    {
+      "label": "Early Head Start",
+      "definition": "A federal program serving infants, toddlers, and pregnant women from low-income families to promote healthy prenatal outcomes and development.",
+      "terms": [
+        "Early Head Start",
+        "Early Head Start program",
+        "Early Head Start programs"
+      ],
+      "mentionCount": 259
+    },
+    {
+      "label": "SUBG",
+      "definition": "The Substance Use Prevention, Treatment, and Recovery Services Block Grant, supporting state substance use disorder systems.",
+      "terms": [
+        "Substance Use Prevention, Treatment, and Recovery Services Block Grant",
+        "SUBG"
+      ],
+      "mentionCount": 151
+    },
+    {
+      "label": "CSBG",
+      "definition": "The Community Services Block Grant, a federal anti-poverty block grant for services like housing, nutrition, and employment.",
+      "terms": [
+        "Community Services Block Grant",
+        "CSBG"
+      ],
+      "mentionCount": 105
+    },
+    {
+      "label": "CMHS Block Grant",
+      "definition": "The Community Mental Health Services Block Grant, funding services for adults with serious mental illnesses and children with serious emotional disturbances.",
+      "terms": [
+        "Community Mental Health Services Block Grant",
+        "CMHS Block Grant"
+      ],
+      "mentionCount": 98
+    },
+    {
+      "label": "PATH Grant Program",
+      "definition": "The Projects for Assistance in Transition from Homelessness grant program, funding services for individuals with serious mental illness experiencing homelessness.",
+      "terms": [
+        "Projects for Assistance in Transition from Homelessness Grant Program",
+        "PATH Grant Program",
+        "PATH grant",
+        "PATH"
+      ],
+      "mentionCount": 90
+    },
+    {
+      "label": "Title IV-E Prevention",
+      "definition": "A federal program providing services for mental health, substance abuse, and in-home parenting skills to prevent foster care entry.",
+      "terms": [
+        "Title IV-E Prevention Services Program",
+        "Title IV-E Prevention Services"
+      ],
+      "mentionCount": 87
+    },
+    {
+      "label": "Migrant Head Start",
+      "definition": "A federal program providing Head Start services to children of migrant and seasonal farmworker families.",
+      "terms": [
+        "Migrant and Seasonal Head Start",
+        "Migrant Head Start",
+        "Migrant Head Start program",
+        "Migrant Head Start programs",
+        "Seasonal Head Start"
+      ],
+      "mentionCount": 21
+    }
+  ],
+  "Government Agencies & Bodies": [
+    {
+      "label": "HHS",
+      "definition": "The U.S. Department of Health & Human Services, a federal agency protecting American health and providing essential human services.",
+      "terms": [
+        "Department of Health and Human Services",
+        "HHS",
+        "Health and Human Services",
+        "US Department of Health and Human Services"
+      ],
+      "mentionCount": 8203
+    },
+    {
+      "label": "Congress",
+      "definition": "The bicameral legislature of the federal government of the United States.",
+      "terms": [
+        "Congress",
+        "U.S. Congress",
+        "US Congress"
+      ],
+      "mentionCount": 6659
+    },
+    {
+      "label": "DOJ",
+      "definition": "The U.S. Department of Justice, the federal executive department responsible for the enforcement of law and administration of justice.",
+      "terms": [
+        "Department of Justice",
+        "DOJ"
+      ],
+      "mentionCount": 252
+    },
+    {
+      "label": "SAMHSA",
+      "definition": "The Substance Abuse and Mental Health Services Administration, an agency of HHS leading public health efforts for mental health.",
+      "terms": [
+        "Substance Abuse and Mental Health Services Administration",
+        "SAMHSA"
+      ],
+      "mentionCount": 196
+    },
+    {
+      "label": "HRSA",
+      "definition": "The Health Resources and Services Administration, an agency of HHS improving health care for geographically isolated or vulnerable populations.",
+      "terms": [
+        "Health Resources and Services Administration",
+        "HRSA"
+      ],
+      "mentionCount": 96
+    },
+    {
+      "label": "Supreme Court",
+      "definition": "The highest court in the federal judiciary of the United States of America.",
+      "terms": [
+        "Supreme Court",
+        "U.S. Supreme Court",
+        "US Supreme Court"
+      ],
+      "mentionCount": 69
+    },
+    {
+      "label": "ACF",
+      "definition": "The Administration for Children and Families, a division of HHS promoting the economic and social well-being of families and children.",
+      "terms": [
+        "Administration for Children & Families",
+        "ACF",
+        "Administration for Children and Families"
+      ],
+      "mentionCount": 46
+    },
+    {
+      "label": "ICE",
+      "definition": "U.S. Immigration and Customs Enforcement, a federal law enforcement agency under the Department of Homeland Security.",
+      "terms": [
+        "Immigration and Customs Enforcement",
+        "ICE"
+      ],
+      "mentionCount": 21
+    }
+  ],
+  "Health Conditions & Diseases": [
+    {
+      "label": "Chronic Disease",
+      "definition": "A condition that lasts for a long duration, generally one year or more, and requires ongoing medical attention.",
+      "terms": [
+        "chronic disease",
+        "chronic diseases",
+        "chronic conditions",
+        "chronic condition"
+      ],
+      "mentionCount": 427
+    },
+    {
+      "label": "Communicable Disease",
+      "definition": "An infectious disease transmissible from one person to another by direct or indirect contact.",
+      "terms": [
+        "communicable disease",
+        "communicable diseases",
+        "infectious disease",
+        "infectious diseases"
+      ],
+      "mentionCount": 379
+    },
+    {
+      "label": "Substance Use Disorder",
+      "definition": "A disease that affects a person's brain and behavior, leading to an inability to control the use of a substance.",
+      "terms": [
+        "substance use disorder",
+        "SUD",
+        "substance abuse",
+        "substance use",
+        "addiction",
+        "drug overdose",
+        "opioid overdose epidemic"
+      ],
+      "mentionCount": 359
+    },
+    {
+      "label": "STI",
+      "definition": "A sexually transmitted infection passed from one person to another through sexual contact.",
+      "terms": [
+        "sexually transmitted infection",
+        "sexually transmitted infections",
+        "STI",
+        "STIs",
+        "STD",
+        "STDs"
+      ],
+      "mentionCount": 237
+    },
+    {
+      "label": "HIV/AIDS",
+      "definition": "Human immunodeficiency virus infection and acquired immunodeficiency syndrome, a spectrum of conditions caused by infection with HIV.",
+      "terms": [
+        "HIV",
+        "AIDS",
+        "HIV/AIDS"
+      ],
+      "mentionCount": 133
+    },
+    {
+      "label": "Mental Illness",
+      "definition": "A wide range of mental health conditions that affect mood, thinking, and behavior.",
+      "terms": [
+        "mental illness",
+        "serious mental illness",
+        "SMI",
+        "serious emotional disturbance",
+        "SED"
+      ],
+      "mentionCount": 92
+    },
+    {
+      "label": "COVID-19",
+      "definition": "A contagious disease caused by a virus named severe acute respiratory syndrome coronavirus 2 (SARS-CoV-2).",
+      "terms": [
+        "COVID-19",
+        "Covid",
+        "pandemic"
+      ],
+      "mentionCount": 64
+    }
+  ],
+  "Healthcare Programs & Insurance": [
+    {
+      "label": "Medicaid",
+      "definition": "A joint federal and state program that provides health coverage to millions of low-income Americans.",
+      "terms": [
+        "Medicaid",
+        "Medicaid program",
+        "Medicaid recipients",
+        "Medicaid patients",
+        "Medicaid benefits",
+        "Medicaid coverage"
+      ],
+      "mentionCount": 542
+    },
+    {
+      "label": "Medicare",
+      "definition": "A federal health insurance program for people who are 65 or older and certain younger people with disabilities.",
+      "terms": [
+        "Medicare",
+        "Medicare program"
+      ],
+      "mentionCount": 245
+    },
+    {
+      "label": "SNAP",
+      "definition": "The Supplemental Nutrition Assistance Program, a federal program that provides food-purchasing assistance for low-income people.",
+      "terms": [
+        "Supplemental Nutrition Assistance Program",
+        "SNAP",
+        "Food Stamps",
+        "food coupons",
+        "CalFresh"
+      ],
+      "mentionCount": 152
+    },
+    {
+      "label": "TANF",
+      "definition": "The Temporary Assistance for Needy Families program, providing temporary financial assistance for pregnant women and families with dependent children.",
+      "terms": [
+        "Temporary Assistance for Needy Families",
+        "TANF"
+      ],
+      "mentionCount": 148
+    },
+    {
+      "label": "CHIP",
+      "definition": "The Children's Health Insurance Program, providing low-cost health coverage to children in families who earn too much for Medicaid.",
+      "terms": [
+        "CHIP",
+        "Children's Health Insurance Program"
+      ],
+      "mentionCount": 84
+    }
+  ],
+  "Healthcare Services & Delivery Models": [
+    {
+      "label": "Community Health Center",
+      "definition": "A community-based clinic that provides primary care services in underserved areas, regardless of ability to pay.",
+      "terms": [
+        "Community Health Center",
+        "Community Health Centers",
+        "CHC",
+        "CHCs"
+      ],
+      "mentionCount": 576
+    },
+    {
+      "label": "FQHC",
+      "definition": "A Federally Qualified Health Center, a type of provider that receives federal grants under Section 330 of the PHS Act.",
+      "terms": [
+        "Federally Qualified Health Center",
+        "Federally Qualified Health Centers",
+        "FQHC",
+        "FQHCs"
+      ],
+      "mentionCount": 540
+    },
+    {
+      "label": "Preventive Care",
+      "definition": "Routine health care that includes screenings, check-ups, and patient counseling to prevent illnesses, disease, or other health problems.",
+      "terms": [
+        "preventive care",
+        "preventative care",
+        "preventive services",
+        "preventative services"
+      ],
+      "mentionCount": 538
+    },
+    {
+      "label": "Primary Care",
+      "definition": "Health services that cover a range of prevention, wellness, and treatment for common illnesses.",
+      "terms": [
+        "primary care",
+        "primary health services"
+      ],
+      "mentionCount": 527
+    },
+    {
+      "label": "Emergency Care",
+      "definition": "Medical services provided for a condition that could lead to serious disability or death if not immediately treated.",
+      "terms": [
+        "emergency care",
+        "emergency services",
+        "emergency room",
+        "emergency department",
+        "ER",
+        "ED"
+      ],
+      "mentionCount": 398
+    },
+    {
+      "label": "Behavioral Health Services",
+      "definition": "Services for mental health conditions, substance use disorders, life stressors, and crises.",
+      "terms": [
+        "behavioral health",
+        "behavioral health care",
+        "behavioral health services"
+      ],
+      "mentionCount": 357
+    },
+    {
+      "label": "Vaccinations",
+      "definition": "Treatment with a vaccine to produce immunity against a disease; inoculation.",
+      "terms": [
+        "vaccinations",
+        "immunizations",
+        "vaccines"
+      ],
+      "mentionCount": 276
+    },
+    {
+      "label": "Prenatal Care",
+      "definition": "Health care for pregnant individuals before birth, involving treatments and trainings to ensure a healthy pregnancy, labor, and delivery.",
+      "terms": [
+        "prenatal care",
+        "prenatal visits"
+      ],
+      "mentionCount": 219
+    },
+    {
+      "label": "Family Planning",
+      "definition": "Services that help individuals and couples decide if and when to have children, including contraception and counseling.",
+      "terms": [
+        "family planning",
+        "family planning services",
+        "family planning care"
+      ],
+      "mentionCount": 178
+    },
+    {
+      "label": "Substance Use Treatment",
+      "definition": "Medical and psychotherapeutic treatment for dependency on psychoactive substances such as alcohol, prescription drugs, and street drugs.",
+      "terms": [
+        "substance use treatment",
+        "addiction treatment",
+        "substance abuse treatment"
+      ],
+      "mentionCount": 148
+    },
+    {
+      "label": "Certified Community Behavioral Health Clinic",
+      "definition": "Clinics designed to provide a comprehensive range of mental health and substance use disorder services.",
+      "terms": [
+        "Certified Community Behavioral Health Clinic",
+        "Certified Community Behavioral Health Clinics",
+        "CCBHC",
+        "CCBHCs"
+      ],
+      "mentionCount": 124
+    }
+  ],
+  "Legislation, Regulations & Legal Concepts": [
+    {
+      "label": "PRWORA",
+      "definition": "The Personal Responsibility and Work Opportunity Reconciliation Act of 1996, a federal law that reformed the welfare system.",
+      "terms": [
+        "Personal Responsibility and Work Opportunity Reconciliation Act of 1996",
+        "PRWORA",
+        "Personal Responsibility and Work Opportunity Reconciliation Act",
+        "Personal Responsibility and Work Opportunity Act"
+      ],
+      "mentionCount": 8286
+    },
+    {
+      "label": "Federal Register Notice",
+      "definition": "An official daily publication for rules, proposed rules, and notices of Federal agencies and organizations.",
+      "terms": [
+        "Federal Register Notice",
+        "FRN",
+        "Federal Register"
+      ],
+      "mentionCount": 372
+    },
+    {
+      "label": "Section 330",
+      "definition": "The section of the Public Health Service Act that authorizes the federal Health Center Program.",
+      "terms": [
+        "Section 330",
+        "Section 330 of the Public Health Service Act"
+      ],
+      "mentionCount": 267
+    },
+    {
+      "label": "Public Health Service Act",
+      "definition": "A 1944 U.S. federal law giving HHS broad authority to respond to public health emergencies and conduct public health programs.",
+      "terms": [
+        "Public Health Service Act",
+        "PHS Act"
+      ],
+      "mentionCount": 241
+    },
+    {
+      "label": "Head Start Act",
+      "definition": "The federal law that authorizes the Head Start program to promote school readiness for low-income children.",
+      "terms": [
+        "Head Start Act",
+        "Head Start Act of 1965"
+      ],
+      "mentionCount": 162
+    },
+    {
+      "label": "Administrative Procedure Act",
+      "definition": "A U.S. federal statute that governs the way in which administrative agencies of the federal government may propose and establish regulations.",
+      "terms": [
+        "Administrative Procedure Act",
+        "APA"
+      ],
+      "mentionCount": 161
+    },
+    {
+      "label": "Public Charge Rule",
+      "definition": "An immigration ground of inadmissibility for individuals likely to become primarily dependent on the government for subsistence.",
+      "terms": [
+        "public charge",
+        "public charge rule"
+      ],
+      "mentionCount": 43
+    }
+  ],
+  "Populations & Demographics": [
+    {
+      "label": "Qualified Alien",
+      "definition": "A specific legal term under PRWORA for non-citizens who are eligible for certain federal public benefits.",
+      "terms": [
+        "qualified alien",
+        "qualified aliens",
+        "qualified immigrant",
+        "qualified immigrants"
+      ],
+      "mentionCount": 442
+    },
+    {
+      "label": "Homeless Population",
+      "definition": "Individuals and families who lack a fixed, regular, and adequate nighttime residence.",
+      "terms": [
+        "homeless",
+        "homelessness",
+        "unhoused"
+      ],
+      "mentionCount": 382
+    },
+    {
+      "label": "Unqualified Alien",
+      "definition": "A legal term under PRWORA for non-citizens who are generally ineligible for federal public benefits.",
+      "terms": [
+        "unqualified alien",
+        "unqualified aliens",
+        "not qualified immigrant",
+        "not qualified immigrants",
+        "non-qualified immigrant",
+        "non-qualified immigrants",
+        "non-qualified aliens",
+        "non qualified alien"
+      ],
+      "mentionCount": 263
+    },
+    {
+      "label": "Undocumented Immigrant",
+      "definition": "A foreign-born person who does not have a legal right to be or remain in the United States.",
+      "terms": [
+        "undocumented immigrant",
+        "undocumented immigrants",
+        "undocumented individual",
+        "undocumented individuals",
+        "undocumented children",
+        "undocumented families",
+        "illegal alien",
+        "illegal aliens",
+        "illegal immigrant",
+        "illegal immigrants"
+      ],
+      "mentionCount": 245
+    },
+    {
+      "label": "Foster Youth",
+      "definition": "Children and young adults who are in the legal custody of the state's child welfare system.",
+      "terms": [
+        "foster youth",
+        "foster care",
+        "children in foster care"
+      ],
+      "mentionCount": 223
+    },
+    {
+      "label": "Mixed-Status Family",
+      "definition": "A family whose members include people with different citizenship or immigration statuses.",
+      "terms": [
+        "mixed-status family",
+        "mixed-status families",
+        "mixed-status household",
+        "mixed-status households"
+      ],
+      "mentionCount": 203
+    },
+    {
+      "label": "Lawful Permanent Resident",
+      "definition": "A non-citizen who is lawfully authorized to live permanently within the United States, also known as a green card holder.",
+      "terms": [
+        "Lawful Permanent Resident",
+        "Lawful Permanent Residents",
+        "LPR",
+        "LPRs",
+        "green card holder",
+        "green card holders"
+      ],
+      "mentionCount": 134
+    },
+    {
+      "label": "TPS Holder",
+      "definition": "An individual granted Temporary Protected Status, allowing them to live and work in the U.S. temporarily.",
+      "terms": [
+        "Temporary Protected Status",
+        "TPS",
+        "TPS holder",
+        "TPS holders"
+      ],
+      "mentionCount": 93
+    },
+    {
+      "label": "DACA Recipient",
+      "definition": "An individual granted deferred action under the Deferred Action for Childhood Arrivals program.",
+      "terms": [
+        "Deferred Action for Childhood Arrivals",
+        "DACA",
+        "DACA recipient",
+        "DACA recipients"
+      ],
+      "mentionCount": 91
+    },
+    {
+      "label": "Refugee",
+      "definition": "A person forced to flee their country because of persecution, war, or violence.",
+      "terms": [
+        "refugee",
+        "refugees"
+      ],
+      "mentionCount": 91
+    }
+  ]
+}
