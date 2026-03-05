@@ -152,10 +152,10 @@ const useStore = create<StoreState>((set, get) => ({
     }
     
     // Start with only representative comments (or all if no clustering)
-    let filtered = state.comments.filter(c => 
-      c.isClusterRepresentative === true || 
-      c.isClusterRepresentative === undefined // For databases without clustering
-    )
+    const hasAnyClustering = state.comments.some(c => c.isClusterRepresentative === true)
+    let filtered = hasAnyClustering
+      ? state.comments.filter(c => c.isClusterRepresentative === true)
+      : state.comments
     const originalCount = state.comments.length
     
     // Apply search
