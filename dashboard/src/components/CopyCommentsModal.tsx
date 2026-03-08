@@ -32,7 +32,7 @@ const defaultCommentSections: CommentSectionOptions = {
   keyRecommendations: false,
   mainConcerns: false,
   notableExperiences: false,
-  keyQuotations: false,
+  keyQuotations: true,
   detailedContent: false,
   themes: true,
   entities: true

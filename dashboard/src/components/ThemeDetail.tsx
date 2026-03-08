@@ -241,7 +241,7 @@ function ThemeDetail() {
           keyRecommendations: false,
           mainConcerns: false,
           notableExperiences: false,
-          keyQuotations: false,
+          keyQuotations: true,
           detailedContent: true,
           themes: false,
           entities: false
