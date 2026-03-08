@@ -130,8 +130,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
     
     if (isFiltered) return null
     
-    // Tighter indentation on mobile (16px per level) vs desktop (20px)
-    const indentPx = depth * 16
+    const indentPx = depth * 20
     const indentPxSm = depth * 20
     
     return (
@@ -139,27 +138,25 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
         <div>
           <Link
             to={`/themes/${theme.code}`}
-            className="flex items-start py-2 pl-1 sm:pl-3 pr-2 sm:pr-3 hover:bg-gray-50 rounded-lg cursor-pointer group hover:no-underline"
-            style={{ paddingLeft: `${indentPx + 4}px` }}
+            className="flex items-start py-2 pr-2 sm:pr-3 hover:bg-gray-50 rounded-lg cursor-pointer group hover:no-underline"
+            style={{ paddingLeft: `${indentPx}px` }}
           >
-            {/* Chevron - fixed width column */}
-            {hasChildren ? (
-              <button
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  toggleNode(theme.code)
-                }}
-                className="mt-0.5 text-gray-400 hover:text-gray-600 p-1 -m-1 min-h-[28px] min-w-[28px] sm:min-h-0 sm:min-w-0 sm:p-0 sm:m-0 flex items-center justify-center flex-shrink-0"
-              >
-                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </button>
-            ) : (
-              <div className="w-4 flex-shrink-0" />
-            )}
-            
-            {/* Code - fixed width so labels align */}
-            <span className="font-mono font-semibold text-gray-400 text-sm w-9 sm:w-10 text-right flex-shrink-0 mt-0.5 mr-2">{theme.code}</span>
+            {/* Code column with optional chevron */}
+            <span className="font-mono font-semibold text-gray-400 text-sm flex-shrink-0 mt-0.5 mr-2 inline-flex items-center gap-0.5">
+              {hasChildren ? (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    toggleNode(theme.code)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 -ml-1 p-1 flex-shrink-0"
+                >
+                  {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                </button>
+              ) : null}
+              {theme.code}
+            </span>
             
             {/* Label + comment count in a column */}
             <div className="flex-1 min-w-0">
