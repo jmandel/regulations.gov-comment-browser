@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Copy, Check } from 'lucide-react'
+import { X, Copy, Check, Download } from 'lucide-react'
 import { Comment, ThemeSummary } from '../types'
 
 interface CopyCommentsModalProps {
@@ -318,7 +318,22 @@ function CopyCommentsModal({
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
+      // Fallback: trigger download if clipboard fails
+      handleDownload()
     }
+  }
+
+  const handleDownload = () => {
+    const content = buildContent()
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `comments-${comments.length}-export.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -330,21 +345,21 @@ function CopyCommentsModal({
       />
       
       {/* Modal content */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] sm:max-h-[80vh] overflow-hidden mx-2 sm:mx-auto" onClick={(e)=>e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
+        <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] sm:max-h-[80vh] flex flex-col mx-0 sm:mx-auto" onClick={(e)=>e.stopPropagation()}>
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 pr-4">{title}</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
           
           {/* Content */}
-          <div className="p-4 sm:p-6 overflow-y-auto max-h-[70vh] sm:max-h-[60vh]">
+          <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0">
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-gray-500">
@@ -623,16 +638,26 @@ function CopyCommentsModal({
           </div>
           
           {/* Footer */}
-          <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+          <div className="flex items-center justify-end space-x-2 sm:space-x-3 p-3 sm:p-4 border-t border-gray-200 flex-shrink-0 bg-white">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="px-3 sm:px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm"
             >
               Cancel
             </button>
             <button
+              onClick={handleDownload}
+              className="flex items-center space-x-1.5 px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg transition-colors text-sm"
+              title="Download as file"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Download</span>
+              <span className="sm:hidden">.md</span>
+            </button>
+            <button
               onClick={handleCopy}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="flex items-center space-x-1.5 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+              title="Copy to clipboard"
             >
               {copied ? (
                 <>
@@ -642,7 +667,7 @@ function CopyCommentsModal({
               ) : (
                 <>
                   <Copy className="h-4 w-4" />
-                  <span>Copy to Clipboard</span>
+                  <span className="hidden sm:inline">Copy</span>
                 </>
               )}
             </button>
