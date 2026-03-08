@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { ChevronRight, ChevronDown, Search, Info, FileText, Copy } from 'lucide-react'
+import { ChevronRight, ChevronDown, Search, Info, FileText, Copy, BarChart3 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import useStore from '../store/useStore'
 import type { Theme } from '../types'
@@ -134,8 +134,8 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
       <div key={theme.code} className="select-none">
         <div>
           <div 
-            className="flex items-center py-2 px-3 hover:bg-gray-50 rounded-lg cursor-pointer group"
-            style={{ paddingLeft: `${depth * 24 + 12}px` }}
+            className="flex items-center py-2 px-2 sm:px-3 hover:bg-gray-50 rounded-lg cursor-pointer group"
+            style={{ paddingLeft: `${depth * 12 + 4}px` }}
           >
             {hasChildren && (
               <button
@@ -143,54 +143,61 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
                   e.stopPropagation()
                   toggleNode(theme.code)
                 }}
-                className="mr-1 sm:mr-2 text-gray-400 hover:text-gray-600 p-1 -m-1 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:p-0 sm:m-0 flex items-center justify-center"
+                className="mr-1 sm:mr-2 text-gray-400 hover:text-gray-600 p-1 -m-1 min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 sm:p-0 sm:m-0 flex items-center justify-center"
               >
                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
             )}
-            {!hasChildren && <div className="w-6" />}
+            {!hasChildren && <div className="w-4 sm:w-6" />}
             
             <Link 
               to={`/themes/${theme.code}`}
-              className="flex-1 flex items-center justify-between hover:no-underline"
+              className="flex-1 flex items-center justify-between hover:no-underline min-w-0"
             >
-              <div className="flex-1 flex items-center">
-                <span className="font-medium text-gray-900">{theme.code}</span>
-                <span className="text-gray-600 ml-2">{theme.label || theme.description}</span>
-                {!shouldHideMetrics && (
-                  <>
-                    {hasSummary ? (
-                      <span className="ml-2 text-purple-600" title="Theme analysis available">
-                        <FileText className="h-3 w-3" />
-                      </span>
-                    ) : (
-                      theme.code.split('.').length > 2 && (
-                        <span className="ml-2 text-amber-500" title="Analysis at parent level">
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                          </svg>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center min-w-0">
+                  <span className="font-medium text-gray-900 flex-shrink-0 text-sm sm:text-base">{theme.code}</span>
+                  <span className="text-gray-600 ml-1.5 sm:ml-2 text-sm sm:text-base line-clamp-2 sm:line-clamp-none">{theme.label || theme.description}</span>
+                  {!shouldHideMetrics && (
+                    <span className="hidden sm:inline-flex">
+                      {hasSummary ? (
+                        <span className="ml-2 text-purple-600" title="Theme analysis available">
+                          <FileText className="h-3 w-3" />
                         </span>
-                      )
-                    )}
-                  </>
-                )}
-                {theme.detailedDescription && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      toggleDescription(theme.code, e)
-                    }}
-                    className="ml-1 sm:ml-2 text-gray-400 hover:text-gray-600 transition-colors p-2 -m-2 sm:p-0 sm:m-0"
-                    title={isDescriptionExpanded ? "Hide description" : "Show description"}
-                  >
-                    <Info className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
-                  </button>
+                      ) : (
+                        theme.code.split('.').length > 2 && (
+                          <span className="ml-2 text-amber-500" title="Analysis at parent level">
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                          </span>
+                        )
+                      )}
+                    </span>
+                  )}
+                  {theme.detailedDescription && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        toggleDescription(theme.code, e)
+                      }}
+                      className="hidden sm:inline-flex ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      title={isDescriptionExpanded ? "Hide description" : "Show description"}
+                    >
+                      <Info className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                {!shouldHideMetrics && (
+                  <span className="sm:hidden text-xs text-blue-600 font-medium mt-0.5 block" title="Direct mentions">
+                    {theme.direct_count} {theme.direct_count === 1 ? 'comment' : 'comments'}
+                  </span>
                 )}
               </div>
               
-              <div className="flex items-center space-x-4 text-sm">
+              <div className="flex items-center space-x-4 text-sm flex-shrink-0">
                 {!shouldHideMetrics && (
-                  <span className="text-blue-600 font-medium" title="Direct mentions">
+                  <span className="hidden sm:inline text-blue-600 font-medium" title="Direct mentions">
                     {theme.direct_count} {theme.direct_count === 1 ? 'comment' : 'comments'}
                   </span>
                 )}
@@ -220,19 +227,23 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
   const visibleThemeCount = themes.length
   
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Theme Hierarchy</h1>
-        <p className="text-gray-600">
-          Explore the hierarchical structure of themes identified in the comments.
-          Click <Info className="inline h-3 w-3" /> to see detailed descriptions.
-        </p>
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
+        <div className="flex items-center space-x-3">
+          <BarChart3 className="h-6 w-6 text-blue-600 flex-shrink-0" />
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Theme Hierarchy</h1>
+            <p className="text-sm text-gray-500 mt-1 hidden sm:block">
+              Explore themes identified in comments. Click <Info className="inline h-3 w-3" /> for descriptions.
+            </p>
+          </div>
+        </div>
       </div>
       
       {/* Controls */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex-1 max-w-md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="w-full sm:flex-1 sm:max-w-md">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
@@ -245,7 +256,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
             </div>
           </div>
           
-          <div className="ml-4 flex items-center space-x-4">
+          <div className="flex items-center space-x-4">
             <button
               onClick={() => expandedNodes.size === visibleThemeCount ? collapseAll() : expandAll()}
               className="text-sm text-blue-600 hover:text-blue-800 font-medium"
@@ -258,7 +269,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
               title="Copy theme hierarchy for LLM"
             >
               <Copy className="h-4 w-4" />
-              <span>Copy for LLM</span>
+              <span className="hidden sm:inline">Copy for LLM</span>
             </button>
           </div>
         </div>
@@ -266,7 +277,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
       
       {/* Theme Tree */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6">
+        <div className="p-2 sm:p-6">
           {rootThemes.length > 0 ? (
             <div className="space-y-1">
               {rootThemes.map(theme => renderThemeNode(theme))}
@@ -280,15 +291,9 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
       </div>
       
       {/* Stats */}
-      <div className="mt-6 grid grid-cols-3 gap-4">
+      <div className="mt-6 grid grid-cols-2 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-gray-900">{themes.length}</div>
-          <div className="text-sm text-gray-600">Total Themes</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-blue-600">
-            {themes.length}
-          </div>
           <div className="text-sm text-gray-600">Total Themes</div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">

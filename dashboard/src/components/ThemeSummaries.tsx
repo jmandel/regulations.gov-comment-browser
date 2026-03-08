@@ -57,11 +57,11 @@ function ThemeSummaries() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <div className="flex items-center space-x-3">
-          <FileText className="h-6 w-6 text-purple-600" />
+          <FileText className="h-6 w-6 text-purple-600 flex-shrink-0" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Theme Analysis Summaries</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Theme Analysis Summaries</h1>
             <p className="text-sm text-gray-500 mt-1">
               {themesWithSummaries.length} of {themes.length} themes have detailed analysis
             </p>

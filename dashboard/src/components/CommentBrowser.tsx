@@ -138,13 +138,13 @@ function CommentBrowser() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <MessageSquare className="h-6 w-6 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Browse Comments</h1>
-              <p className="text-sm text-gray-500 mt-1">
+          <div className="flex items-center space-x-3 min-w-0">
+            <MessageSquare className="h-6 w-6 text-blue-600 flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Browse Comments</h1>
+              <p className="text-sm text-gray-500 mt-1 truncate sm:whitespace-normal">
                 {comments.some(c => c.isClusterRepresentative !== undefined) ? (
                   <>Showing {filteredComments.length} clusters representing {comments.length} comments</>
                 ) : (
@@ -154,20 +154,22 @@ function CommentBrowser() {
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-shrink-0">
             <button
               onClick={() => setShowCopyModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              title="Copy for LLM"
             >
               <Copy className="h-4 w-4" />
-              <span>Copy for LLM</span>
+              <span className="hidden sm:inline">Copy for LLM</span>
             </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center space-x-2 px-4 py-2 border rounded-lg hover:bg-gray-50"
+              className="flex items-center space-x-2 px-3 sm:px-4 py-2 border rounded-lg hover:bg-gray-50"
+              title={showFilters ? 'Hide Filters' : 'Show Filters'}
             >
               <Filter className="h-4 w-4" />
-              <span>{showFilters ? 'Hide' : 'Show'} Filters</span>
+              <span className="hidden sm:inline">{showFilters ? 'Hide' : 'Show'} Filters</span>
             </button>
           </div>
         </div>
