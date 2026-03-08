@@ -1,4 +1,4 @@
-import { CheckCircle, AlertCircle, Users, Lightbulb, TrendingUp, Quote, BarChart3, MessageSquare } from 'lucide-react'
+import { CheckCircle, AlertCircle, Users, Lightbulb, TrendingUp, Quote, BarChart3, MessageSquare, Target, AlertTriangle } from 'lucide-react'
 import type { ThemeSummary } from '../types'
 import CommentAuthorLink from './CommentAuthorLink'
 import CommentAuthorsList from './CommentAuthorsList'
@@ -105,7 +105,7 @@ function ThemeSummaryView({ summary }: ThemeSummaryViewProps) {
                     <div key={posIndex} className="bg-gray-50 rounded-lg p-4">
                       <h5 className="font-medium text-gray-900 mb-2 flex items-center">
                         <span className={`h-2 w-2 rounded-full mr-2 ${
-                          posIndex === 0 ? 'bg-blue-500' : 'bg-orange-500'
+                          ['bg-blue-500', 'bg-orange-500', 'bg-emerald-500', 'bg-violet-500', 'bg-rose-500'][posIndex % 5]
                         }`} />
                         {position.label}
                       </h5>
@@ -195,6 +195,73 @@ function ThemeSummaryView({ summary }: ThemeSummaryViewProps) {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Key Recommendations */}
+      {sections.keyRecommendations && sections.keyRecommendations.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-teal-50 px-6 py-4 border-b border-teal-100">
+            <h3 className="text-lg font-semibold text-teal-900 flex items-center">
+              <Target className="h-5 w-5 mr-2" />
+              Key Recommendations
+            </h3>
+          </div>
+          <div className="p-6 space-y-4">
+            {sections.keyRecommendations.map((rec, index) => (
+              <div key={index} className="border-l-4 border-teal-200 pl-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <span className="text-xs font-semibold text-teal-700 uppercase tracking-wider">{rec.approach}</span>
+                    <p className="text-gray-800 mt-1">{rec.recommendation}</p>
+                    {rec.supportLevel && (
+                      <span className="text-xs text-gray-500 italic">({rec.supportLevel})</span>
+                    )}
+                  </div>
+                </div>
+                {rec.commentIds && rec.commentIds.length > 0 && (
+                  <div className="mt-2">
+                    <span className="text-xs text-gray-500 mr-2">Proposed by:</span>
+                    <CommentAuthorsList commentIds={rec.commentIds} className="inline" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Major Concerns */}
+      {sections.majorConcerns && sections.majorConcerns.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-orange-50 px-6 py-4 border-b border-orange-100">
+            <h3 className="text-lg font-semibold text-orange-900 flex items-center">
+              <AlertTriangle className="h-5 w-5 mr-2" />
+              Major Concerns
+            </h3>
+          </div>
+          <div className="p-6 space-y-4">
+            {sections.majorConcerns.map((concern, index) => (
+              <div key={index} className="relative pl-8">
+                <div className="absolute left-0 top-1 h-6 w-6 bg-orange-100 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold text-orange-700">{index + 1}</span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-gray-800 font-medium">{concern.concern}</p>
+                  <p className="text-sm text-gray-600">Raised by: {concern.raisedBy}</p>
+                  {concern.evidence && (
+                    <p className="text-sm text-gray-500 italic">{concern.evidence}</p>
+                  )}
+                  {concern.commentIds && concern.commentIds.length > 0 && (
+                    <div className="mt-1">
+                      <span className="text-xs text-gray-500 mr-2">Examples:</span>
+                      <CommentAuthorsList commentIds={concern.commentIds} className="inline" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

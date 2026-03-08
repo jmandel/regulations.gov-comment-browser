@@ -85,11 +85,15 @@ What does THIS commenter know/see/experience that others might not?
 2. **No Duplication**: Each insight appears under only ONE most relevant theme
 3. **Follow the Guidelines**: Use the detailed theme descriptions to determine fit
 
+## Thoroughness
+For themes where the commenter has substantial input (relevance=1), be THOROUGH. Capture ALL distinct arguments, ALL specific evidence, ALL concrete recommendations. A commenter who devotes three paragraphs to a theme should produce a proportionally detailed extract — don't compress a rich discussion into two bullet points to save space. When a commenter provides a concrete detail that no other commenter is likely to provide — a vivid analogy, a personal experience, a specific data point — that is high-value signal that must be preserved.
+
 ## Quality Checks
 - Would a policymaker learn something SPECIFIC from this extract?
 - Could you identify this commenter's unique perspective from the extract?
 - Did you capture details that differentiate this from generic feedback?
 - Would this extract help identify patterns when aggregated with others?
+- For high-relevance themes: did you capture EVERYTHING substantive, or did you leave detail on the table?
 
 Remember: You're preserving testimony that will inform critical policy decisions. Every specific detail, compelling story, and unique insight matters.`;
 
@@ -125,6 +129,7 @@ Map the key disagreements, organizing by topic then position:
   - Support level: [Quantify support]
   - Key arguments: [2-3 strongest counterpoints]
   - Representative voices: [Comment IDs with role/perspective noted]
+- (Include additional positions if the debate has more than two sides — look for "middle ground," "alternative framing," or "conditional support" positions)
 
 Example:
 **Mandatory Staffing Ratios**
@@ -211,6 +216,7 @@ Choose quotes that:
 5. **Connect Patterns**: Link related concerns across different stakeholder groups
 6. **Highlight Tensions**: Make conflicts and trade-offs explicit
 7. **Evidence Hierarchy**: Prioritize data > specific examples > general assertions
+8. **Preserve Vivid Specifics**: When a commenter provides a concrete detail that no other commenter provides — a vivid analogy, a named program, a personal experience — prefer preserving one vivid specific over two generic characterizations. These unique details are what make an analysis actionable rather than abstract.
 
 Remember: This analysis will help policymakers understand not just WHAT people think, but WHY they think it, WHO thinks what, and HOW STRONGLY they feel about it.`;
 
@@ -221,6 +227,9 @@ export const EXTRACT_MERGE_PROMPT = `You are merging multiple analyses of the sa
 
 ## Analyses to Merge
 {EXTRACT_SETS}
+
+## Output Length Guidance
+Your merged analysis should be AT LEAST as long as the longest individual batch analysis. You are combining N analyses into one — compression is not the goal. If details, insights, or quotations are unique to a single batch, they must survive into the merged output. Only compress where batches are genuinely redundant.
 
 ## Merging Instructions
 

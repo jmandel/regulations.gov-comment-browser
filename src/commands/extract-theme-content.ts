@@ -204,19 +204,24 @@ async function extractThemeContent(documentId: string, options: any) {
       console.log(`\n[${index}/${total}] Processing comment ${comment.comment_id}`);
       
       try {
-        // Parse structured sections
+        // Parse structured sections for commenter profile
         const sections = JSON.parse(comment.structured_sections || '{}');
         
-        // Build comment text from transcription + notable quotes
+        // Build comment text: commenter identity + full transcription
+        // We pass the raw transcription directly rather than pre-digested summaries
+        // to avoid biasing the extraction toward previously-selected quotes/positions.
+        // The commenter profile provides essential context (who they are, their role)
+        // without pre-filtering what the LLM should pay attention to.
         let commentText = '';
         
-        // Include key quotations if available
-        if (sections.keyQuotations && sections.keyQuotations !== "No key quotations provided") {
-          commentText += `## Notable Quotes from Commenter\n${sections.keyQuotations}\n\n`;
+        if (sections.commenterProfile) {
+          commentText += `## Commenter Profile\n${sections.commenterProfile}\n\n`;
+        }
+        if (sections.oneLineSummary) {
+          commentText += `## Comment Overview\n${sections.oneLineSummary}\n\n`;
         }
         
-        // Add the full transcription
-        commentText += comment.markdown || JSON.stringify(sections);
+        commentText += `## Full Comment\n${comment.markdown || JSON.stringify(sections)}`;
         
         // Build prompt
         const prompt = THEME_EXTRACT_PROMPT

@@ -33,6 +33,7 @@ You MUST organize your analysis into these exact sections with these exact heade
     - [Key arguments or evidence, referencing specific comment IDs for particularly articulate examples]
   - **[Brief label for Position]:** [Opposing perspective with approximate support level, noting key organizations/stakeholders who hold this view]
     - [Key arguments or evidence, referencing specific comment IDs for particularly articulate examples]
+  - (Include additional positions if the debate has more than two sides — look for "middle ground," "alternative framing," or "conditional support" positions)
 
 ### STAKEHOLDER PERSPECTIVES
 [Group commenters by their type/role and summarize their distinct viewpoints]
@@ -165,13 +166,25 @@ Return a JSON object with this exact structure:
       "supportLevel": string | null,
       "keyArguments": Array<string>,  // Keep names in these narratives
       "commentIds": Array<string> // Extract only comment IDs
-    }>, 
+    }>,  // NOTE: debates may have 2, 3, or more distinct positions - capture all of them
   }> | null,
   "stakeholderPerspectives": Array<{
     "stakeholderType": string,
     "primaryConcerns": string,  // Keep specific organization names mentioned
     "specificPoints": Array<string>,  // Narrative points with key organizatio names where relevant
     "commentIds": Array<string>  // Extract only comment IDs
+  }> | null,
+  "keyRecommendations": Array<{
+    "approach": string,  // Category like "Regulatory", "Operational", "Financial"
+    "recommendation": string,  // Specific recommendation with key proponent names
+    "supportLevel": string | null,
+    "commentIds": Array<string>
+  }> | null,
+  "majorConcerns": Array<{
+    "concern": string,  // Specific concern
+    "raisedBy": string,  // Who raises it and how broadly
+    "evidence": string | null,  // Specific risks or evidence cited
+    "commentIds": Array<string>
   }> | null,
   "noteworthyInsights": Array<{
     "insight": string,  // Keep narrative insight

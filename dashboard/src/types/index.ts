@@ -55,6 +55,18 @@ export interface ThemeSummary {
       specificPoints: string[]
       commentIds?: string[] | null
     }> | null
+    keyRecommendations?: Array<{
+      approach: string
+      recommendation: string
+      supportLevel?: string | null
+      commentIds?: string[] | null
+    }> | null
+    majorConcerns?: Array<{
+      concern: string
+      raisedBy: string
+      evidence?: string | null
+      commentIds?: string[] | null
+    }> | null
     noteworthyInsights?: Array<{
       insight: string
       commentId?: string | null
