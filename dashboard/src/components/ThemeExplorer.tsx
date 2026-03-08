@@ -143,7 +143,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
                   e.stopPropagation()
                   toggleNode(theme.code)
                 }}
-                className="mr-2 text-gray-400 hover:text-gray-600"
+                className="mr-1 sm:mr-2 text-gray-400 hover:text-gray-600 p-1 -m-1 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:p-0 sm:m-0 flex items-center justify-center"
               >
                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
@@ -180,10 +180,10 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
                       e.preventDefault()
                       toggleDescription(theme.code, e)
                     }}
-                    className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="ml-1 sm:ml-2 text-gray-400 hover:text-gray-600 transition-colors p-2 -m-2 sm:p-0 sm:m-0"
                     title={isDescriptionExpanded ? "Hide description" : "Show description"}
                   >
-                    <Info className="h-3 w-3" />
+                    <Info className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
                   </button>
                 )}
               </div>

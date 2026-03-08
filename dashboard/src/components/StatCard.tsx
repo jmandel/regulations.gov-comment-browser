@@ -22,20 +22,20 @@ interface StatCardProps {
 function StatCard({ icon, label, value, subtext, color = 'blue', clickable = false }: StatCardProps) {
   return (
     <div className={clsx(
-      "bg-white rounded-lg shadow-sm border border-gray-200 p-6",
+      "bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6",
       clickable && "cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all"
     )}>
       <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <p className="text-sm text-gray-500">{label}</p>
-          <p className="text-2xl font-semibold text-gray-900 mt-1">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs sm:text-sm text-gray-500">{label}</p>
+          <p className="text-xl sm:text-2xl font-semibold text-gray-900 mt-1">
             {typeof value === 'number' ? value.toLocaleString() : value}
           </p>
           {subtext && (
-            <p className="text-xs text-gray-400 mt-1">{subtext}</p>
+            <p className="text-xs text-gray-400 mt-1 truncate">{subtext}</p>
           )}
         </div>
-        <div className={clsx('p-3 rounded-lg', colorClasses[color])}>
+        <div className={clsx('p-2 sm:p-3 rounded-lg flex-shrink-0', colorClasses[color])}>
           {icon}
         </div>
       </div>

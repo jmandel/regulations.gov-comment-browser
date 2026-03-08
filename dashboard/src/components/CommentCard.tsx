@@ -48,60 +48,57 @@ function CommentCard({
       clickable && "hover:shadow-lg hover:border-blue-300"
     )}>
       {/* Header with Key Information */}
-      <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              {(comment.submitterType === 'Organization' || 
-                comment.submitterType === 'Business' ||
-                comment.submitterType === 'Healthcare Organization' ||
-                comment.submitterType === 'Government Agency' ||
-                comment.submitterType === 'Trade Association') ? (
-                <Building2 className="h-4 w-4 text-gray-500" />
-              ) : (
-                <User className="h-4 w-4 text-gray-500" />
-              )}
-              <h4 className="font-semibold text-gray-900">{comment.submitter}</h4>
-              <span className="text-sm text-gray-600">• {comment.submitterType}</span>
-            </div>
-            
-            <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
-              <span className="flex items-center space-x-1">
-                <Calendar className="h-3 w-3" />
-                <span>{formatDate(comment.date)}</span>
-              </span>
-              {comment.location && (
-                <span className="flex items-center space-x-1">
-                  <MapPin className="h-3 w-3" />
-                  <span>{comment.location}</span>
-                </span>
-              )}
-              {comment.hasAttachments && (
-                <span className="flex items-center space-x-1">
-                  <Paperclip className="h-3 w-3" />
-                  <span>Has attachments</span>
-                </span>
-              )}
-            </div>
+      <div className="bg-gray-50 border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
+        {/* Row 1: Author + type */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center space-x-2 min-w-0 flex-1">
+            {(comment.submitterType === 'Organization' || 
+              comment.submitterType === 'Business' ||
+              comment.submitterType === 'Healthcare Organization' ||
+              comment.submitterType === 'Government Agency' ||
+              comment.submitterType === 'Trade Association') ? (
+              <Building2 className="h-4 w-4 text-gray-500 flex-shrink-0" />
+            ) : (
+              <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
+            )}
+            <h4 className="font-semibold text-gray-900 truncate">{comment.submitter}</h4>
+            <span className="text-sm text-gray-600 flex-shrink-0 hidden sm:inline">• {comment.submitterType}</span>
           </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* Cluster Badge */}
-            {comment.clusterSize && comment.clusterSize > 1 && comment.isClusterRepresentative && (
-              <span 
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
-                title={`This comment represents ${comment.clusterSize} aligned submissions`}
-              >
-                <Users className="h-3 w-3" />
-                {comment.clusterSize > 100 ? (
-                  <span>{comment.clusterSize} aligned comments</span>
-                ) : (
-                  <span>+{comment.clusterSize - 1} similar</span>
-                )}
+          {/* Cluster Badge */}
+          {comment.clusterSize && comment.clusterSize > 1 && comment.isClusterRepresentative && (
+            <span 
+              className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 flex-shrink-0"
+              title={`This comment represents ${comment.clusterSize} aligned submissions`}
+            >
+              <Users className="h-3 w-3" />
+              <span className="hidden sm:inline">{comment.clusterSize > 100 ? `${comment.clusterSize} aligned` : `+${comment.clusterSize - 1} similar`}</span>
+              <span className="sm:hidden">{comment.clusterSize}</span>
+            </span>
+          )}
+        </div>
+        
+        {/* Row 2: Date, ID, word count, actions */}
+        <div className="flex items-center justify-between mt-2 gap-2">
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600 min-w-0">
+            <span className="flex items-center space-x-1">
+              <Calendar className="h-3 w-3 flex-shrink-0" />
+              <span>{formatDate(comment.date)}</span>
+            </span>
+            {comment.location && (
+              <span className="flex items-center space-x-1 hidden sm:flex">
+                <MapPin className="h-3 w-3" />
+                <span>{comment.location}</span>
               </span>
             )}
-            {/* ID */}
-            <span className="text-xs font-mono text-gray-500 bg-gray-200 px-2 py-1 rounded" title="Comment ID">
+            {comment.hasAttachments && (
+              <span className="flex items-center space-x-1">
+                <Paperclip className="h-3 w-3" />
+                <span className="hidden sm:inline">Has attachments</span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+            <span className="text-xs font-mono text-gray-500 bg-gray-200 px-2 py-1 rounded hidden sm:inline" title="Comment ID">
               #{comment.id}
             </span>
             {typeof comment.wordCount === 'number' && !isNaN(comment.wordCount) && (
@@ -120,7 +117,7 @@ function CommentCard({
                 e.stopPropagation()
                 setShowCopyModal(true)
               }}
-              className="text-purple-600 hover:text-purple-800 transition-colors"
+              className="text-purple-600 hover:text-purple-800 transition-colors p-1 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
               title="Copy for LLM"
             >
               <FileText className="h-4 w-4" />
@@ -129,7 +126,7 @@ function CommentCard({
               href={regulationsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 transition-colors"
+              className="text-blue-600 hover:text-blue-800 transition-colors p-1 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
               title="View on regulations.gov"
             >
               <ExternalLink className="h-4 w-4" />

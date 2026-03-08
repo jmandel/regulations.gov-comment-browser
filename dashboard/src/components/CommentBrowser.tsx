@@ -19,7 +19,7 @@ function CommentBrowser() {
   const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {} } = useStore()
   const [searchParams] = useSearchParams()
   const [page, setPage] = useState(0)
-  const [showFilters, setShowFilters] = useState(true)
+  const [showFilters, setShowFilters] = useState(() => window.innerWidth >= 768)
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(filters?.searchQuery || '')
   const [submitterTypeSearch, setSubmitterTypeSearch] = useState('')

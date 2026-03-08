@@ -102,7 +102,7 @@ function ThemeSummaryView({ summary }: ThemeSummaryViewProps) {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {debate.positions.map((position, posIndex) => (
-                    <div key={posIndex} className="bg-gray-50 rounded-lg p-4">
+                    <div key={posIndex} className="bg-gray-50 rounded-lg p-4 min-w-0">
                       <h5 className="font-medium text-gray-900 mb-2 flex items-center">
                         <span className={`h-2 w-2 rounded-full mr-2 ${
                           ['bg-blue-500', 'bg-orange-500', 'bg-emerald-500', 'bg-violet-500', 'bg-rose-500'][posIndex % 5]
@@ -129,12 +129,12 @@ function ThemeSummaryView({ summary }: ThemeSummaryViewProps) {
                       {position.commentIds && position.commentIds.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-gray-100">
                           <span className="text-xs text-gray-500 block mb-1">Example comments:</span>
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2 min-w-0">
                             {position.commentIds.map((commentId, idx) => (
                               <CommentLink 
                                 key={idx}
                                 commentId={commentId} 
-                                className="text-indigo-600 hover:text-indigo-800"
+                                className="text-indigo-600 hover:text-indigo-800 truncate max-w-[200px]"
                                 showIcon={true}
                               />
                             ))}
@@ -163,8 +163,8 @@ function ThemeSummaryView({ summary }: ThemeSummaryViewProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sections.stakeholderPerspectives.map((stakeholder, index) => (
                 <div key={index} className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg p-5 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                    <Users className="h-4 w-4 mr-2 text-blue-600" />
+                  <h4 className="font-semibold text-gray-900 mb-3 flex items-start">
+                    <Users className="h-4 w-4 mr-2 mt-1 text-blue-600 flex-shrink-0" />
                     {stakeholder.stakeholderType}
                   </h4>
                   <div className="space-y-3">
@@ -351,7 +351,7 @@ function ThemeSummaryView({ summary }: ThemeSummaryViewProps) {
             {sections.keyQuotations.map((quotation, index) => (
               <blockquote key={index} className="border-l-4 border-indigo-200 pl-6 py-2">
                 <p className="text-gray-800 italic mb-2">"{quotation.quote}"</p>
-                <cite className="text-sm text-gray-600 not-italic flex items-center">
+                <cite className="text-sm text-gray-600 not-italic flex items-center flex-wrap break-words">
                   <span className="mr-2">—</span>
                   {quotation.commentId ? (
                     <>
@@ -436,7 +436,7 @@ function ThemeSummaryView({ summary }: ThemeSummaryViewProps) {
       )}
       
       {/* Summary Stats */}
-      <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-center space-x-8 text-sm text-gray-600">
+      <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-center space-x-4 sm:space-x-8 text-sm text-gray-600 flex-wrap gap-y-2">
         <div className="flex items-center">
           <MessageSquare className="h-4 w-4 mr-2 text-gray-400" />
           <span>{summary.commentCount} comments analyzed</span>

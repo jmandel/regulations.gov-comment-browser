@@ -71,12 +71,12 @@ function ThemeSummaries() {
       
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex flex-col gap-3 sm:gap-4">
           {/* Sort By */}
-          <div className="flex items-center space-x-2">
-            <ListOrdered className="h-4 w-4 text-gray-500" />
-            <label className="text-xs font-medium text-gray-700">Sort by</label>
-            <div className="flex space-x-1">
+          <div className="flex items-center space-x-2 min-w-0">
+            <ListOrdered className="h-4 w-4 text-gray-500 flex-shrink-0 hidden sm:block" />
+            <label className="text-xs font-medium text-gray-700 flex-shrink-0 hidden sm:block">Sort by</label>
+            <div className="flex space-x-1 overflow-x-auto pb-1 -mb-1">
               <button
                 className={`flex items-center space-x-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${sortBy === 'comments' ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}
                 onClick={() => setSortBy('comments')}
@@ -122,7 +122,7 @@ function ThemeSummaries() {
             </div>
           </div>
           {/* Search */}
-          <div className="flex-1">
+          <div className="w-full">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
