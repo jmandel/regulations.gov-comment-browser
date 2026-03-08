@@ -64,7 +64,7 @@
     
     "discoverEntities": {
       "concurrency": 3,
-      "model": "gemini-flash-lite",
+      "model": "gemini-3-flash",
       "stages": {
         "categoryDiscovery": {
           "mergeWidth": 10,

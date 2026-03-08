@@ -6,6 +6,7 @@ import { AIClient } from "../lib/ai-client";
 import { loadCondensedCommentsForEntities } from "../lib/comment-processing";
 import type { EntityTaxonomy, EnrichedComment } from "../types";
 import { parseJsonResponse } from "../lib/json-parser";
+import { getTaskModel } from "../lib/batch-config";
 
 export const discoverEntitiesV2Command = new Command("discover-entities-v2")
   .description("Discover named entities using single large prompt (v2)")
@@ -13,7 +14,7 @@ export const discoverEntitiesV2Command = new Command("discover-entities-v2")
   .option("-l, --limit <n>", "Process only N comments", parseInt)
   .option("--word-limit <n>", "Target word count for prompt (default: 150000)", parseInt)
   .option("-d, --debug", "Enable debug output")
-  .option("-m, --model <model>", "AI model to use (default: gemini-pro)")
+  .option("-m, --model <model>", "AI model to use (overrides batch-config)")
   .option("--discover-only", "Only discover entities, skip annotation")
   .option("--annotate-only", "Only annotate comments with existing entities")
   .action(discoverEntitiesV2);
@@ -23,7 +24,7 @@ async function discoverEntitiesV2(documentId: string, options: any) {
   
   const db = openDb(documentId);
   const targetWords = options.wordLimit || 150000;
-  const model = options.model || 'gemini-pro';
+  const model = getTaskModel('discoverEntities', options.model);
   
   const ai = new AIClient(model, db);
   

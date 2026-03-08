@@ -55,7 +55,7 @@ export async function generateWithGeminiPro(prompt: string, options?: StreamingO
   }];
   
   const response = await ai.models.generateContentStream({
-    model: "gemini-2.5-pro-preview-06-05",
+    model: "gemini-2.5-pro",
     config,
     contents,
   });
@@ -83,7 +83,7 @@ export async function generateWithGeminiFlash(prompt: string, options?: Streamin
   }];
   
   const response = await ai.models.generateContentStream({
-    model: "gemini-2.5-flash-preview-05-20",
+    model: "gemini-2.5-flash",
     config,
     contents,
   });
@@ -111,7 +111,7 @@ export async function generateWithGeminiFlashLite(prompt: string, options?: Stre
   }];
   
   const response = await ai.models.generateContentStream({
-    model: "gemini-2.5-flash-lite-preview-06-17",
+    model: "gemini-2.5-flash-lite",
     config,
     contents,
   });
@@ -269,7 +269,7 @@ export type ModelName = keyof typeof MODEL_FUNCTIONS;
 export type GenerationFunction = (prompt: string, options?: StreamingOptions) => Promise<string>;
 
 // Get the appropriate generation function based on model selection
-export function getGenerationFunction(model: string = "gemini-pro"): GenerationFunction {
+export function getGenerationFunction(model: string = "gemini-3-flash"): GenerationFunction {
   const fn = MODEL_FUNCTIONS[model as ModelName];
   if (!fn) {
     throw new Error(`Unknown model: ${model}. Available: ${Object.keys(MODEL_FUNCTIONS).join(", ")}`);
