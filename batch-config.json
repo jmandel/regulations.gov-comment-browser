@@ -11,13 +11,13 @@
       "default": 10,
       "description": "Default number of items to merge at once in hierarchical tasks"
     },
-    "defaultModel": "gemini-pro"
+    "defaultModel": "gemini-3-flash"
   },
   
   "tasks": {
     "condense": {
       "concurrency": 3,
-      "model": "gemini-flash",
+      "model": "gemini-3-flash",
       "batching": false,
       "description": "Processes comments individually for structured extraction"
     },
@@ -25,7 +25,7 @@
     "discoverThemes": {
       "concurrency": 5,
       "mergeWidth": 10,
-      "model": "gemini-pro",
+      "model": "gemini-3-flash",
       "batching": {
         "triggerWordLimit": 250000,
         "batchWordLimit": 150000,
@@ -35,7 +35,7 @@
     
     "extractThemeContent": {
       "concurrency": 10,
-      "model": "gemini-flash",
+      "model": "gemini-3-flash",
       "batching": false,
       "description": "Extracts theme-specific content from individual comments"
     },
@@ -43,7 +43,7 @@
     "summarizeThemes": {
       "concurrency": 4,
       "mergeWidth": 4,
-      "model": "gemini-pro",
+      "model": "gemini-3-flash",
       "batching": {
         "triggerWordLimit": 50000,
         "batchWordLimit": 40000,
@@ -61,7 +61,7 @@
       "stages": {
         "categoryDiscovery": {
           "mergeWidth": 10,
-          "model": "gemini-flash-lite",
+          "model": "gemini-3-flash",
           "batching": {
             "triggerWordLimit": 50000,
             "batchWordLimit": 50000,
@@ -70,7 +70,7 @@
           "description": "Uses hierarchical merging to combine category lists from multiple batches"
         },
         "entityExtraction": {
-          "model": "gemini-flash-lite",
+          "model": "gemini-3-flash",
           "concurrency": 20,  
           "batching": {
             "triggerWordLimit": 1000,

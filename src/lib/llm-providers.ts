@@ -119,6 +119,45 @@ export async function generateWithGeminiFlashLite(prompt: string, options?: Stre
   return processStream(response, chunk => chunk.text || '', options);
 }
 
+export async function generateWithGemini3Flash(prompt: string, options?: StreamingOptions): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY environment variable is required");
+  }
+  
+  const ai = new GoogleGenAI({ apiKey });
+  
+  const config = { 
+    responseMimeType: "text/plain",
+  };
+  const contents = [{
+    role: "user" as const,
+    parts: [{ text: prompt }]
+  }];
+  
+  const MAX_RETRIES = 5;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const response = await ai.models.generateContentStream({
+        model: "gemini-3-flash-preview",
+        config,
+        contents,
+      });
+      return await processStream(response, chunk => chunk.text || '', options);
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if ((msg.includes('429') || msg.includes('503')) && attempt < MAX_RETRIES - 1) {
+        const backoff = Math.min(5000 * Math.pow(2, attempt), 60000);
+        console.log(`   \ud83d\udd04 Gemini ${msg.includes('429') ? '429' : '503'}, retrying in ${(backoff/1000).toFixed(0)}s (attempt ${attempt+1}/${MAX_RETRIES})...`);
+        await new Promise(r => setTimeout(r, backoff));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Max retries exceeded for gemini-3-flash');
+}
+
 export async function generateWithClaude(prompt: string, options?: StreamingOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -166,7 +205,8 @@ export const MODEL_FUNCTIONS = {
   "gemini-pro": generateWithGeminiPro,
   "gemini-flash": generateWithGeminiFlash,
   "gemini-flash-lite": generateWithGeminiFlashLite,
-  "claude": generateWithClaude
+  "claude": generateWithClaude,
+  "gemini-3-flash": generateWithGemini3Flash
 } as const;
 
 export type ModelName = keyof typeof MODEL_FUNCTIONS;

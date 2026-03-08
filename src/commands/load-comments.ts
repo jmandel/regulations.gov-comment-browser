@@ -36,13 +36,28 @@ async function loadFromApi(documentId: string, options: any) {
   const db = openDb(documentId);
   const headers = { "X-Api-Key": options.apiKey };
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  // Retry-with-backoff wrapper for regulations.gov fetches
+  async function fetchWithRetry(url: string, opts: RequestInit = {}, maxRetries = 10): Promise<Response> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const resp = await fetch(url, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+      if (resp.status === 429) {
+        const backoff = Math.min(5000 * Math.pow(2, attempt), 120000);
+        console.log(`   ⏳ 429 rate limited, waiting ${(backoff/1000).toFixed(0)}s (attempt ${attempt+1}/${maxRetries})...`);
+        await sleep(backoff);
+        continue;
+      }
+      return resp;
+    }
+    // Last attempt, return whatever we get
+    return fetch(url, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+  }
   
   try {
     // Get document object ID
     console.log("🔍 Resolving document object ID...");
-    const docResponse = await fetch(
-      `https://api.regulations.gov/v4/documents/${documentId}`,
-      { headers }
+    const docResponse = await fetchWithRetry(
+      `https://api.regulations.gov/v4/documents/${documentId}`
     );
     
     if (!docResponse.ok) {
@@ -60,9 +75,8 @@ async function loadFromApi(documentId: string, options: any) {
     // Fetch agency name if possible
     let agencyName = agencyId;
     try {
-      const agencyResponse = await fetch(
-        `https://api.regulations.gov/v4/agencies/${agencyId}`,
-        { headers }
+      const agencyResponse = await fetchWithRetry(
+        `https://api.regulations.gov/v4/agencies/${agencyId}`
       );
       if (agencyResponse.ok) {
         const agencyData: any = await agencyResponse.json();
@@ -105,7 +119,7 @@ async function loadFromApi(documentId: string, options: any) {
     
     while (true) {
       const url = `https://api.regulations.gov/v4/comments?filter[commentOnId]=${objectId}&page[size]=250&page[number]=${page}`;
-      const response = await fetch(url, { headers });
+      const response = await fetchWithRetry(url);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch comments: ${response.status} ${response.statusText}`);
@@ -147,7 +161,7 @@ async function loadFromApi(documentId: string, options: any) {
       try {
         // 1️⃣ Fetch comment details with relationships to attachments
         const url = `https://api.regulations.gov/v4/comments/${commentId}?include=attachments`;
-        const response = await fetch(url, { headers });
+        const response = await fetchWithRetry(url);
         if (!response.ok) {
           console.error(`❌ Failed to fetch comment ${commentId}: ${response.status}`);
           continue;
@@ -176,7 +190,7 @@ async function loadFromApi(documentId: string, options: any) {
 
         for (const rel of relationshipData) {
           const attUrl = `https://api.regulations.gov/v4/attachments/${rel.id}?include=fileFormats`;
-          const attResp = await fetch(attUrl, { headers });
+          const attResp = await fetchWithRetry(attUrl);
           if (!attResp.ok) {
             console.error(`\n❌ Failed to fetch attachment metadata ${rel.id}: ${attResp.status}`);
             attachmentFailures++;
@@ -197,7 +211,7 @@ async function loadFromApi(documentId: string, options: any) {
 
             if (!options.skipAttachments) {
               try {
-                const binResp = await fetch(fileUrl, { headers });
+                const binResp = await fetchWithRetry(fileUrl, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", "Accept": "application/pdf,*/*" } });
                 if (binResp.ok) {
                   const buffer = new Uint8Array(await binResp.arrayBuffer());
                   blob = buffer;

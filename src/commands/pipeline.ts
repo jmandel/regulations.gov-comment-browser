@@ -63,7 +63,7 @@ export const pipelineCommand = new Command("pipeline")
         name: "Clustering comments",
         icon: "🔗",
         execute: async () => {
-          if (options.noClustering) {
+          if (!options.clustering) {
             console.log("⏭️  Skipping clustering (--no-clustering flag)");
             return;
           }
@@ -98,7 +98,7 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.debug ? ['--debug'] : []),
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
-            ...(!options.noClustering ? ['--use-clustering'] : []),
+            ...(!!options.clustering ? ['--use-clustering'] : []),
           ]);
         }
       },
@@ -113,7 +113,7 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.debug ? ['--debug'] : []),
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
-            ...(!options.noClustering ? ['--use-clustering'] : []),
+            ...(!!options.clustering ? ['--use-clustering'] : []),
           ]);
         }
       },
@@ -128,7 +128,7 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.debug ? ['--debug'] : []),
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
-            ...(!options.noClustering ? ['--use-clustering'] : []),
+            ...(!!options.clustering ? ['--use-clustering'] : []),
           ]);
         }
       },
@@ -143,7 +143,7 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.debug ? ['--debug'] : []),
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
-            ...(!options.noClustering ? ['--use-clustering'] : []),
+            ...(!!options.clustering ? ['--use-clustering'] : []),
           ]);
         }
       },
@@ -156,7 +156,6 @@ export const pipelineCommand = new Command("pipeline")
             'bun', 'cli.ts', 
             documentId,
             ...(options.debug ? ['--debug'] : []),
-            ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
           ]);
         }
