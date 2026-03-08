@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Tag, ChevronRight, Copy, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -14,6 +14,13 @@ function EntityBrowser() {
   const [sortBy, setSortBy] = useState<SortOption>('mentions-desc')
 
   const categories = Object.keys(entities).sort()
+
+  // Select first category once entities load (initial useState runs before data is ready)
+  useEffect(() => {
+    if (!selectedCategory && categories.length > 0) {
+      setSelectedCategory(categories[0])
+    }
+  }, [categories, selectedCategory])
   
   // User-friendly category names
   const getCategoryDisplayName = (category: string): string => {

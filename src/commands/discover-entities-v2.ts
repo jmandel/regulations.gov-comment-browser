@@ -278,13 +278,12 @@ async function saveEntitiesWithFiltering(
 
   let processedCount = 0;
   for (const comment of comments) {
-    // structuredSections should already be parsed in EnrichedComment
-    const sections = comment.structuredSections ?? {};
-    const detailedContent = sections.detailedContent ?? "";
-    if (!detailedContent) continue;
+    // Search against the full comment content (transcription + metadata)
+    const searchText = comment.content;
+    if (!searchText) continue;
 
     for (const entry of searchEntries) {
-      if (entry.regex.test(detailedContent)) {
+      if (entry.regex.test(searchText)) {
         entityHits.get(entry.entityKey)!.add(comment.id);
       }
     }
@@ -411,14 +410,13 @@ async function annotateComments(
   
   withTransaction(db, () => {
     for (const comment of comments) {
-      const sections = comment.structuredSections ?? {};
-      const detailedContent = sections.detailedContent ?? "";
-      if (!detailedContent) continue;
+      const searchText = comment.content;
+      if (!searchText) continue;
       
       const alreadyAdded = new Set<string>();
       for (const entry of searchEntries) {
         if (alreadyAdded.has(entry.entityKey)) continue;
-        if (entry.regex.test(detailedContent)) {
+        if (entry.regex.test(searchText)) {
           insertAnnotation.run(comment.id, entry.category, entry.label);
           alreadyAdded.add(entry.entityKey);
           annotationCount++;
