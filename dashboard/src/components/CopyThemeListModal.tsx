@@ -77,17 +77,21 @@ function CopyThemeListModal({ isOpen, onClose, themes }: CopyThemeListModalProps
   const handleExport = async () => {
     const content = buildContent()
     const filename = `theme-hierarchy-${themes.length}-themes.md`
-    const file = new File([content], filename, { type: 'text/markdown;charset=utf-8' })
+    const file = new File([content], filename, { type: 'text/plain;charset=utf-8' })
 
-    if (canShare && navigator.canShare({ files: [file] })) {
+    if (canShare) {
       try {
-        await navigator.share({ files: [file], title: filename })
-        return
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: filename })
+          return
+        }
       } catch (e) {
         if ((e as Error).name === 'AbortError') return
+        // Fall through to download
       }
     }
-    const url = URL.createObjectURL(file)
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = filename

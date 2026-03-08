@@ -328,18 +328,23 @@ function CopyCommentsModal({
   const handleExport = async () => {
     const content = buildContent()
     const filename = `comments-${comments.length}-export.md`
-    const file = new File([content], filename, { type: 'text/markdown;charset=utf-8' })
+    // Use text/plain so mobile share sheets accept it; .md extension preserved
+    const file = new File([content], filename, { type: 'text/plain;charset=utf-8' })
 
-    if (canShare && navigator.canShare({ files: [file] })) {
+    if (canShare) {
       try {
-        await navigator.share({ files: [file], title: filename })
-        return
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: filename })
+          return
+        }
       } catch (e) {
         if ((e as Error).name === 'AbortError') return // user cancelled
+        // Fall through to download
       }
     }
     // Desktop fallback: download
-    const url = URL.createObjectURL(file)
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = filename
