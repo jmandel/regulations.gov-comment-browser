@@ -2,11 +2,17 @@ import { Command } from "commander";
 import { openDb, withTransaction, getProcessingStatus } from "../lib/database";
 import { initDebug } from "../lib/debug";
 import { AIClient } from "../lib/ai-client";
-import { loadComments, enrichComment, checkClusteringStatus } from "../lib/comment-processing";
+import { loadComments, checkClusteringStatus } from "../lib/comment-processing";
 import { TRANSCRIBE_PROMPT } from "../prompts/transcribe";
-import type { RawComment } from "../types";
+import type { RawComment, CommentAttributes, Attachment } from "../types";
 import { runPool } from "../lib/worker-pool";
 import { getTaskConfig, getTaskModel } from "../lib/batch-config";
+import { createPartFromBase64 } from "@google/genai";
+import type { Part } from "@google/genai";
+import { mkdtemp, writeFile, unlink } from "fs/promises";
+import { join } from "path";
+import { tmpdir } from "os";
+import { $ } from "bun";
 
 export const transcribeCommand = new Command("transcribe")
   .description("Transcribe comments and attachments into clean markdown")
@@ -18,6 +24,120 @@ export const transcribeCommand = new Command("transcribe")
   .option("-m, --model <model>", "AI model to use (overrides config)")
   .option("--use-clustering", "Only transcribe representative comments from clusters")
   .action(transcribeComments);
+
+// MIME types that Gemini can ingest natively as inline data
+const NATIVE_MIME: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  tiff: "image/tiff",
+  tif: "image/tiff",
+};
+
+// Convert a DOCX blob to plain text via pandoc
+async function docxToText(blob: Uint8Array): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'docx-'));
+  const path = join(dir, 'temp.docx');
+  try {
+    await writeFile(path, blob);
+    return (await $`pandoc -f docx -t plain --wrap=none ${path}`.text()).trim();
+  } catch (err) {
+    console.warn('    pandoc docx extraction failed:', err);
+    return '';
+  } finally {
+    try { await unlink(path); await $`rmdir ${dir}`.quiet(); } catch {}
+  }
+}
+
+// Build multimodal Part[] for a comment and its attachments
+async function buildTranscriptionParts(
+  comment: RawComment,
+  attachments: Map<string, Attachment[]>,
+): Promise<{ parts: Part[]; description: string } | null> {
+  const attrs = JSON.parse(comment.attributes_json) as CommentAttributes;
+  const commentText = (attrs.comment || attrs.text || "").trim();
+
+  // Group attachments by attachment ID (same doc may appear as pdf + docx)
+  const commentAttachments = attachments.get(comment.id) || [];
+  const byId = new Map<string, Attachment[]>();
+  for (const a of commentAttachments) {
+    if (!byId.has(a.id)) byId.set(a.id, []);
+    byId.get(a.id)!.push(a);
+  }
+
+  // For each attachment ID, pick the best format:
+  //   - If a native format exists (pdf, png, etc.), use it as inline binary
+  //   - Else if docx, convert to text
+  //   - Else if txt, include as text
+  const binaryParts: Part[] = [];
+  const textAttachmentParts: string[] = [];
+  const partDescriptions: string[] = [];
+
+  for (const [attId, formats] of byId) {
+    // Try native format first
+    const nativeAtt = formats.find(a => NATIVE_MIME[a.format.toLowerCase()] && a.blob_data);
+    if (nativeAtt && nativeAtt.blob_data) {
+      const mime = NATIVE_MIME[nativeAtt.format.toLowerCase()];
+      binaryParts.push(
+        createPartFromBase64(Buffer.from(nativeAtt.blob_data).toString('base64'), mime)
+      );
+      partDescriptions.push(`${nativeAtt.format.toUpperCase()} ${nativeAtt.file_name} (${(nativeAtt.blob_data.length / 1024).toFixed(0)}KB, native)`);
+      continue;
+    }
+
+    // Try docx
+    const docxAtt = formats.find(a => a.format.toLowerCase() === 'docx' && a.blob_data);
+    if (docxAtt && docxAtt.blob_data) {
+      const text = await docxToText(Buffer.from(docxAtt.blob_data));
+      if (text) {
+        textAttachmentParts.push(`=== ATTACHMENT: ${docxAtt.file_name} (converted from DOCX) ===\n${text}`);
+        partDescriptions.push(`DOCX ${docxAtt.file_name} (${(docxAtt.blob_data.length / 1024).toFixed(0)}KB, pandoc→text)`);
+      }
+      continue;
+    }
+
+    // Try txt
+    const txtAtt = formats.find(a => a.format.toLowerCase() === 'txt' && a.blob_data);
+    if (txtAtt && txtAtt.blob_data) {
+      const text = Buffer.from(txtAtt.blob_data).toString('utf-8').trim();
+      if (text) {
+        textAttachmentParts.push(`=== ATTACHMENT: ${txtAtt.file_name} ===\n${text}`);
+        partDescriptions.push(`TXT ${txtAtt.file_name}`);
+      }
+      continue;
+    }
+  }
+
+  // Must have either comment text or at least one attachment
+  if (!commentText && binaryParts.length === 0 && textAttachmentParts.length === 0) {
+    return null;
+  }
+
+  // Build the text part of the prompt
+  let textPrompt = TRANSCRIBE_PROMPT + "\n\n";
+  if (commentText) {
+    textPrompt += `=== COMMENT TEXT ===\n${commentText}\n\n`;
+  } else {
+    textPrompt += `=== COMMENT TEXT ===\n(No text entered in comment box — see attached document(s))\n\n`;
+  }
+  if (textAttachmentParts.length > 0) {
+    textPrompt += textAttachmentParts.join("\n\n") + "\n\n";
+  }
+  if (binaryParts.length > 0) {
+    textPrompt += `The following ${binaryParts.length} file(s) are attached as binary document(s) for you to read directly.\n`;
+  }
+
+  const parts: Part[] = [{ text: textPrompt }, ...binaryParts];
+  const desc = [
+    commentText ? `text=${commentText.length}ch` : 'no-text',
+    ...partDescriptions,
+  ].join(', ');
+
+  return { parts, description: desc };
+}
 
 async function transcribeComments(documentId: string, options: any) {
   await initDebug(options.debug);
@@ -152,19 +272,18 @@ async function transcribeComments(documentId: string, options: any) {
     try {
       markProcessing.run(comment.id);
 
-      // Enrich comment with attachments
-      const enriched = await enrichComment(comment, attachments);
-      if (!enriched) {
-        console.log(`  [${comment.id}] ⚠️  Skipped (empty content)`);
-        updateFailed.run(comment.id, "Empty comment content");
+      // Build multimodal parts (comment text + native binary attachments)
+      const built = await buildTranscriptionParts(comment, attachments);
+      if (!built) {
+        console.log(`  [${comment.id}] ⚠️  Skipped (empty content, no attachments)`);
+        updateFailed.run(comment.id, "Empty comment content and no attachments");
         failed++;
         return;
       }
+      console.log(`  [${comment.id}] Parts: ${built.description}`);
 
-      const prompt = TRANSCRIBE_PROMPT.replace("{COMMENT_TEXT}", enriched.content);
-
-      const response = await ai.generateContent(
-        prompt,
+      const response = await ai.generateMultimodal(
+        built.parts,
         options.debug ? `transcribe_${comment.id}` : undefined,
         `transcribe_${comment.id}`,
         {

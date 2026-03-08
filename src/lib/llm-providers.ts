@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type Part } from "@google/genai";
 import { debugStreamStart, debugStreamWrite, debugStreamEnd } from "./debug";
 
 // Simple provider functions that just handle the generation call
@@ -198,6 +198,61 @@ export async function generateWithClaude(prompt: string, options?: StreamingOpti
   }
   
   return result;
+}
+
+// Multimodal generation (accepts Part[] with inline binary data)
+export type MultimodalGenerationFunction = (parts: Part[], options?: StreamingOptions) => Promise<string>;
+
+export async function generateMultimodalGemini3Flash(parts: Part[], options?: StreamingOptions): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY environment variable is required");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const config = {
+    responseMimeType: "text/plain" as const,
+  };
+  const contents = [{
+    role: "user" as const,
+    parts,
+  }];
+
+  const MAX_RETRIES = 5;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const response = await ai.models.generateContentStream({
+        model: "gemini-3-flash-preview",
+        config,
+        contents,
+      });
+      return await processStream(response, chunk => chunk.text || '', options);
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if ((msg.includes('429') || msg.includes('503')) && attempt < MAX_RETRIES - 1) {
+        const backoff = Math.min(5000 * Math.pow(2, attempt), 60000);
+        console.log(`   \uD83D\uDD04 Gemini ${msg.includes('429') ? '429' : '503'}, retrying in ${(backoff/1000).toFixed(0)}s (attempt ${attempt+1}/${MAX_RETRIES})...`);
+        await new Promise(r => setTimeout(r, backoff));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Max retries exceeded for gemini-3-flash multimodal');
+}
+
+// Map of model names to multimodal generation functions
+export const MULTIMODAL_FUNCTIONS: Record<string, MultimodalGenerationFunction> = {
+  "gemini-3-flash": generateMultimodalGemini3Flash,
+};
+
+export function getMultimodalGenerationFunction(model: string): MultimodalGenerationFunction {
+  const fn = MULTIMODAL_FUNCTIONS[model];
+  if (!fn) {
+    throw new Error(`No multimodal support for model: ${model}. Available: ${Object.keys(MULTIMODAL_FUNCTIONS).join(", ")}`);
+  }
+  return fn;
 }
 
 // Map of model names to generation functions

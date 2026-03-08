@@ -2,7 +2,8 @@ import { debugSave } from "./debug";
 import { parseJsonResponse } from "./json-parser";
 import { createHash } from "crypto";
 import { Database } from "bun:sqlite";
-import { getGenerationFunction } from "./llm-providers";
+import { getGenerationFunction, getMultimodalGenerationFunction } from "./llm-providers";
+import type { Part } from "@google/genai";
 
 export interface CacheMetadata {
   taskType: string;
@@ -165,6 +166,108 @@ export class AIClient {
     }
   }
   
+  async generateMultimodal(
+    parts: Part[],
+    debugPrefix?: string,
+    jobId?: string,
+    metadata?: CacheMetadata,
+    timeout?: number
+  ): Promise<string> {
+    const workerId = jobId || debugPrefix || `worker_${Date.now()}`;
+
+    // Build a cache key from all text parts (binary parts are too large to hash efficiently,
+    // but we include their mime types + sizes as a fingerprint)
+    if (this.db && metadata) {
+      const cacheInput = parts.map(p => {
+        if (p.text) return `text:${p.text}`;
+        if (p.inlineData) return `blob:${p.inlineData.mimeType}:${(p.inlineData.data || '').length}`;
+        return 'unknown';
+      }).join('|');
+      const promptHash = createHash('sha256').update(cacheInput).digest('hex');
+
+      try {
+        const cached = this.db.prepare(`
+          SELECT result FROM llm_cache
+          WHERE prompt_hash = ?
+        `).get(promptHash) as { result: string } | undefined;
+
+        if (cached) {
+          console.log(`   ✅ [${workerId}] Using cached result [${promptHash.substring(0, 8)}...]`);
+          return cached.result;
+        }
+      } catch (error) {
+        console.warn(`   ⚠️  [${workerId}] Cache check failed:`, error);
+      }
+    }
+
+    AIClient.activeJobs.add(workerId);
+    const activeCount = AIClient.activeJobs.size;
+    const activeList = Array.from(AIClient.activeJobs).join(', ');
+    const modelName = this.modelKey || "gemini-3-flash";
+    console.log(`🤖 [${workerId}] Starting ${modelName} multimodal call (${activeCount} active: ${activeList})`);
+
+    try {
+      if (debugPrefix) {
+        // Save only the text parts for debugging
+        const textContent = parts.filter(p => p.text).map(p => p.text).join('\n---\n');
+        const binarySummary = parts.filter(p => p.inlineData).map(p =>
+          `[${p.inlineData!.mimeType}, ${(p.inlineData!.data || '').length} base64 chars]`
+        ).join(', ');
+        await debugSave(`${debugPrefix}_prompt.txt`, `${textContent}\n\n--- Binary parts: ${binarySummary}`);
+      }
+
+      const generateFn = getMultimodalGenerationFunction(modelName);
+      const streamingOptions = debugPrefix ? { debugFilename: `${debugPrefix}_response.txt` } : undefined;
+
+      let rawResult: string;
+      if (timeout) {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error(`AI generation timed out after ${timeout}ms`)), timeout);
+        });
+        rawResult = await Promise.race([generateFn(parts, streamingOptions), timeoutPromise]);
+      } else {
+        rawResult = await generateFn(parts, streamingOptions);
+      }
+
+      // Cache the result
+      if (this.db && metadata) {
+        const cacheInput = parts.map(p => {
+          if (p.text) return `text:${p.text}`;
+          if (p.inlineData) return `blob:${p.inlineData.mimeType}:${(p.inlineData.data || '').length}`;
+          return 'unknown';
+        }).join('|');
+        const promptHash = createHash('sha256').update(cacheInput).digest('hex');
+
+        try {
+          const existing = this.db.prepare(`SELECT 1 FROM llm_cache WHERE prompt_hash = ?`).get(promptHash);
+          if (!existing) {
+            this.db.prepare(`
+              INSERT INTO llm_cache (prompt_hash, task_type, task_level, task_params, result, model)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `).run(
+              promptHash,
+              metadata.taskType,
+              metadata.taskLevel || 0,
+              JSON.stringify(metadata.params || {}),
+              rawResult,
+              modelName
+            );
+            console.log(`   💾 [${workerId}] Cached result [${promptHash.substring(0, 8)}...]`);
+          }
+        } catch (error) {
+          console.warn(`   ⚠️  [${workerId}] Failed to cache result:`, error);
+        }
+      }
+
+      return rawResult;
+    } finally {
+      AIClient.activeJobs.delete(workerId);
+      const remainingCount = AIClient.activeJobs.size;
+      const remainingList = Array.from(AIClient.activeJobs).join(', ') || 'none';
+      console.log(`✅ [${workerId}] Completed ${modelName} multimodal call (${remainingCount} remaining: ${remainingList})`);
+    }
+  }
+
   // Extract JSON from AI response (handles markdown code blocks)
   extractJson(text: string): any {
     return parseJsonResponse(text);
