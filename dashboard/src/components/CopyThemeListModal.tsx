@@ -72,22 +72,27 @@ function CopyThemeListModal({ isOpen, onClose, themes }: CopyThemeListModalProps
     }
   }
 
-  const canShare = typeof navigator.share === 'function' && typeof navigator.canShare === 'function'
+  const hasShareApi = typeof navigator.share === 'function'
 
   const handleExport = async () => {
     const content = buildContent()
     const filename = `theme-hierarchy-${themes.length}-themes.md`
-    const file = new File([content], filename, { type: 'text/plain;charset=utf-8' })
 
-    if (canShare) {
+    if (hasShareApi) {
       try {
-        if (navigator.canShare({ files: [file] })) {
+        const file = new File([content], filename, { type: 'text/plain;charset=utf-8' })
+        if (navigator.canShare?.({ files: [file] })) {
           await navigator.share({ files: [file], title: filename })
           return
         }
       } catch (e) {
         if ((e as Error).name === 'AbortError') return
-        // Fall through to download
+      }
+      try {
+        await navigator.share({ title: filename, text: content })
+        return
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return
       }
     }
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
@@ -155,11 +160,11 @@ function CopyThemeListModal({ isOpen, onClose, themes }: CopyThemeListModalProps
             <button
               onClick={handleExport}
               className="flex items-center space-x-1.5 px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg transition-colors text-sm"
-              title={canShare ? 'Share as file' : 'Download as file'}
+              title={hasShareApi ? 'Share as file' : 'Download as file'}
             >
-              {canShare ? <Share2 className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-              <span className="hidden sm:inline">{canShare ? 'Share' : 'Download'}</span>
-              <span className="sm:hidden">{canShare ? 'Share' : '.md'}</span>
+              {hasShareApi ? <Share2 className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+              <span className="hidden sm:inline">{hasShareApi ? 'Share' : 'Download'}</span>
+              <span className="sm:hidden">{hasShareApi ? 'Share' : '.md'}</span>
             </button>
             <button
               onClick={handleCopy}
