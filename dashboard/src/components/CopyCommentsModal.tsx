@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Copy, Check, Download } from 'lucide-react'
+import { X, Copy, Check, Download, Share2 } from 'lucide-react'
 import { Comment, ThemeSummary } from '../types'
 
 interface CopyCommentsModalProps {
@@ -318,18 +318,31 @@ function CopyCommentsModal({
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
-      // Fallback: trigger download if clipboard fails
-      handleDownload()
+      // Fallback: trigger share/download if clipboard fails
+      handleExport()
     }
   }
 
-  const handleDownload = () => {
+  const canShare = typeof navigator.share === 'function' && typeof navigator.canShare === 'function'
+
+  const handleExport = async () => {
     const content = buildContent()
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
+    const filename = `comments-${comments.length}-export.md`
+    const file = new File([content], filename, { type: 'text/markdown;charset=utf-8' })
+
+    if (canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: filename })
+        return
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return // user cancelled
+      }
+    }
+    // Desktop fallback: download
+    const url = URL.createObjectURL(file)
     const a = document.createElement('a')
     a.href = url
-    a.download = `comments-${comments.length}-export.md`
+    a.download = filename
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -646,13 +659,13 @@ function CopyCommentsModal({
               Cancel
             </button>
             <button
-              onClick={handleDownload}
+              onClick={handleExport}
               className="flex items-center space-x-1.5 px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg transition-colors text-sm"
-              title="Download as file"
+              title={canShare ? 'Share as file' : 'Download as file'}
             >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Download</span>
-              <span className="sm:hidden">.md</span>
+              {canShare ? <Share2 className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+              <span className="hidden sm:inline">{canShare ? 'Share' : 'Download'}</span>
+              <span className="sm:hidden">{canShare ? 'Share' : '.md'}</span>
             </button>
             <button
               onClick={handleCopy}
