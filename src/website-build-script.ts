@@ -409,7 +409,7 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
       hasAttachments: c.attachment_count > 0,
       wordCount,
       clusterSize: c.cluster_size || 1,
-      isClusterRepresentative: c.is_representative === 1,
+      isClusterRepresentative: c.is_representative == null ? undefined : c.is_representative === 1,
       clusterRepresentativeId: c.cluster_representative_id || null,
       isAlignedSummary: c.uses_representative_summary === 1,
     };
