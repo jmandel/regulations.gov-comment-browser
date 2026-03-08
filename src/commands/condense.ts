@@ -1,11 +1,10 @@
 import { Command } from "commander";
 import { openDb, withTransaction, getProcessingStatus } from "../lib/database";
-import { initDebug, debugSave } from "../lib/debug";
+import { initDebug } from "../lib/debug";
 import { AIClient } from "../lib/ai-client";
-import { loadComments, enrichComment, checkClusteringStatus, loadRepresentativeComments } from "../lib/comment-processing";
+import { checkClusteringStatus } from "../lib/comment-processing";
 import { CONDENSE_PROMPT } from "../prompts/condense";
 import { parseCondensedSections } from "../lib/parse-condensed-sections";
-import type { RawComment } from "../types";
 import { runPool } from "../lib/worker-pool";
 import { getTaskConfig, getTaskModel } from "../lib/batch-config";
 
@@ -46,50 +45,39 @@ async function condenseComments(documentId: string, options: any) {
   const status = getProcessingStatus(db, "condensed_comments");
   console.log(`📊 Status: ${status.completed} completed, ${status.failed} failed, ${status.pending} pending`);
   
-  // Build query based on options
+  // Check that transcriptions exist
+  const transcriptionCount = db.prepare(
+    `SELECT COUNT(*) as count FROM transcriptions WHERE status = 'completed'`
+  ).get() as { count: number };
+  if (transcriptionCount.count === 0) {
+    console.error("❌ No transcriptions found. Run 'transcribe' first.");
+    process.exit(1);
+  }
+
+  // Build query - read from transcriptions, find ones not yet condensed
   let query: string;
   let params: any[] = [];
-  let comments: RawComment[];
-  
-  if (options.useClustering && !options.retryFailed) {
-    // Load only representative comments that haven't been processed
+  let comments: { id: string; attributes_json: string; markdown: string }[];
+
+  if (options.retryFailed) {
     query = `
-      SELECT c.id, c.attributes_json 
+      SELECT c.id, c.attributes_json, t.markdown
       FROM comments c
-      INNER JOIN comment_cluster_membership ccm ON c.id = ccm.comment_id
-      LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
-      WHERE ccm.is_representative = 1 
-        AND (cc.comment_id IS NULL OR cc.status IN ('pending', 'processing'))
-      ORDER BY c.id
-    `;
-    if (options.limit) {
-      query += " LIMIT ?";
-      params.push(options.limit);
-    }
-    comments = db.prepare(query).all(...params) as RawComment[];
-  } else if (options.retryFailed) {
-    query = `
-      SELECT c.id, c.attributes_json 
-      FROM comments c
+      JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
       LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
       WHERE cc.status = 'failed'
+      ORDER BY cc.attempt_count ASC, c.id
     `;
-    if (options.useClustering) {
-      query += ` AND EXISTS (
-        SELECT 1 FROM comment_cluster_membership ccm 
-        WHERE ccm.comment_id = c.id AND ccm.is_representative = 1
-      )`;
-    }
-    query += ` ORDER BY cc.attempt_count ASC, c.id`;
     if (options.limit) {
       query += " LIMIT ?";
       params.push(options.limit);
     }
-    comments = db.prepare(query).all(...params) as RawComment[];
+    comments = db.prepare(query).all(...params) as any[];
   } else {
     query = `
-      SELECT c.id, c.attributes_json 
+      SELECT c.id, c.attributes_json, t.markdown
       FROM comments c
+      JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
       LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
       WHERE cc.comment_id IS NULL OR cc.status IN ('pending', 'processing')
       ORDER BY c.id
@@ -98,7 +86,7 @@ async function condenseComments(documentId: string, options: any) {
       query += " LIMIT ?";
       params.push(options.limit);
     }
-    comments = db.prepare(query).all(...params) as RawComment[];
+    comments = db.prepare(query).all(...params) as any[];
   }
   
   console.log(`🎯 Found ${comments.length} comments to process`);
@@ -107,9 +95,6 @@ async function condenseComments(documentId: string, options: any) {
     console.log("✅ No comments to process");
     return;
   }
-  
-  // Load attachments
-  const { attachments } = loadComments(db);
   
   // Prepare statements
   const insertCondensed = db.prepare(`
@@ -159,17 +144,8 @@ async function condenseComments(documentId: string, options: any) {
       // Mark as processing
       markProcessing.run(comment.id);
       
-      // Enrich comment with attachments
-      const enriched = await enrichComment(comment, attachments);
-      if (!enriched) {
-        console.log(`  [${comment.id}] ⚠️  Skipped (empty content)`);
-        updateFailed.run(comment.id, "Empty comment content");
-        failed++;
-        return;
-      }
-      
-      // Build prompt using the enriched content only (already contains a concise metadata block)
-      const prompt = CONDENSE_PROMPT.replace("{COMMENT_TEXT}", enriched.content);
+      // Build prompt using the transcription
+      const prompt = CONDENSE_PROMPT.replace("{COMMENT_TEXT}", comment.markdown);
       
       // Generate condensed version with caching metadata
       const response = await ai.generateContent(
@@ -198,7 +174,7 @@ async function condenseComments(documentId: string, options: any) {
         insertCondensed.run(
           comment.id, 
           JSON.stringify(sections),
-          enriched.content.trim().split(/\s+/).length
+          comment.markdown.trim().split(/\s+/).length
         );
       });
       

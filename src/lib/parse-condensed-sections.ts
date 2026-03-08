@@ -17,7 +17,6 @@ const SECTION_HEADERS = {
   'MAIN CONCERNS': 'mainConcerns',
   'NOTABLE EXPERIENCES & INSIGHTS': 'notableExperiences',
   'KEY QUOTATIONS': 'keyQuotations',
-  'DETAILED CONTENT': 'detailedContent'
 } as const;
 
 export function parseCondensedSections(text: string): {

@@ -15,11 +15,18 @@
   },
   
   "tasks": {
-    "condense": {
-      "concurrency": 3,
+    "transcribe": {
+      "concurrency": 5,
       "model": "gemini-3-flash",
       "batching": false,
-      "description": "Processes comments individually for structured extraction"
+      "description": "Transcribes comments and attachments into clean markdown"
+    },
+
+    "condense": {
+      "concurrency": 5,
+      "model": "gemini-3-flash",
+      "batching": false,
+      "description": "Extracts structured metadata sections from transcriptions"
     },
     
     "discoverThemes": {

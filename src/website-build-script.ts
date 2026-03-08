@@ -319,6 +319,7 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
         c.id,
         c.attributes_json,
         COALESCE(cc.structured_sections, cc_rep.structured_sections) as structured_sections,
+        COALESCE(t.markdown, t_rep.markdown) as transcription_markdown,
         COALESCE(cc.word_count, cc_rep.word_count) as word_count,
         GROUP_CONCAT(DISTINCT cte.theme_code) as theme_codes,
         GROUP_CONCAT(DISTINCT ce.category || '|' || ce.entity_label) as entities,
@@ -329,9 +330,11 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
         CASE WHEN cc.structured_sections IS NULL AND cc_rep.structured_sections IS NOT NULL THEN 1 ELSE 0 END as uses_representative_summary
       FROM comments c
       LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
+      LEFT JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
       LEFT JOIN comment_cluster_membership ccm ON c.id = ccm.comment_id
       LEFT JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id
       LEFT JOIN condensed_comments cc_rep ON ccl.representative_comment_id = cc_rep.comment_id
+      LEFT JOIN transcriptions t_rep ON ccl.representative_comment_id = t_rep.comment_id AND t_rep.status = 'completed'
       LEFT JOIN comment_theme_extracts cte ON c.id = cte.comment_id
       LEFT JOIN comment_entities ce ON c.id = ce.comment_id
       LEFT JOIN attachments a ON c.id = a.comment_id
@@ -345,6 +348,7 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
         c.id,
         c.attributes_json,
         cc.structured_sections,
+        t.markdown as transcription_markdown,
         cc.word_count,
         GROUP_CONCAT(DISTINCT cte.theme_code) as theme_codes,
         GROUP_CONCAT(DISTINCT ce.category || '|' || ce.entity_label) as entities,
@@ -353,6 +357,7 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
         NULL as is_representative
       FROM comments c
       LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
+      LEFT JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
       LEFT JOIN comment_theme_extracts cte ON c.id = cte.comment_id
       LEFT JOIN comment_entities ce ON c.id = ce.comment_id
       LEFT JOIN attachments a ON c.id = a.comment_id
@@ -394,6 +399,12 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
       } catch (e) {
         console.warn(`Failed to parse structured sections for comment ${c.id}:`, e);
       }
+    }
+    
+    // Use transcription as detailedContent
+    if (c.transcription_markdown) {
+      if (!structuredSections) structuredSections = {};
+      structuredSections.detailedContent = c.transcription_markdown;
     }
     
     return {

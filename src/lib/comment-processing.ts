@@ -184,9 +184,10 @@ export async function getRepresentativeCommentIds(
 
 // Load condensed comments
 export function loadCondensedComments(db: Database, limit?: number, filterIds?: Set<string>): EnrichedComment[] {
-  let query = `SELECT c.id, cc.structured_sections, c.attributes_json 
+  let query = `SELECT c.id, cc.structured_sections, c.attributes_json, t.markdown
        FROM comments c 
        JOIN condensed_comments cc ON c.id = cc.comment_id 
+       LEFT JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
        WHERE cc.status = 'completed'`;
   
   const params: any[] = [];
@@ -209,10 +210,8 @@ export function loadCondensedComments(db: Database, limit?: number, filterIds?: 
     const attrs = JSON.parse(row.attributes_json) as CommentAttributes;
     const sections = JSON.parse(row.structured_sections || '{}');
     
-    // Use detailedContent as the main content, or fall back to concatenating key sections
-    const content = sections.detailedContent || [
-      sections.oneSummary || '',
-      sections.commenterProfile || '',
+    // Use transcription as the main content
+    const content = row.markdown || [
       sections.corePosition || '',
       sections.keyRecommendations || '',
       sections.mainConcerns || ''
@@ -228,17 +227,19 @@ export function loadCondensedComments(db: Database, limit?: number, filterIds?: 
   });
 }
 
-// Load condensed comments for entity extraction (metadata + detailed content only)
+// Load condensed comments for entity extraction (metadata + transcription)
 export function loadCondensedCommentsForEntities(db: Database, limit?: number): EnrichedComment[] {
   const query = limit
-    ? `SELECT c.id, cc.structured_sections, c.attributes_json 
+    ? `SELECT c.id, cc.structured_sections, c.attributes_json, t.markdown
        FROM comments c 
        JOIN condensed_comments cc ON c.id = cc.comment_id 
+       LEFT JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
        WHERE cc.status = 'completed' 
        LIMIT ?`
-    : `SELECT c.id, cc.structured_sections, c.attributes_json 
+    : `SELECT c.id, cc.structured_sections, c.attributes_json, t.markdown
        FROM comments c 
        JOIN condensed_comments cc ON c.id = cc.comment_id 
+       LEFT JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
        WHERE cc.status = 'completed'`;
   
   const rows = limit
@@ -250,7 +251,7 @@ export function loadCondensedCommentsForEntities(db: Database, limit?: number): 
     const sections = JSON.parse(row.structured_sections || '{}');
     const metadata = extractMetadata(attrs);
     
-    // Build a condensed representation with metadata and detailed content only
+    // Build representation with metadata and transcription
     const parts: string[] = [];
     
     // Add metadata
@@ -263,9 +264,9 @@ export function loadCondensedCommentsForEntities(db: Database, limit?: number): 
     }
     parts.push('');
     
-    // Add detailed content (the bulletized version)
-    if (sections.detailedContent) {
-      parts.push(sections.detailedContent);
+    // Add transcription
+    if (row.markdown) {
+      parts.push(row.markdown);
     }
     
     const content = parts.join('\n');

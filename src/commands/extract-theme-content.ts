@@ -135,10 +135,12 @@ async function extractThemeContent(documentId: string, options: any) {
       SELECT DISTINCT 
         cc.comment_id, 
         cc.structured_sections,
+        t.markdown,
         ccl.cluster_size
       FROM condensed_comments cc
       INNER JOIN comment_cluster_membership ccm ON cc.comment_id = ccm.comment_id
       INNER JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id
+      LEFT JOIN transcriptions t ON cc.comment_id = t.comment_id AND t.status = 'completed'
       LEFT JOIN (
         SELECT DISTINCT comment_id 
         FROM comment_theme_extracts
@@ -154,8 +156,10 @@ async function extractThemeContent(documentId: string, options: any) {
       SELECT DISTINCT 
         cc.comment_id, 
         cc.structured_sections,
+        t.markdown,
         1 as cluster_size
       FROM condensed_comments cc
+      LEFT JOIN transcriptions t ON cc.comment_id = t.comment_id AND t.status = 'completed'
       LEFT JOIN (
         SELECT DISTINCT comment_id 
         FROM comment_theme_extracts
@@ -175,6 +179,7 @@ async function extractThemeContent(documentId: string, options: any) {
   const comments = db.prepare(query).all(...params) as { 
     comment_id: string; 
     structured_sections: string;
+    markdown: string | null;
     cluster_size: number;
   }[];
   
@@ -202,7 +207,7 @@ async function extractThemeContent(documentId: string, options: any) {
         // Parse structured sections
         const sections = JSON.parse(comment.structured_sections || '{}');
         
-        // Build comment text with notable quotes included
+        // Build comment text from transcription + notable quotes
         let commentText = '';
         
         // Include key quotations if available
@@ -210,8 +215,8 @@ async function extractThemeContent(documentId: string, options: any) {
           commentText += `## Notable Quotes from Commenter\n${sections.keyQuotations}\n\n`;
         }
         
-        // Add the detailed content
-        commentText += `## Detailed Analysis\n${sections.detailedContent || JSON.stringify(sections)}`;
+        // Add the full transcription
+        commentText += comment.markdown || JSON.stringify(sections);
         
         // Build prompt
         const prompt = THEME_EXTRACT_PROMPT
