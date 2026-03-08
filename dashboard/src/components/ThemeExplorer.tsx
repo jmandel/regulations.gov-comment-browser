@@ -130,49 +130,51 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
     
     if (isFiltered) return null
     
+    // Tighter indentation on mobile (16px per level) vs desktop (20px)
+    const indentPx = depth * 16
+    const indentPxSm = depth * 20
+    
     return (
       <div key={theme.code} className="select-none">
         <div>
-          <div 
-            className="flex items-center py-2 px-2 sm:px-3 hover:bg-gray-50 rounded-lg cursor-pointer group"
-            style={{ paddingLeft: `${depth * 12 + 4}px` }}
+          <Link
+            to={`/themes/${theme.code}`}
+            className="flex items-start py-2 pl-1 sm:pl-3 pr-2 sm:pr-3 hover:bg-gray-50 rounded-lg cursor-pointer group hover:no-underline"
+            style={{ paddingLeft: `${indentPx + 4}px` }}
           >
-            {hasChildren && (
+            {/* Chevron - fixed width column */}
+            {hasChildren ? (
               <button
                 onClick={(e) => {
+                  e.preventDefault()
                   e.stopPropagation()
                   toggleNode(theme.code)
                 }}
-                className="mr-1 sm:mr-2 text-gray-400 hover:text-gray-600 p-1 -m-1 min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 sm:p-0 sm:m-0 flex items-center justify-center"
+                className="mt-0.5 text-gray-400 hover:text-gray-600 p-1 -m-1 min-h-[28px] min-w-[28px] sm:min-h-0 sm:min-w-0 sm:p-0 sm:m-0 flex items-center justify-center flex-shrink-0"
               >
                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
+            ) : (
+              <div className="w-4 flex-shrink-0" />
             )}
-            {!hasChildren && <div className="w-4 sm:w-6" />}
             
-            <Link 
-              to={`/themes/${theme.code}`}
-              className="flex-1 flex items-center justify-between hover:no-underline min-w-0"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center min-w-0">
-                  <span className="font-medium text-gray-900 flex-shrink-0 text-sm sm:text-base">{theme.code}</span>
-                  <span className="text-gray-600 ml-1.5 sm:ml-2 text-sm sm:text-base line-clamp-2 sm:line-clamp-none">{theme.label || theme.description}</span>
+            {/* Code - fixed width so labels align */}
+            <span className="font-mono font-semibold text-gray-400 text-sm w-9 sm:w-10 text-right flex-shrink-0 mt-0.5 mr-2">{theme.code}</span>
+            
+            {/* Label + comment count in a column */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-gray-900 text-sm sm:text-base leading-snug">{theme.label || theme.description}</span>
+                {/* Desktop: comment count + chevron on the right */}
+                <div className="hidden sm:flex items-center space-x-2 flex-shrink-0 mt-0.5">
                   {!shouldHideMetrics && (
-                    <span className="hidden sm:inline-flex">
-                      {hasSummary ? (
-                        <span className="ml-2 text-purple-600" title="Theme analysis available">
-                          <FileText className="h-3 w-3" />
-                        </span>
-                      ) : (
-                        theme.code.split('.').length > 2 && (
-                          <span className="ml-2 text-amber-500" title="Analysis at parent level">
-                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                            </svg>
-                          </span>
-                        )
-                      )}
+                    <span className="text-sm text-blue-600 font-medium whitespace-nowrap" title="Direct mentions">
+                      {theme.direct_count}
+                    </span>
+                  )}
+                  {!shouldHideMetrics && hasSummary && (
+                    <span className="text-purple-600" title="Theme analysis available">
+                      <FileText className="h-3 w-3" />
                     </span>
                   )}
                   {theme.detailedDescription && (
@@ -181,36 +183,29 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
                         e.preventDefault()
                         toggleDescription(theme.code, e)
                       }}
-                      className="hidden sm:inline-flex ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
                       title={isDescriptionExpanded ? "Hide description" : "Show description"}
                     >
                       <Info className="h-3 w-3" />
                     </button>
                   )}
+                  <ChevronRight className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                {!shouldHideMetrics && (
-                  <span className="sm:hidden text-xs text-blue-600 font-medium mt-0.5 block" title="Direct mentions">
-                    {theme.direct_count} {theme.direct_count === 1 ? 'comment' : 'comments'}
-                  </span>
-                )}
               </div>
-              
-              <div className="flex items-center space-x-4 text-sm flex-shrink-0">
-                {!shouldHideMetrics && (
-                  <span className="hidden sm:inline text-blue-600 font-medium" title="Direct mentions">
-                    {theme.direct_count} {theme.direct_count === 1 ? 'comment' : 'comments'}
-                  </span>
-                )}
-                <ChevronRight className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </Link>
-          </div>
+              {/* Mobile: comment count on its own line */}
+              {!shouldHideMetrics && (
+                <span className="sm:hidden text-xs text-blue-600 font-medium leading-tight">
+                  {theme.direct_count} {theme.direct_count === 1 ? 'comment' : 'comments'}
+                </span>
+              )}
+            </div>
+          </Link>
           
           {/* Inline description */}
           {isDescriptionExpanded && theme.detailedDescription && (
             <div 
               className="ml-6 mr-3 mb-2 p-3 bg-blue-50 rounded-lg text-sm text-gray-700 border border-blue-100"
-              style={{ marginLeft: `${depth * 24 + 48}px` }}
+              style={{ marginLeft: `${indentPxSm + 48}px` }}
             >
               {theme.detailedDescription}
             </div>
@@ -227,7 +222,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
   const visibleThemeCount = themes.length
   
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
+    <div className="sm:p-8 max-w-7xl mx-auto">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
         <div className="flex items-center space-x-3">
           <BarChart3 className="h-6 w-6 text-blue-600 flex-shrink-0" />
@@ -277,7 +272,7 @@ function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) 
       
       {/* Theme Tree */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-2 sm:p-6">
+        <div className="p-1 sm:p-6">
           {rootThemes.length > 0 ? (
             <div className="space-y-1">
               {rootThemes.map(theme => renderThemeNode(theme))}
