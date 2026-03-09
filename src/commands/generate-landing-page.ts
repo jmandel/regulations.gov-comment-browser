@@ -376,10 +376,63 @@ function generateHTML(regulations: RegulationInfo[]): string {
       opacity: 0.95;
     }
 
+    .skill-section .prompt-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      opacity: 0.85;
+    }
+
+    .prompt-box {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-bottom: 1rem;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .prompt-box:hover {
+      background: rgba(0,0,0,0.35);
+    }
+
+    .prompt-box code {
+      color: rgba(255,255,255,0.7);
+      font-style: italic;
+    }
+
+    .prompt-box .copy-hint {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.75rem;
+      font-size: 0.75rem;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+
+    .prompt-box:hover .copy-hint {
+      opacity: 1;
+    }
+
+    .prompt-box.copied {
+      background: rgba(0,0,0,0.4);
+    }
+
+    .prompt-box.copied .copy-hint {
+      opacity: 1;
+    }
+
     .skill-links {
       display: flex;
       gap: 1rem;
       flex-wrap: wrap;
+      align-items: center;
     }
 
     .skill-link {
@@ -406,6 +459,11 @@ function generateHTML(regulations: RegulationInfo[]): string {
 
     .skill-link-secondary:hover {
       background: rgba(255,255,255,0.25);
+    }
+
+    .skill-divider {
+      opacity: 0.5;
+      font-size: 0.875rem;
     }
 
     footer {
@@ -491,14 +549,37 @@ function generateHTML(regulations: RegulationInfo[]): string {
         <strong>Give your AI assistant direct access to this dataset.</strong> The AI skill
         teaches language models how to fetch, search, and analyze all ${totalComments.toLocaleString()} comments
         across ${regulations.length} dockets — including theme hierarchies, entity taxonomies,
-        and structured comment summaries. Point your AI tool at the skill file to get started.
+        and structured comment summaries.
       </p>
+      <div class="prompt-label">Copy this prompt to your AI assistant</div>
+      <div class="prompt-box" onclick="copyPrompt(this)">
+        <span class="copy-hint">Click to copy</span>
+        Please read https://joshuamandel.com/regulations.gov-comment-browser/skill/SKILL.md and then help me analyze public comments on federal regulations. <code>[Ask your question here]</code>
+      </div>
       <div class="skill-links">
-        <a href="./skill/SKILL.md" class="skill-link">
-          View Skill →
+        <a href="https://claude.ai/new?q=${encodeURIComponent('Please read https://joshuamandel.com/regulations.gov-comment-browser/skill/SKILL.md and then help me analyze public comments on federal regulations.')}" class="skill-link" target="_blank">
+          Open in Claude &rarr;
+        </a>
+        <span class="skill-divider">or</span>
+        <a href="./skill/SKILL.md" class="skill-link skill-link-secondary">
+          View Skill File
         </a>
       </div>
     </div>
+    <script>
+    function copyPrompt(el) {
+      const text = el.textContent.replace('Click to copy', '').trim();
+      navigator.clipboard.writeText(text).then(() => {
+        const hint = el.querySelector('.copy-hint');
+        hint.textContent = 'Copied!';
+        el.classList.add('copied');
+        setTimeout(() => {
+          hint.textContent = 'Click to copy';
+          el.classList.remove('copied');
+        }, 2000);
+      });
+    }
+    </script>
 
     <div class="about-section">
       <h2>About This Tool</h2>
