@@ -117,12 +117,12 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-gray-600 text-white px-2 py-0.5 rounded text-xs mr-2">COMMENTER PROFILE</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-gray-200">
+                <div className="text-sm pl-4 border-l-2 border-gray-200">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
@@ -138,12 +138,12 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-xs mr-2">CORE POSITION</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-purple-200">
+                <div className="text-sm pl-4 border-l-2 border-purple-200">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
@@ -161,7 +161,7 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                   <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY QUOTATIONS</span>
                   <Quote className="h-4 w-4 text-amber-600" />
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-amber-200">
+                <div className="text-sm pl-4 border-l-2 border-amber-200">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -198,12 +198,12 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY RECOMMENDATIONS</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-blue-200">
+                <div className="text-sm pl-4 border-l-2 border-blue-200">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
@@ -220,12 +220,12 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">MAIN CONCERNS</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-red-200">
+                <div className="text-sm pl-4 border-l-2 border-red-200">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
@@ -242,12 +242,12 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">NOTABLE INSIGHTS</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-green-200">
+                <div className="text-sm pl-4 border-l-2 border-green-200">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
@@ -263,7 +263,7 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-slate-600 text-white px-2 py-0.5 rounded text-xs mr-2">DETAILED CONTENT</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-slate-200">
+                <div className="text-sm pl-4 border-l-2 border-slate-200">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                   >

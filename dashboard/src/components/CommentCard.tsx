@@ -167,8 +167,8 @@ function CommentCard({
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                   <span className="bg-teal-600 text-white px-2 py-0.5 rounded text-xs mr-2">POSITIONS</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-teal-200">
-                  <ul className="list-disc space-y-1 ml-4">
+                <div className="pl-4 border-l-2 border-teal-200">
+                  <ul className="list-disc pl-4 space-y-1 text-sm">
                     {themeExtract.positions.map((p, i) => (
                       <li key={i} className="text-gray-800">{p}</li>
                     ))}
@@ -182,8 +182,8 @@ function CommentCard({
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                   <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">CONCERNS</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-red-200">
-                  <ul className="list-disc space-y-1 ml-4">
+                <div className="pl-4 border-l-2 border-red-200">
+                  <ul className="list-disc pl-4 space-y-1 text-sm">
                     {themeExtract.concerns.map((c, i) => (
                       <li key={i} className="text-gray-800">{c}</li>
                     ))}
@@ -197,8 +197,8 @@ function CommentCard({
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                   <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">RECOMMENDATIONS</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-blue-200">
-                  <ul className="list-disc space-y-1 ml-4">
+                <div className="pl-4 border-l-2 border-blue-200">
+                  <ul className="list-disc pl-4 space-y-1 text-sm">
                     {themeExtract.recommendations.map((r, i) => (
                       <li key={i} className="text-gray-800">{r}</li>
                     ))}
@@ -213,7 +213,7 @@ function CommentCard({
                   <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY QUOTES</span>
                   <Quote className="h-4 w-4 text-amber-600" />
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-amber-200 space-y-2">
+                <div className="pl-4 border-l-2 border-amber-200 space-y-2">
                   {themeExtract.key_quotes.map((q, i) => (
                     <blockquote key={i} className="border-l-4 border-amber-200 pl-4 py-2 bg-amber-50 rounded-r-lg">
                       <p className="text-sm text-gray-800 italic m-0">{q}</p>
@@ -228,8 +228,8 @@ function CommentCard({
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                   <span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">EXPERIENCES & EVIDENCE</span>
                 </h5>
-                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-green-200">
-                  <ul className="list-disc space-y-1 ml-4">
+                <div className="pl-4 border-l-2 border-green-200">
+                  <ul className="list-disc pl-4 space-y-1 text-sm">
                     {themeExtract.experiences.map((e, i) => (
                       <li key={i} className="text-gray-800">{e}</li>
                     ))}
@@ -266,12 +266,12 @@ function CommentCard({
                       <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                         <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-xs mr-2">CORE POSITION</span>
                       </h5>
-                      <div className="prose prose-sm max-w-none pl-4 border-l-2 border-purple-200">
+                      <div className="text-sm pl-4 border-l-2 border-purple-200">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
+                            ul: ({children}) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
                             li: ({children}) => <li className="text-gray-800">{children}</li>,
                           }}
                         >
@@ -289,18 +289,18 @@ function CommentCard({
                         <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY QUOTATIONS</span>
                         <Quote className="h-4 w-4 text-amber-600" />
                       </h5>
-                      <div className="prose prose-sm max-w-none pl-4 border-l-2 border-amber-200">
+                      <div className="text-sm pl-4 border-l-2 border-amber-200">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
                             li: ({children}) => (
-                              <li className="mb-2 list-none">
+                              <li className="mb-2" style={{ listStyle: 'none' }}>
                                 <blockquote className="border-l-4 border-amber-200 pl-4 py-2 bg-amber-50 rounded-r-lg">
                                   <p className="text-sm text-gray-800 italic m-0">{children}</p>
                                 </blockquote>
                               </li>
                             ),
-                            ul: ({children}) => <ul className="m-0 p-0 space-y-2">{children}</ul>,
+                            ul: ({children}) => <ul className="space-y-2" style={{ margin: 0, padding: 0 }}>{children}</ul>,
                             p: ({children}) => {
                               const text = String(children);
                               if (text.startsWith('"') || text.startsWith('\u201c')) {
@@ -327,12 +327,12 @@ function CommentCard({
                       <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                         <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY RECOMMENDATIONS</span>
                       </h5>
-                      <div className="prose prose-sm max-w-none pl-4 border-l-2 border-blue-200">
+                      <div className="text-sm pl-4 border-l-2 border-blue-200">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
+                            ul: ({children}) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
                             li: ({children}) => <li className="text-gray-800">{children}</li>,
                           }}
                         >
@@ -349,12 +349,12 @@ function CommentCard({
                       <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                         <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">MAIN CONCERNS</span>
                       </h5>
-                      <div className="prose prose-sm max-w-none pl-4 border-l-2 border-red-200">
+                      <div className="text-sm pl-4 border-l-2 border-red-200">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
+                            ul: ({children}) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
                             li: ({children}) => <li className="text-gray-800">{children}</li>,
                           }}
                         >
@@ -371,12 +371,12 @@ function CommentCard({
                       <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                         <span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">NOTABLE INSIGHTS</span>
                       </h5>
-                      <div className="prose prose-sm max-w-none pl-4 border-l-2 border-green-200">
+                      <div className="text-sm pl-4 border-l-2 border-green-200">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
+                            ul: ({children}) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
                             li: ({children}) => <li className="text-gray-800">{children}</li>,
                           }}
                         >
