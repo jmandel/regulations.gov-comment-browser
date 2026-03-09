@@ -144,8 +144,26 @@ async function condenseComments(documentId: string, options: any) {
       // Mark as processing
       markProcessing.run(comment.id);
       
-      // Build prompt using the transcription
-      const prompt = CONDENSE_PROMPT.replace("{COMMENT_TEXT}", comment.markdown);
+      // Build metadata from API attributes
+      const attrs = JSON.parse(comment.attributes_json || '{}');
+      const metadataParts: string[] = [];
+      if (attrs.firstName || attrs.lastName) {
+        metadataParts.push(`Submitter Name: ${[attrs.firstName, attrs.lastName].filter(Boolean).join(' ')}`);
+      }
+      if (attrs.organization) {
+        metadataParts.push(`Organization: ${attrs.organization}`);
+      }
+      if (attrs.category) {
+        metadataParts.push(`Category: ${attrs.category}`);
+      }
+      const metadataStr = metadataParts.length > 0
+        ? metadataParts.join('\n')
+        : 'No submitter metadata available';
+
+      // Build prompt using the transcription + metadata
+      const prompt = CONDENSE_PROMPT
+        .replace("{COMMENTER_METADATA}", metadataStr)
+        .replace("{COMMENT_TEXT}", comment.markdown);
       
       // Generate condensed version with caching metadata
       const response = await ai.generateContent(

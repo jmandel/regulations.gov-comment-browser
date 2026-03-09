@@ -58,6 +58,10 @@ You MUST organize every comment into these exact sections with these exact heade
 
 ---
 
-Here is the comment to distill:
+Here is metadata from the submission system for this comment:
+
+{COMMENTER_METADATA}
+
+And here is the comment to distill:
 
 {COMMENT_TEXT}`;

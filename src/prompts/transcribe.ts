@@ -14,12 +14,11 @@ Transcribe the FULL substantive content of the comment and all attachments into 
 - **Keep all quotations, statistics, and specific references** verbatim
 
 **The ONLY things to remove:**
-- Salutations and greetings ("Dear Secretary...", "To Whom It May Concern")
-- Closing pleasantries and sign-offs ("Thank you for the opportunity to comment", "Sincerely", "Respectfully submitted")
-- Signature blocks (name, title, address repeated at the end)
-- Pure boilerplate about the comment process itself ("Please see attached file(s)", "See the attached document for our comments", etc.)
 - Page headers/footers, letterhead artifacts, and formatting noise from PDF extraction
+- Pure boilerplate about the comment process itself ("Please see attached file(s)", "See the attached document for our comments", etc.)
 - Comment-box text that contains no substantive content beyond pointing to attachments — if the real content is in the attached documents, just transcribe those
+
+**Keep salutations, sign-offs, and signature blocks** only if they contain unique information (credentials, titles, affiliations, organizations) not already mentioned in the body of the comment. Strip them if they just repeat the commenter's name and address.
 
 **Do NOT remove or compress:**
 - Introductory paragraphs that establish who the commenter is and their stake in the issue
