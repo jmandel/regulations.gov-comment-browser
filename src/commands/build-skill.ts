@@ -369,7 +369,7 @@ All comments with structured summaries, theme scores, and entity tags.
 - \`submitterType\`: "Individual" or "Organization"
 - \`date\`: Submission timestamp
 
-**\`structuredSections\`** (AI-generated structured summary):
+**\`structuredSections\`**:
 - \`detailedContent\`: **The most important field.** A faithful markdown transcription of the
   original comment text plus all PDF attachments. This is the closest thing to the raw submission
   and should be your go-to for source-level analysis.
