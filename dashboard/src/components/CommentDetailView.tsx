@@ -121,8 +121,8 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal list-inside space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
@@ -142,8 +142,8 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal list-inside space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
@@ -202,8 +202,8 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal list-inside space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
@@ -224,8 +224,8 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal list-inside space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >
@@ -246,8 +246,8 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal list-inside space-y-1 ml-4">{children}</ol>,
+                      ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
                       li: ({children}) => <li className="text-gray-800">{children}</li>,
                     }}
                   >

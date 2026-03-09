@@ -9,7 +9,7 @@ interface ThemeExplorerProps {
   hideTopLevelMetrics?: boolean
 }
 
-function ThemeExplorer({ hideTopLevelMetrics = true }: ThemeExplorerProps = {}) {
+function ThemeExplorer({ hideTopLevelMetrics = false }: ThemeExplorerProps = {}) {
   const { themes, themeSummaries } = useStore()
   console.log('Rendering ThemeExplorer with themes:', themes)
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())

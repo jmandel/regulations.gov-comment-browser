@@ -168,7 +168,7 @@ function CommentCard({
                   <span className="bg-teal-600 text-white px-2 py-0.5 rounded text-xs mr-2">POSITIONS</span>
                 </h5>
                 <div className="prose prose-sm max-w-none pl-4 border-l-2 border-teal-200">
-                  <ul className="list-disc list-inside space-y-1 ml-4">
+                  <ul className="list-disc space-y-1 ml-4">
                     {themeExtract.positions.map((p, i) => (
                       <li key={i} className="text-gray-800">{p}</li>
                     ))}
@@ -183,7 +183,7 @@ function CommentCard({
                   <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">CONCERNS</span>
                 </h5>
                 <div className="prose prose-sm max-w-none pl-4 border-l-2 border-red-200">
-                  <ul className="list-disc list-inside space-y-1 ml-4">
+                  <ul className="list-disc space-y-1 ml-4">
                     {themeExtract.concerns.map((c, i) => (
                       <li key={i} className="text-gray-800">{c}</li>
                     ))}
@@ -198,7 +198,7 @@ function CommentCard({
                   <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">RECOMMENDATIONS</span>
                 </h5>
                 <div className="prose prose-sm max-w-none pl-4 border-l-2 border-blue-200">
-                  <ul className="list-disc list-inside space-y-1 ml-4">
+                  <ul className="list-disc space-y-1 ml-4">
                     {themeExtract.recommendations.map((r, i) => (
                       <li key={i} className="text-gray-800">{r}</li>
                     ))}
@@ -229,7 +229,7 @@ function CommentCard({
                   <span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">EXPERIENCES & EVIDENCE</span>
                 </h5>
                 <div className="prose prose-sm max-w-none pl-4 border-l-2 border-green-200">
-                  <ul className="list-disc list-inside space-y-1 ml-4">
+                  <ul className="list-disc space-y-1 ml-4">
                     {themeExtract.experiences.map((e, i) => (
                       <li key={i} className="text-gray-800">{e}</li>
                     ))}
@@ -270,8 +270,8 @@ function CommentCard({
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal list-inside space-y-1 ml-4">{children}</ol>,
+                            ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
                             li: ({children}) => <li className="text-gray-800">{children}</li>,
                           }}
                         >
@@ -331,8 +331,8 @@ function CommentCard({
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal list-inside space-y-1 ml-4">{children}</ol>,
+                            ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
                             li: ({children}) => <li className="text-gray-800">{children}</li>,
                           }}
                         >
@@ -353,8 +353,8 @@ function CommentCard({
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal list-inside space-y-1 ml-4">{children}</ol>,
+                            ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
                             li: ({children}) => <li className="text-gray-800">{children}</li>,
                           }}
                         >
@@ -375,8 +375,8 @@ function CommentCard({
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal list-inside space-y-1 ml-4">{children}</ol>,
+                            ul: ({children}) => <ul className="list-disc space-y-1 ml-4">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal space-y-1 ml-4">{children}</ol>,
                             li: ({children}) => <li className="text-gray-800">{children}</li>,
                           }}
                         >
