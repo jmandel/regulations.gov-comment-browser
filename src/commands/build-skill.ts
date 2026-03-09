@@ -124,7 +124,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
 
 function generateSkillMd(dockets: DocketInfo[], baseUrl: string): string {
   const docketTable = dockets.map(d =>
-    `| ${d.id} | ${truncate(d.title, 60)} | ${d.agency} | ${d.commentCount.toLocaleString()} | ${d.themeCount} | ${d.entityCount} |`
+    `| ${d.id} | ${d.title} | ${d.agency} | ${d.commentCount.toLocaleString()} | ${d.themeCount} | ${d.entityCount} |`
   ).join('\n');
 
   const generatedDate = new Date().toISOString().split('T')[0];
@@ -406,6 +406,3 @@ Maps entity labels (as "Category|Label") to arrays of comment IDs.
 `;
 }
 
-function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max - 3) + '...' : s;
-}
