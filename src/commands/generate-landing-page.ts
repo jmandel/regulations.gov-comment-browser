@@ -58,93 +58,82 @@ async function generateLandingPage(options: any) {
     const documentId = dbFile.replace('.sqlite', '');
     console.log(`  Processing ${documentId}...`);
     
-    try {
-      const db = openDb(documentId);
-      
-      // Read document details from database
-      let title = documentId;
-      let docketId = documentId;
-      let agency = "Unknown Agency";
-      let commentEndDate = "";
-      
-      try {
-        // Check if document_metadata table exists and has data
-        const hasMetadata = db.prepare(`
-          SELECT name FROM sqlite_master 
-          WHERE type='table' AND name='document_metadata'
-        `).get();
-        
-        if (hasMetadata) {
-          const metadata = db.prepare(`
-            SELECT title, docket_id, agency_name, agency_id, comment_end_date
-            FROM document_metadata
-            WHERE document_id = ?
-          `).get(documentId) as any;
-          
-          if (metadata) {
-            title = metadata.title || documentId;
-            docketId = metadata.docket_id || documentId;
-            agency = metadata.agency_name || metadata.agency_id || "Unknown Agency";
-            if (metadata.comment_end_date) commentEndDate = metadata.comment_end_date;
-          } else {
-            console.warn(`  ⚠️  No metadata found in database for ${documentId}`);
-          }
-        } else {
-          console.warn(`  ⚠️  No document_metadata table in database for ${documentId}`);
-        }
-      } catch (error) {
-        console.warn(`  ⚠️  Failed to read metadata for ${documentId}:`, error);
+    const db = openDb(documentId);
+
+    // Read document details from database
+    let title = documentId;
+    let docketId = documentId;
+    let agency = "Unknown Agency";
+    let commentEndDate = "";
+
+    const hasMetadata = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='document_metadata'
+    `).get();
+
+    if (hasMetadata) {
+      const metadata = db.prepare(`
+        SELECT title, docket_id, agency_name, agency_id, comment_end_date
+        FROM document_metadata
+        WHERE document_id = ?
+      `).get(documentId) as any;
+
+      if (metadata) {
+        title = metadata.title || documentId;
+        docketId = metadata.docket_id || documentId;
+        agency = metadata.agency_name || metadata.agency_id || "Unknown Agency";
+        if (metadata.comment_end_date) commentEndDate = metadata.comment_end_date;
+      } else {
+        console.warn(`  ⚠️  No metadata found in database for ${documentId}`);
       }
-      
-      // Get statistics
-      const stats = {
-        commentCount: (db.prepare("SELECT COUNT(*) as count FROM comments").get() as any).count,
-        condensedCount: (db.prepare("SELECT COUNT(*) as count FROM condensed_comments WHERE status = 'completed'").get() as any).count,
-        themeCount: (db.prepare("SELECT COUNT(*) as count FROM theme_hierarchy").get() as any).count,
-        scoredCount: (db.prepare("SELECT COUNT(DISTINCT comment_id) as count FROM comment_themes").get() as any).count,
-        summaryCount: (db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get() as any).count,
-      };
-      
-      // Fall back to latest comment date if no comment_end_date
-      if (!commentEndDate) {
-        try {
-          const latest = db.prepare(`
-            SELECT json_extract(attributes_json, '$.postedDate') as posted
-            FROM comments ORDER BY json_extract(attributes_json, '$.postedDate') DESC LIMIT 1
-          `).get() as any;
-          if (latest?.posted) commentEndDate = latest.posted;
-        } catch (_) {}
-      }
-      
-      // Determine processing status
-      let status = "Not Started";
-      if (stats.summaryCount > 0) {
-        status = "Complete";
-      } else if (stats.scoredCount > 0) {
-        status = "Themes Scored";
-      } else if (stats.themeCount > 0) {
-        status = "Themes Discovered";
-      } else if (stats.condensedCount > 0) {
-        status = "Condensed";
-      } else if (stats.commentCount > 0) {
-        status = "Comments Loaded";
-      }
-      
-      regulations.push({
-        id: documentId,
-        title,
-        docketId,
-        commentCount: stats.commentCount,
-        themeCount: stats.themeCount,
-        lastUpdated: commentEndDate || new Date().toISOString(),
-        agency,
-        status
-      });
-      
-      db.close();
-    } catch (error) {
-      console.error(`  ⚠️  Failed to process ${documentId}:`, error);
+    } else {
+      console.warn(`  ⚠️  No document_metadata table in database for ${documentId}`);
     }
+
+    // Get statistics
+    const stats = {
+      commentCount: (db.prepare("SELECT COUNT(*) as count FROM comments").get() as any).count,
+      condensedCount: (db.prepare("SELECT COUNT(*) as count FROM condensed_comments WHERE status = 'completed'").get() as any).count,
+      themeCount: (db.prepare("SELECT COUNT(*) as count FROM theme_hierarchy").get() as any).count,
+      scoredCount: (db.prepare("SELECT COUNT(DISTINCT comment_id) as count FROM comment_themes").get() as any).count,
+      summaryCount: (db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get() as any).count,
+    };
+
+    // Fall back to latest comment date if no comment_end_date
+    if (!commentEndDate) {
+      const latest = db.prepare(`
+        SELECT json_extract(attributes_json, '$.postedDate') as posted
+        FROM comments ORDER BY json_extract(attributes_json, '$.postedDate') DESC LIMIT 1
+      `).get() as any;
+      if (latest?.posted) commentEndDate = latest.posted;
+    }
+
+    // Determine processing status
+    let status = "Not Started";
+    if (stats.summaryCount > 0) {
+      status = "Complete";
+    } else if (stats.scoredCount > 0) {
+      status = "Themes Scored";
+    } else if (stats.themeCount > 0) {
+      status = "Themes Discovered";
+    } else if (stats.condensedCount > 0) {
+      status = "Condensed";
+    } else if (stats.commentCount > 0) {
+      status = "Comments Loaded";
+    }
+
+    regulations.push({
+      id: documentId,
+      title,
+      docketId,
+      commentCount: stats.commentCount,
+      themeCount: stats.themeCount,
+      lastUpdated: commentEndDate || new Date().toISOString(),
+      agency,
+      status
+    });
+
+    db.close();
   }
   
   // Sort by date (most recent first)
@@ -419,55 +408,6 @@ function generateHTML(regulations: RegulationInfo[]): string {
       background: rgba(255,255,255,0.25);
     }
 
-    .floodgate-section {
-      background: linear-gradient(135deg, #0077be 0%, #00a8cc 100%);
-      padding: 2rem;
-      border-radius: 0.5rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      margin-bottom: 3rem;
-      color: white;
-    }
-    
-    .floodgate-section h2 {
-      font-size: 1.75rem;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .floodgate-section p {
-      margin-bottom: 1.5rem;
-      opacity: 0.95;
-    }
-    
-    .floodgate-link {
-      display: inline-block;
-      background: white;
-      color: #0077be;
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.375rem;
-      text-decoration: none;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-    
-    .floodgate-link:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-    
-    .warning-badge {
-      display: inline-block;
-      background: rgba(255,255,255,0.2);
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-left: 1rem;
-    }
-    
     footer {
       text-align: center;
       padding: 2rem 0;
@@ -541,25 +481,6 @@ function generateHTML(regulations: RegulationInfo[]): string {
         <div class="stat-label">Themes Discovered</div>
         <div class="stat-value">${totalThemes.toLocaleString()}</div>
       </div>
-    </div>
-    
-    <div class="floodgate-section">
-      <h2>
-        🌊 FloodGate
-        <span class="warning-badge">Research Demo</span>
-      </h2>
-      <p>
-        <strong>Explore the future of public comment campaigns.</strong> FloodGate demonstrates how AI can generate 
-        thousands of unique, authentic-seeming comments that share core arguments but vary dramatically in expression. 
-        This proof-of-concept tool shows why traditional form letter detection methods may soon become obsolete.
-      </p>
-      <p>
-        Try generating a few comments to see how different they can be while maintaining the same position. 
-        This is a research demonstration only—not for actual submission to government agencies.
-      </p>
-      <a href="./floodgate/" class="floodgate-link">
-        Launch FloodGate Demo →
-      </a>
     </div>
     
     <div class="skill-section">
