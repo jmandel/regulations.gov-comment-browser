@@ -560,9 +560,10 @@ function generateHTML(regulations: RegulationInfo[]): string {
         <a href="https://claude.ai/new?q=${encodeURIComponent('Please read https://joshuamandel.com/regulations.gov-comment-browser/skill/SKILL.md and then help me analyze public comments on federal regulations.')}" class="skill-link" target="_blank">
           Open in Claude &rarr;
         </a>
-        <a href="https://chatgpt.com/?q=${encodeURIComponent('Please read https://joshuamandel.com/regulations.gov-comment-browser/skill/SKILL.md and then help me analyze public comments on federal regulations.')}" class="skill-link" target="_blank">
+        <!-- ChatGPT sandbox prevents web access, so this doesn't work -->
+        <!-- <a href="https://chatgpt.com/?q=${encodeURIComponent('Please read https://joshuamandel.com/regulations.gov-comment-browser/skill/SKILL.md and then help me analyze public comments on federal regulations.')}" class="skill-link" target="_blank">
           Open in ChatGPT &rarr;
-        </a>
+        </a> -->
         <span class="skill-divider">or</span>
         <a href="./skill/SKILL.md" class="skill-link skill-link-secondary">
           View Skill File
