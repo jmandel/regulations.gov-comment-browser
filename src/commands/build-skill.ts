@@ -402,7 +402,8 @@ Maps entity labels (as "Category|Label") to arrays of comment IDs.
 ## Tips
 
 - Comments can be large (the full comments.json for a 9,000-comment docket is several hundred MB).
-  For large dockets, prefer using theme-summaries or indexes first, then fetch comments only when needed.
+  For large dockets, use theme-summaries or indexes to orient yourself, then fetch the full comments
+  for source-level analysis.
 - When searching comments, \`structuredSections.detailedContent\` is the most comprehensive field,
   but \`keyQuotations\` and \`keyRecommendations\` are useful for targeted searches.
 - Theme codes are hierarchical: "1.1" is a sub-theme of "1". Use the parent for broader analysis.
