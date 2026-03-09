@@ -65,6 +65,7 @@ async function generateLandingPage(options: any) {
       let title = documentId;
       let docketId = documentId;
       let agency = "Unknown Agency";
+      let commentEndDate = "";
       
       try {
         // Check if document_metadata table exists and has data
@@ -84,6 +85,7 @@ async function generateLandingPage(options: any) {
             title = metadata.title || documentId;
             docketId = metadata.docket_id || documentId;
             agency = metadata.agency_name || metadata.agency_id || "Unknown Agency";
+            if (metadata.comment_end_date) commentEndDate = metadata.comment_end_date;
           } else {
             console.warn(`  ⚠️  No metadata found in database for ${documentId}`);
           }
@@ -103,8 +105,7 @@ async function generateLandingPage(options: any) {
         summaryCount: (db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get() as any).count,
       };
       
-      // Get comment close date or latest comment date as fallback
-      let commentEndDate = (metadata as any)?.comment_end_date || "";
+      // Fall back to latest comment date if no comment_end_date
       if (!commentEndDate) {
         try {
           const latest = db.prepare(`
