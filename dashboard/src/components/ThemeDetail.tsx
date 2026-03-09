@@ -9,12 +9,13 @@ import CopyCommentsModal from './CopyCommentsModal'
 
 function ThemeDetail() {
   const { themeCode } = useParams<{ themeCode: string }>()
-  const { themes, themeSummaries, getCommentsForTheme } = useStore()
+  const { themes, themeSummaries, getCommentsForTheme, themeExtracts } = useStore()
   const [showCopyModal, setShowCopyModal] = useState(false)
   
   const theme = themes.find(t => t.code === themeCode)
   const themeSummary = themeCode ? themeSummaries[themeCode] : undefined
   const { direct } = themeCode ? getCommentsForTheme(themeCode) : { direct: [] }
+  const extracts = themeCode ? themeExtracts[themeCode] || {} : {}
   
   // Filter to only show representative comments (or all if no clustering)
   const displayedComments = direct.filter(c => 
@@ -213,11 +214,13 @@ function ThemeDetail() {
         {displayedComments.length > 0 ? (
           <div className="space-y-4">
             {displayedComments.map(comment => (
-              <CommentCard 
-                key={comment.id} 
-                comment={comment} 
+              <CommentCard
+                key={comment.id}
+                comment={comment}
                 showThemes={false}
                 showEntities={false}
+                themeExtract={extracts[comment.id]}
+                themeCode={themeCode}
               />
             ))}
           </div>

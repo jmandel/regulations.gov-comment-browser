@@ -360,6 +360,60 @@ function generateHTML(regulations: RegulationInfo[]): string {
       margin-left: 1rem;
     }
     
+    .skill-section {
+      background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
+      padding: 2rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 1.5rem;
+      color: white;
+    }
+
+    .skill-section h2 {
+      font-size: 1.75rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .skill-section p {
+      margin-bottom: 1.5rem;
+      opacity: 0.95;
+    }
+
+    .skill-links {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .skill-link {
+      display: inline-block;
+      background: white;
+      color: #5b21b6;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.375rem;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .skill-link:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .skill-link-secondary {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .skill-link-secondary:hover {
+      background: rgba(255,255,255,0.25);
+    }
+
     .floodgate-section {
       background: linear-gradient(135deg, #0077be 0%, #00a8cc 100%);
       padding: 2rem;
@@ -498,6 +552,23 @@ function generateHTML(regulations: RegulationInfo[]): string {
       </a>
     </div>
     
+    <div class="skill-section">
+      <h2>
+        AI Skill
+      </h2>
+      <p>
+        <strong>Give your AI assistant direct access to this dataset.</strong> The AI skill
+        teaches language models how to fetch, search, and analyze all ${totalComments.toLocaleString()} comments
+        across ${regulations.length} dockets — including theme hierarchies, entity taxonomies,
+        and structured comment summaries. Point your AI tool at the skill file to get started.
+      </p>
+      <div class="skill-links">
+        <a href="./skill/SKILL.md" class="skill-link">
+          View Skill →
+        </a>
+      </div>
+    </div>
+
     <div class="about-section">
       <h2>About This Tool</h2>
       <p>

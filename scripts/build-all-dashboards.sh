@@ -207,6 +207,10 @@ main() {
         BUILT_DASHBOARDS+=("$(basename "$db_file" .sqlite)")
     done
     
+    # Build AI skill package
+    log_info "Building AI skill package..."
+    bun run src/cli.ts build-skill --db-dir "$DB_DIR" --output "$OUTPUT_DIR/skill"
+
     # Generate landing page
     log_info "Generating landing page..."
     bun run src/cli.ts generate-landing-page --db-dir "$DB_DIR" --output "$OUTPUT_DIR/index.html"

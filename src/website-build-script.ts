@@ -47,7 +47,10 @@ async function buildWebsite(documentId: string, options: any) {
   
   // 7. Generate indexes for efficient lookups
   await generateIndexes(db, outputDir);
-  
+
+  // 8. Export theme extracts (per-comment, per-theme analysis)
+  await exportThemeExtracts(db, outputDir);
+
   console.log(`✅ Website data built in ${outputDir}`);
   db.close();
 }
@@ -531,6 +534,49 @@ async function generateIndexes(db: any, outputDir: string) {
   }
   
   await writeJson(join(outputDir, "indexes", "entity-comments.json"), entityMap);
+}
+
+async function exportThemeExtracts(db: any, outputDir: string) {
+  console.log("  📋 Exporting theme extracts...");
+
+  // Check if the table exists
+  const hasTable = db.prepare(`
+    SELECT name FROM sqlite_master
+    WHERE type='table' AND name='comment_theme_extracts'
+  `).get();
+
+  if (!hasTable) {
+    console.log("  ⏭️  No comment_theme_extracts table, skipping");
+    return;
+  }
+
+  const rows = db.prepare(`
+    SELECT theme_code, comment_id, extract_json
+    FROM comment_theme_extracts
+    ORDER BY theme_code, comment_id
+  `).all();
+
+  if (rows.length === 0) {
+    console.log("  ⏭️  No theme extracts found, skipping");
+    return;
+  }
+
+  const extractsMap: any = {};
+  for (const row of rows) {
+    if (!extractsMap[row.theme_code]) {
+      extractsMap[row.theme_code] = {};
+    }
+    try {
+      const parsed = JSON.parse(row.extract_json);
+      // Unwrap the { relevance, extract: { ... } } wrapper if present
+      extractsMap[row.theme_code][row.comment_id] = parsed.extract || parsed;
+    } catch (e) {
+      console.warn(`  ⚠️  Failed to parse extract for ${row.comment_id}/${row.theme_code}`);
+    }
+  }
+
+  await writeJson(join(outputDir, "theme-extracts.json"), extractsMap);
+  console.log(`  ✅ Exported theme extracts for ${Object.keys(extractsMap).length} themes (${rows.length} total extracts)`);
 }
 
 async function writeJson(path: string, data: any) {

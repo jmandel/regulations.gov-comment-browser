@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary } from '../types'
+import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtractsMap } from '../types'
 import { parseThemeDescription } from '../utils/helpers'
 
 interface FilterOptions {
@@ -21,6 +21,7 @@ interface StoreState {
   searchQuery: string
   themeIndex: ThemeIndex
   entityIndex: EntityIndex
+  themeExtracts: ThemeExtractsMap
   organizationCategory: string | null
   
   // UI state
@@ -53,6 +54,7 @@ const useStore = create<StoreState>((set, get) => ({
   comments: [],
   themeIndex: {},
   entityIndex: {},
+  themeExtracts: {},
   organizationCategory: null,
   
   // UI state
@@ -86,7 +88,7 @@ const useStore = create<StoreState>((set, get) => ({
     set({ loading: true, error: null })
     
     try {
-      const [meta, themes, themeSummaries, entities, comments, themeIndex, entityIndex] = await Promise.all([
+      const [meta, themes, themeSummaries, entities, comments, themeIndex, entityIndex, themeExtracts] = await Promise.all([
         fetch('./data/meta.json').then(r => r.json()),
         fetch('./data/themes.json').then(r => r.json()),
         fetch('./data/theme-summaries.json').then(r => r.json()),
@@ -94,6 +96,7 @@ const useStore = create<StoreState>((set, get) => ({
         fetch('./data/comments.json').then(r => r.json()),
         fetch('./data/indexes/theme-comments.json').then(r => r.json()),
         fetch('./data/indexes/entity-comments.json').then(r => r.json()),
+        fetch('./data/theme-extracts.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
       ])
       
       // Parse theme descriptions
@@ -130,6 +133,7 @@ const useStore = create<StoreState>((set, get) => ({
         comments: commentsWithCounts,
         themeIndex,
         entityIndex,
+        themeExtracts,
         organizationCategory: orgCategory,
         loading: false,
         error: null,

@@ -136,6 +136,20 @@ export interface Comment {
   isAlignedSummary?: boolean
 }
 
+export interface ThemeExtract {
+  positions?: string[]
+  concerns?: string[]
+  recommendations?: string[]
+  key_quotes?: string[]
+  experiences?: string[]
+}
+
+export interface ThemeExtractsMap {
+  [themeCode: string]: {
+    [commentId: string]: ThemeExtract
+  }
+}
+
 export interface ThemeIndex {
   [themeCode: string]: {
     direct: string[]

@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { getRegulationsGovUrl, formatDate } from '../utils/helpers'
 import clsx from 'clsx'
 import { useState } from 'react'
-import type { Comment } from '../types'
+import type { Comment, ThemeExtract } from '../types'
 import CopyCommentsModal from './CopyCommentsModal'
 
 interface CommentCardProps {
@@ -13,6 +13,8 @@ interface CommentCardProps {
   showThemes?: boolean
   showEntities?: boolean
   clickable?: boolean
+  themeExtract?: ThemeExtract
+  themeCode?: string
   sections?: {
     oneLineSummary?: boolean
     corePosition?: boolean
@@ -32,12 +34,14 @@ const defaultSections = {
   keyQuotations: false
 }
 
-function CommentCard({ 
-  comment, 
-  showThemes = true, 
-  showEntities = true, 
+function CommentCard({
+  comment,
+  showThemes = true,
+  showEntities = true,
   clickable = true,
-  sections = defaultSections 
+  themeExtract,
+  themeCode,
+  sections = defaultSections
 }: CommentCardProps) {
   const [showCopyModal, setShowCopyModal] = useState(false)
   const regulationsUrl = getRegulationsGovUrl(comment.documentId || '', comment.id)
@@ -144,20 +148,109 @@ function CommentCard({
           </div>
         )}
         
-        {/* Condensed Comment Section */}
-        {comment.structuredSections ? (
+        {/* Theme-Specific Extract (shown when viewing from a theme page) */}
+        {themeExtract ? (
           <>
-            {/* Use the structured sections */}
+            {/* One-line summary for commenter context */}
+            {comment.structuredSections?.oneLineSummary && (
+              <div className="mb-4">
+                <p className="text-base font-medium text-gray-900 italic">{comment.structuredSections.oneLineSummary}</p>
+              </div>
+            )}
+
+            <div className="mb-3 p-2 bg-teal-50 border border-teal-200 rounded text-xs text-teal-800">
+              Analysis specific to theme {themeCode}
+            </div>
+
+            {themeExtract.positions && themeExtract.positions.length > 0 && (
+              <div className="mb-6">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
+                  <span className="bg-teal-600 text-white px-2 py-0.5 rounded text-xs mr-2">POSITIONS</span>
+                </h5>
+                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-teal-200">
+                  <ul className="list-disc list-inside space-y-1 ml-4">
+                    {themeExtract.positions.map((p, i) => (
+                      <li key={i} className="text-gray-800">{p}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {themeExtract.concerns && themeExtract.concerns.length > 0 && (
+              <div className="mb-6">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
+                  <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">CONCERNS</span>
+                </h5>
+                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-red-200">
+                  <ul className="list-disc list-inside space-y-1 ml-4">
+                    {themeExtract.concerns.map((c, i) => (
+                      <li key={i} className="text-gray-800">{c}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {themeExtract.recommendations && themeExtract.recommendations.length > 0 && (
+              <div className="mb-6">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
+                  <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">RECOMMENDATIONS</span>
+                </h5>
+                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-blue-200">
+                  <ul className="list-disc list-inside space-y-1 ml-4">
+                    {themeExtract.recommendations.map((r, i) => (
+                      <li key={i} className="text-gray-800">{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {themeExtract.key_quotes && themeExtract.key_quotes.length > 0 && (
+              <div className="mb-6">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
+                  <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY QUOTES</span>
+                  <Quote className="h-4 w-4 text-amber-600" />
+                </h5>
+                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-amber-200 space-y-2">
+                  {themeExtract.key_quotes.map((q, i) => (
+                    <blockquote key={i} className="border-l-4 border-amber-200 pl-4 py-2 bg-amber-50 rounded-r-lg">
+                      <p className="text-sm text-gray-800 italic m-0">{q}</p>
+                    </blockquote>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {themeExtract.experiences && themeExtract.experiences.length > 0 && (
+              <div className="mb-6">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
+                  <span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">EXPERIENCES & EVIDENCE</span>
+                </h5>
+                <div className="prose prose-sm max-w-none pl-4 border-l-2 border-green-200">
+                  <ul className="list-disc list-inside space-y-1 ml-4">
+                    {themeExtract.experiences.map((e, i) => (
+                      <li key={i} className="text-gray-800">{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </>
+        ) : comment.structuredSections ? (
+          <>
+            {/* Generic structured sections (default view) */}
             {(() => {
-              const { 
-                oneLineSummary, 
-                corePosition, 
-                keyRecommendations, 
-                mainConcerns, 
+              const {
+                oneLineSummary,
+                corePosition,
+                keyRecommendations,
+                mainConcerns,
                 notableExperiences,
-                keyQuotations 
+                keyQuotations
               } = comment.structuredSections;
-              
+
               return (
                 <>
                   {/* One-line Summary */}
@@ -166,7 +259,7 @@ function CommentCard({
                       <p className="text-base font-medium text-gray-900 italic">{oneLineSummary}</p>
                     </div>
                   )}
-                  
+
                   {/* Core Position */}
                   {sections.corePosition && corePosition && (
                     <div className="mb-6">
@@ -174,7 +267,7 @@ function CommentCard({
                         <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-xs mr-2">CORE POSITION</span>
                       </h5>
                       <div className="prose prose-sm max-w-none pl-4 border-l-2 border-purple-200">
-                        <ReactMarkdown 
+                        <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
                             ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
@@ -187,9 +280,9 @@ function CommentCard({
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Key Quotations */}
-                  {sections.keyQuotations && keyQuotations && 
+                  {sections.keyQuotations && keyQuotations &&
                    keyQuotations !== "No standout quotations" && (
                     <div className="mb-6">
                       <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
@@ -197,7 +290,7 @@ function CommentCard({
                         <Quote className="h-4 w-4 text-amber-600" />
                       </h5>
                       <div className="prose prose-sm max-w-none pl-4 border-l-2 border-amber-200">
-                        <ReactMarkdown 
+                        <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
                             li: ({children}) => (
@@ -210,7 +303,7 @@ function CommentCard({
                             ul: ({children}) => <ul className="m-0 p-0 space-y-2">{children}</ul>,
                             p: ({children}) => {
                               const text = String(children);
-                              if (text.startsWith('"') || text.startsWith('"')) {
+                              if (text.startsWith('"') || text.startsWith('\u201c')) {
                                 return (
                                   <blockquote className="border-l-4 border-amber-200 pl-4 py-2 bg-amber-50 rounded-r-lg mb-2">
                                     <p className="text-sm text-gray-800 italic m-0">{children}</p>
@@ -226,16 +319,16 @@ function CommentCard({
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Key Recommendations */}
-                  {sections.keyRecommendations && keyRecommendations && 
+                  {sections.keyRecommendations && keyRecommendations &&
                    keyRecommendations !== "No specific recommendations provided" && (
                     <div className="mb-6">
                       <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                         <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY RECOMMENDATIONS</span>
                       </h5>
                       <div className="prose prose-sm max-w-none pl-4 border-l-2 border-blue-200">
-                        <ReactMarkdown 
+                        <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
                             ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
@@ -248,16 +341,16 @@ function CommentCard({
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Main Concerns */}
-                  {sections.mainConcerns && mainConcerns && 
+                  {sections.mainConcerns && mainConcerns &&
                    mainConcerns !== "No specific concerns raised" && (
                     <div className="mb-6">
                       <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                         <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">MAIN CONCERNS</span>
                       </h5>
                       <div className="prose prose-sm max-w-none pl-4 border-l-2 border-red-200">
-                        <ReactMarkdown 
+                        <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
                             ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,
@@ -270,16 +363,16 @@ function CommentCard({
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Notable Experiences */}
-                  {sections.notableExperiences && notableExperiences && 
+                  {sections.notableExperiences && notableExperiences &&
                    notableExperiences !== "No distinctive experiences shared" && (
                     <div className="mb-6">
                       <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
                         <span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">NOTABLE INSIGHTS</span>
                       </h5>
                       <div className="prose prose-sm max-w-none pl-4 border-l-2 border-green-200">
-                        <ReactMarkdown 
+                        <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
                             ul: ({children}) => <ul className="list-disc list-inside space-y-1 ml-4">{children}</ul>,

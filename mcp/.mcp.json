@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "regulations-comment-browser": {
-      "type": "http",
-      "url": "http://localhost:3000/mcp"
-    }
-  }
-}
