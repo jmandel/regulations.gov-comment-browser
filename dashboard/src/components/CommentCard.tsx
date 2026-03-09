@@ -210,7 +210,7 @@ function CommentCard({
             {themeExtract.key_quotes && themeExtract.key_quotes.length > 0 && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
-                  <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY QUOTES</span>
+                  <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs mr-2">KEY QUOTATIONS</span>
                   <Quote className="h-4 w-4 text-amber-600" />
                 </h5>
                 <div className="pl-4 border-l-2 border-amber-200 space-y-2">
