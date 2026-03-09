@@ -24,7 +24,8 @@ function CommentBrowser() {
   const [localSearchQuery, setLocalSearchQuery] = useState(filters?.searchQuery || '')
   const [submitterTypeSearch, setSubmitterTypeSearch] = useState('')
   const [entitySearch, setEntitySearch] = useState('')
-  const ITEMS_PER_PAGE = 100
+  const PAGE_SIZE_OPTIONS = [50, 100, 250, 500]
+  const [itemsPerPage, setItemsPerPage] = useState(100)
   
   // Debounced search handler - use useRef to avoid recreating on every render
   const debouncedSetSearchQuery = useMemo(
@@ -111,10 +112,10 @@ function CommentBrowser() {
   }, [comments, themes, entities, submitterTypeSearch, entitySearch])
   
   // Pagination
-  const totalPages = Math.ceil(filteredComments.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredComments.length / itemsPerPage)
   const paginatedComments = filteredComments.slice(
-    page * ITEMS_PER_PAGE,
-    (page + 1) * ITEMS_PER_PAGE
+    page * itemsPerPage,
+    (page + 1) * itemsPerPage
   )
   
   const commentsToCopy = filteredComments
@@ -389,7 +390,7 @@ function CommentBrowser() {
       
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center space-x-2">
+        <div className="flex justify-center items-center space-x-2 flex-wrap gap-y-2">
           <button
             onClick={() => setPage(Math.max(0, page - 1))}
             disabled={page === 0}
@@ -397,11 +398,11 @@ function CommentBrowser() {
           >
             Previous
           </button>
-          
+
           <span className="text-sm text-gray-600">
             Page {page + 1} of {totalPages}
           </span>
-          
+
           <button
             onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
             disabled={page === totalPages - 1}
@@ -409,6 +410,19 @@ function CommentBrowser() {
           >
             Next
           </button>
+
+          <select
+            value={itemsPerPage}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value))
+              setPage(0)
+            }}
+            className="ml-4 px-2 py-2 border rounded-lg text-sm text-gray-600"
+          >
+            {PAGE_SIZE_OPTIONS.map(size => (
+              <option key={size} value={size}>{size} per page</option>
+            ))}
+          </select>
         </div>
       )}
       
