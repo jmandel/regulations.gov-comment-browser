@@ -197,9 +197,14 @@ require searching. Here's the decision tree:
 3. Optionally fetch \`theme-summaries.json\` for the top themes
 
 ### General principle
-Fetch the full comments and search through them unless a preexisting theme analysis is directly
-relevant to the user's question. The theme summaries are a great starting point, but the real
-evidence — specific quotes, nuanced positions, surprising arguments — lives in the comments.
+**Strongly prefer the full comments as your primary source.** The \`comments.json\` file contains
+each commenter's \`detailedContent\` (faithfully condensed from the original submission) along with
+submitter name, type, and profile — this is the unadorned ground truth of what people actually said.
+Theme summaries, extracts, and entity indexes are useful for orientation and navigation, but they
+are pre-digested interpretations. Whenever a query seems to require or benefit from source-level
+analysis — specific arguments, direct quotes, who said what, or any question where nuance matters —
+go to the full comments. The pre-canned themes and summaries are a convenient map, but the comments
+are the territory.
 
 ## Data Files Reference
 
