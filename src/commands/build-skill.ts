@@ -140,7 +140,6 @@ description: |
   submitted comments on a regulation, or what organizations think about a policy proposal.
   Provides AI-generated theme hierarchies, structured comment summaries, entity taxonomies, and
   full comment text for ${dockets.length} federal regulation dockets with ${dockets.reduce((s, d) => s + d.commentCount, 0).toLocaleString()} total comments.
-allowed-tools: WebFetch
 ---
 
 # Regulations.gov Comment Browser
@@ -160,7 +159,7 @@ ${docketTable}
 
 ## Fetching Data
 
-All data is publicly hosted as static JSON. Use \`WebFetch\` to retrieve any file.
+All data is publicly hosted as static JSON. Fetch any file by URL.
 
 **URL pattern:**
 \`\`\`
