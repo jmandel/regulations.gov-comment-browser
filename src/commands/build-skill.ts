@@ -364,14 +364,24 @@ All comments with structured summaries, theme scores, and entity tags.
 ]
 \`\`\`
 
-Key fields in \`structuredSections\`:
+**Submitter fields** (top-level on each comment):
+- \`submitter\`: Name of the person or organization
+- \`submitterType\`: "Individual" or "Organization"
+- \`date\`: Submission timestamp
+
+**\`structuredSections\`** (AI-generated structured summary):
+- \`detailedContent\`: **The most important field.** A faithful markdown transcription of the
+  original comment text plus all PDF attachments. This is the closest thing to the raw submission
+  and should be your go-to for source-level analysis.
+- \`commenterProfile\`: Who the commenter is, their expertise, role, and stake
 - \`oneLineSummary\`: Quick overview of the comment's position
 - \`corePosition\`: The central argument (1-2 paragraphs)
 - \`keyRecommendations\`: Specific proposals, often numbered
 - \`mainConcerns\`: Problems or risks identified
 - \`keyQuotations\`: Notable direct quotes from the original comment
-- \`detailedContent\`: Full condensed text — use this for thorough searching
-- \`commenterProfile\`: Who the commenter is, their expertise and stake
+
+Together, the submitter metadata and \`detailedContent\` provide a full picture of who said what.
+The other \`structuredSections\` fields are useful shortcuts but are AI-distilled from the same source.
 
 \`themeScores\` is an array of theme codes (from themes.json) that this comment is relevant to.
 
