@@ -24,7 +24,7 @@ function CommentBrowser() {
   const [localSearchQuery, setLocalSearchQuery] = useState(filters?.searchQuery || '')
   const [submitterTypeSearch, setSubmitterTypeSearch] = useState('')
   const [entitySearch, setEntitySearch] = useState('')
-  const PAGE_SIZE_OPTIONS = [50, 100, 250, 500]
+  const PAGE_SIZE_OPTIONS = [50, 100, 250, 500, 1000, 1500, 2000]
   const [itemsPerPage, setItemsPerPage] = useState(100)
   
   // Debounced search handler - use useRef to avoid recreating on every render
