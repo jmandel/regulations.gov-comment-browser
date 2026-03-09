@@ -11,6 +11,7 @@
     "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "@types/lodash": "^4.17.18",
     "clsx": "^2.0.0",
     "lodash": "^4.17.21",
