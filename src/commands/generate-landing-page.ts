@@ -75,7 +75,7 @@ async function generateLandingPage(options: any) {
         
         if (hasMetadata) {
           const metadata = db.prepare(`
-            SELECT title, docket_id, agency_name, agency_id
+            SELECT title, docket_id, agency_name, agency_id, comment_end_date
             FROM document_metadata
             WHERE document_id = ?
           `).get(documentId) as any;
@@ -103,13 +103,17 @@ async function generateLandingPage(options: any) {
         summaryCount: (db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get() as any).count,
       };
       
-      // Get last update time
-      const lastComment = db.prepare(`
-        SELECT created_at 
-        FROM comments 
-        ORDER BY created_at DESC 
-        LIMIT 1
-      `).get() as { created_at: string } | undefined;
+      // Get comment close date or latest comment date as fallback
+      let commentEndDate = (metadata as any)?.comment_end_date || "";
+      if (!commentEndDate) {
+        try {
+          const latest = db.prepare(`
+            SELECT json_extract(attributes_json, '$.postedDate') as posted
+            FROM comments ORDER BY json_extract(attributes_json, '$.postedDate') DESC LIMIT 1
+          `).get() as any;
+          if (latest?.posted) commentEndDate = latest.posted;
+        } catch (_) {}
+      }
       
       // Determine processing status
       let status = "Not Started";
@@ -131,7 +135,7 @@ async function generateLandingPage(options: any) {
         docketId,
         commentCount: stats.commentCount,
         themeCount: stats.themeCount,
-        lastUpdated: lastComment?.created_at || new Date().toISOString(),
+        lastUpdated: commentEndDate || new Date().toISOString(),
         agency,
         status
       });
@@ -142,8 +146,8 @@ async function generateLandingPage(options: any) {
     }
   }
   
-  // Sort by comment count (descending)
-  regulations.sort((a, b) => b.commentCount - a.commentCount);
+  // Sort by date (most recent first)
+  regulations.sort((a, b) => (b.lastUpdated || "").localeCompare(a.lastUpdated || ""));
   
   // Generate HTML
   const html = generateHTML(regulations);
@@ -504,6 +508,11 @@ function generateHTML(regulations: RegulationInfo[]): string {
             <div class="meta-item">
               <strong>${reg.agency}</strong>
             </div>
+            ${reg.lastUpdated ? `
+            <div class="meta-item">
+              Closed <strong>${new Date(reg.lastUpdated).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</strong>
+            </div>
+            ` : ''}
             <div class="meta-item">
               <strong>${reg.commentCount.toLocaleString()}</strong> comments
             </div>

@@ -18,6 +18,7 @@ interface DocketInfo {
   commentCount: number;
   themeCount: number;
   entityCount: number;
+  lastCommentDate: string;
   generatedAt: string;
 }
 
@@ -55,6 +56,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
 
       let title = documentId;
       let agency = "Unknown Agency";
+      let lastCommentDate = "";
 
       try {
         const hasMetadata = db.prepare(`
@@ -64,7 +66,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
 
         if (hasMetadata) {
           const metadata = db.prepare(`
-            SELECT title, agency_name, agency_id
+            SELECT title, agency_name, agency_id, comment_end_date
             FROM document_metadata
             WHERE document_id = ?
           `).get(documentId) as any;
@@ -72,9 +74,23 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
           if (metadata) {
             title = metadata.title || documentId;
             agency = metadata.agency_name || metadata.agency_id || "Unknown Agency";
+            if (metadata.comment_end_date) {
+              lastCommentDate = metadata.comment_end_date;
+            }
           }
         }
       } catch (_) {}
+
+      // Fall back to latest comment date if no comment_end_date
+      if (!lastCommentDate) {
+        try {
+          const latest = db.prepare(`
+            SELECT json_extract(attributes_json, '$.postedDate') as posted
+            FROM comments ORDER BY json_extract(attributes_json, '$.postedDate') DESC LIMIT 1
+          `).get() as any;
+          if (latest?.posted) lastCommentDate = latest.posted;
+        } catch (_) {}
+      }
 
       const commentCount = (db.prepare("SELECT COUNT(*) as count FROM comments").get() as any).count;
       const themeCount = (db.prepare("SELECT COUNT(*) as count FROM theme_hierarchy").get() as any).count;
@@ -91,6 +107,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
         commentCount,
         themeCount,
         entityCount,
+        lastCommentDate,
         generatedAt: new Date().toISOString(),
       });
 
@@ -100,7 +117,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
     }
   }
 
-  dockets.sort((a, b) => b.commentCount - a.commentCount);
+  dockets.sort((a, b) => (b.lastCommentDate || "").localeCompare(a.lastCommentDate || ""));
 
   const skillMd = generateSkillMd(dockets, baseUrl);
 
@@ -123,9 +140,10 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
 }
 
 function generateSkillMd(dockets: DocketInfo[], baseUrl: string): string {
-  const docketTable = dockets.map(d =>
-    `| ${d.id} | ${d.title} | ${d.agency} | ${d.commentCount.toLocaleString()} | ${d.themeCount} | ${d.entityCount} |`
-  ).join('\n');
+  const docketTable = dockets.map(d => {
+    const date = d.lastCommentDate ? d.lastCommentDate.split('T')[0] : "—";
+    return `| ${d.id} | ${d.title} | ${d.agency} | ${date} | ${d.commentCount.toLocaleString()} | ${d.themeCount} |`;
+  }).join('\n');
 
   const generatedDate = new Date().toISOString().split('T')[0];
 
@@ -153,8 +171,8 @@ standards, programs). Theme-level narrative summaries synthesize the positions a
 
 *Updated ${generatedDate}*
 
-| Docket ID | Title | Agency | Comments | Themes | Entities |
-|-----------|-------|--------|----------|--------|----------|
+| Docket ID | Title | Agency | Closed | Comments | Themes |
+|-----------|-------|--------|--------|----------|--------|
 ${docketTable}
 
 ## Fetching Data
