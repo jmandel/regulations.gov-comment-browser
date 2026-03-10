@@ -84,12 +84,14 @@ function ActiveFilterChips({
         return (
           <span
             key={`theme-${code}`}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-sm rounded-full border bg-blue-50 text-blue-700 border-blue-200"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-sm rounded-full border bg-blue-50 text-blue-700 border-blue-200 max-w-64"
+            title={`${code} ${label}`}
           >
-            <span className="font-medium">Theme:</span> {code} {label}
+            <span className="font-medium shrink-0">Theme:</span>
+            <span className="truncate">{code} {label}</span>
             <button
               onClick={() => onRemoveTheme(code)}
-              className="ml-0.5 hover:text-blue-900 transition-colors"
+              className="ml-0.5 hover:text-blue-900 transition-colors shrink-0"
             >
               <X className="h-3 w-3" />
             </button>
