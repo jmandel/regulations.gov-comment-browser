@@ -1,12 +1,15 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, useTransition } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Filter, MessageSquare, Copy, Search, X } from 'lucide-react'
+import { MessageSquare, Copy, Search, X } from 'lucide-react'
 import useStore from '../store/useStore'
 import CommentCard from './CommentCard'
 import CopyCommentsModal from './CopyCommentsModal'
+import ActiveFilterChips from './ActiveFilterChips'
+import FilterAddButtons from './FilterAddButtons'
 import { getUniqueValues } from '../utils/helpers'
+import { parseSearchQuery, tokensToString, removeToken } from '../utils/searchParser'
 import { debounce } from 'lodash'
-import type { Comment } from '../types'
+// types imported as needed via store
 
 interface FilterOptions {
   themes: string[]
@@ -19,115 +22,152 @@ function CommentBrowser() {
   const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {} } = useStore()
   const [searchParams] = useSearchParams()
   const [page, setPage] = useState(0)
-  const [showFilters, setShowFilters] = useState(() => window.innerWidth >= 768)
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(filters?.searchQuery || '')
-  const [submitterTypeSearch, setSubmitterTypeSearch] = useState('')
-  const [entitySearch, setEntitySearch] = useState('')
   const PAGE_SIZE_OPTIONS = [50, 100, 250, 500, 1000, 1500, 2000]
   const [itemsPerPage, setItemsPerPage] = useState(100)
-  
-  // Debounced search handler - use useRef to avoid recreating on every render
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const [, startTransition] = useTransition()
+
+  // Parse search tokens from local query
+  const searchTokens = useMemo(
+    () => parseSearchQuery(localSearchQuery),
+    [localSearchQuery]
+  )
+
+  // Debounced search handler — called directly from onChange, not via useEffect
   const debouncedSetSearchQuery = useMemo(
     () => debounce((query: string) => {
       if (setFilters) {
-        setFilters((prev: FilterOptions) => ({ ...prev, searchQuery: query }))
-        setPage(0)
+        startTransition(() => {
+          setFilters((prev: FilterOptions) => ({ ...prev, searchQuery: query }))
+          setPage(0)
+        })
       }
     }, 300),
     [setFilters]
   )
 
-  // Update search query
+  // Apply URL query parameters on mount
   useEffect(() => {
-    debouncedSetSearchQuery(localSearchQuery)
-  }, [localSearchQuery, debouncedSetSearchQuery])
-
-  // Apply URL query parameters to filters on mount ONLY
-  useEffect(() => {
-    // Check for submitterType parameter
     const submitterType = searchParams.get('submitterType')
-    const filterType = searchParams.get('filter')
-    
     if (submitterType) {
       setFilters((prev: FilterOptions) => ({
         ...prev,
-        submitterTypes: submitterType ? [submitterType] : prev.submitterTypes
+        submitterTypes: [submitterType]
       }))
     }
-    
-    // Check for filter parameter (general purpose)
-    if (filterType === 'stakeholder') {
-      setShowFilters(true)
-    }
-  }, [searchParams, setFilters]) // Include deps but this should still only run on mount/param change
-  
-  // Get filtered comments - don't memoize, let it re-run on each render
-  let filteredComments: Comment[] = []
-  if (getFilteredComments) {
-    filteredComments = getFilteredComments()
-  }
-  
-  // Get unique values for filters with typeahead filtering
-  const filterOptions = useMemo(() => {
-    // Count comments per submitter type
-    const submitterTypeCounts = comments.reduce((acc, comment) => {
-      acc[comment.submitterType] = (acc[comment.submitterType] || 0) + 1
+  }, [searchParams, setFilters])
+
+  // Memoize filtered comments — only recompute when store filters change (after debounce),
+  // not on every keystroke in the search input
+  const filteredComments = useMemo(() => {
+    if (!getFilteredComments) return []
+    return getFilteredComments()
+  }, [getFilteredComments, filters])
+
+  // Available submitter types (with 5+ comments)
+  const availableSubmitterTypes = useMemo(() => {
+    const counts = comments.reduce((acc, c) => {
+      acc[c.submitterType] = (acc[c.submitterType] || 0) + 1
       return acc
     }, {} as Record<string, number>)
-    
-    // Filter out types with < 5 comments
-    const allSubmitterTypes = getUniqueValues(comments, 'submitterType')
-      .filter(type => submitterTypeCounts[type] >= 5)
-    
-    const submitterTypes = submitterTypeSearch
-      ? allSubmitterTypes.filter(type => 
-          type.toLowerCase().includes(submitterTypeSearch.toLowerCase())
-        )
-      : allSubmitterTypes
+    return getUniqueValues(comments, 'submitterType').filter(t => counts[t] >= 5)
+  }, [comments])
 
-    const availableThemes = themes.filter(t => t.comment_count > 0).map(t => t.code)
-    
-    const allEntities: Array<{key: string, label: string, category: string}> = []
-    Object.entries(entities).forEach(([category, entityList]) => {
-      entityList.forEach(entity => {
-        if (entity.mentionCount > 0) {
-          allEntities.push({
-            key: `${category}|${entity.label}`,
-            label: entity.label,
-            category
-          })
-        }
-      })
-    })
-    
-    const availableEntities = entitySearch
-      ? allEntities.filter(entity => 
-          entity.label.toLowerCase().includes(entitySearch.toLowerCase()) ||
-          entity.category.toLowerCase().includes(entitySearch.toLowerCase())
-        )
-      : allEntities
-    
-    return { submitterTypes, themes: availableThemes, entities: availableEntities }
-  }, [comments, themes, entities, submitterTypeSearch, entitySearch])
-  
-  // Pagination
-  const totalPages = Math.ceil(filteredComments.length / itemsPerPage)
-  const paginatedComments = filteredComments.slice(
-    page * itemsPerPage,
-    (page + 1) * itemsPerPage
-  )
-  
+  // Pagination — memoize so keystroke re-renders don't recompute
+  const { totalPages, paginatedComments } = useMemo(() => {
+    const tp = Math.ceil(filteredComments.length / itemsPerPage)
+    const pc = filteredComments.slice(page * itemsPerPage, (page + 1) * itemsPerPage)
+    return { totalPages: tp, paginatedComments: pc }
+  }, [filteredComments, page, itemsPerPage])
+
   const commentsToCopy = filteredComments
+
+  // Memoize the comment list JSX — this is the expensive part
+  const commentListJsx = useMemo(() => (
+    paginatedComments.length > 0 ? (
+      paginatedComments.map(comment => (
+        <CommentCard
+          key={comment.id}
+          comment={comment}
+          showThemes={false}
+          showEntities={false}
+        />
+      ))
+    ) : (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+        <p className="text-gray-500">No comments match your filters</p>
+      </div>
+    )
+  ), [paginatedComments])
 
   const handleFilterChange = useCallback((type: string, value: any) => {
     if (setFilters) {
-      setFilters((prev: FilterOptions) => ({ ...prev, [type]: value }))
-      setPage(0) // Reset to first page when filters change
+      startTransition(() => {
+        setFilters((prev: FilterOptions) => ({ ...prev, [type]: value }))
+        setPage(0)
+      })
     }
   }, [setFilters])
 
-  // Show loading state if data isn't ready
+  const handleRemoveSearchToken = useCallback((tokenId: string) => {
+    debouncedSetSearchQuery.cancel()
+    const updated = removeToken(searchTokens, tokenId)
+    const newQuery = tokensToString(updated)
+    setLocalSearchQuery(newQuery)
+    startTransition(() => {
+      setFilters((prev: FilterOptions) => ({ ...prev, searchQuery: newQuery }))
+      setPage(0)
+    })
+  }, [searchTokens, debouncedSetSearchQuery, setFilters])
+
+  const handleClickSearchToken = useCallback((token: { startIndex: number; endIndex: number }) => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus()
+      searchInputRef.current.setSelectionRange(token.startIndex, token.endIndex)
+    }
+  }, [])
+
+  const handleToggleTheme = useCallback((code: string) => {
+    const current = filters?.themes || []
+    const updated = current.includes(code)
+      ? current.filter((c: string) => c !== code)
+      : [...current, code]
+    handleFilterChange('themes', updated)
+  }, [filters?.themes, handleFilterChange])
+
+  const handleToggleEntity = useCallback((key: string) => {
+    const current = filters?.entities || []
+    const updated = current.includes(key)
+      ? current.filter((k: string) => k !== key)
+      : [...current, key]
+    handleFilterChange('entities', updated)
+  }, [filters?.entities, handleFilterChange])
+
+  const handleToggleSubmitterType = useCallback((value: string) => {
+    const current = filters?.submitterTypes || []
+    const updated = current.includes(value)
+      ? current.filter((v: string) => v !== value)
+      : [...current, value]
+    handleFilterChange('submitterTypes', updated)
+  }, [filters?.submitterTypes, handleFilterChange])
+
+  const handleClearAll = useCallback(() => {
+    debouncedSetSearchQuery.cancel()
+    setLocalSearchQuery('')
+    startTransition(() => {
+      setFilters((prev: FilterOptions) => ({
+        ...prev,
+        submitterTypes: [],
+        themes: [],
+        entities: [],
+        searchQuery: ''
+      }))
+      setPage(0)
+    })
+  }, [setFilters, debouncedSetSearchQuery])
+
   if (loading || !filters) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -151,243 +191,90 @@ function CommentBrowser() {
                 ) : (
                   <>Showing {filteredComments.length} of {comments.length} comments</>
                 )}
-                {searchParams.get('submitterType') && ` from ${searchParams.get('submitterType')}`}
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2 flex-shrink-0">
-            <button
-              onClick={() => setShowCopyModal(true)}
-              className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              title="Copy for LLM"
-            >
-              <Copy className="h-4 w-4" />
-              <span className="hidden sm:inline">Copy for LLM</span>
-            </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center space-x-2 px-3 sm:px-4 py-2 border rounded-lg hover:bg-gray-50"
-              title={showFilters ? 'Hide Filters' : 'Show Filters'}
-            >
-              <Filter className="h-4 w-4" />
-              <span className="hidden sm:inline">{showFilters ? 'Hide' : 'Show'} Filters</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setShowCopyModal(true)}
+            className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
+            title="Copy for LLM"
+          >
+            <Copy className="h-4 w-4" />
+            <span className="hidden sm:inline">Copy for LLM</span>
+          </button>
         </div>
       </div>
-      
-      {/* Filters */}
-      {showFilters && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold mb-4">Filters</h2>
-          
-          <div className="space-y-4">
-            {/* Search Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search in Comment Details
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={localSearchQuery}
-                  onChange={(e) => setLocalSearchQuery(e.target.value)}
-                  placeholder="Search in condensed comment details..."
-                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                {localSearchQuery && (
-                  <button
-                    onClick={() => setLocalSearchQuery('')}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Submitter Type Filter with Typeahead */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Submitter Type
-                  </label>
-                  {filters.submitterTypes?.length > 0 && (
-                    <button
-                      onClick={() => {
-                        handleFilterChange('submitterTypes', [])
-                        setSubmitterTypeSearch('')
-                      }}
-                      className="text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={submitterTypeSearch}
-                  onChange={(e) => setSubmitterTypeSearch(e.target.value)}
-                  placeholder="Type to filter..."
-                  className="w-full px-3 py-1 border rounded-lg mb-2"
-                />
-                <select
-                  multiple
-                  value={filters.submitterTypes || []}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.selectedOptions, option => option.value)
-                    handleFilterChange('submitterTypes', selected)
-                  }}
-                  className="w-full border rounded-lg p-2 h-32"
-                >
-                  {filterOptions.submitterTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-                {filters.submitterTypes?.length > 0 && (
-                  <div className="mt-2 text-xs text-gray-600">
-                    Selected: {filters.submitterTypes.join(', ')}
-                  </div>
-                )}
-              </div>
-              
-              {/* Entity Filter with Typeahead */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Topics/Entities
-                  </label>
-                  {filters.entities?.length > 0 && (
-                    <button
-                      onClick={() => {
-                        handleFilterChange('entities', [])
-                        setEntitySearch('')
-                      }}
-                      className="text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={entitySearch}
-                  onChange={(e) => setEntitySearch(e.target.value)}
-                  placeholder="Type to filter entities..."
-                  className="w-full px-3 py-1 border rounded-lg mb-2"
-                />
-                <select
-                  multiple
-                  value={filters.entities || []}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.selectedOptions, option => option.value)
-                    handleFilterChange('entities', selected)
-                  }}
-                  className="w-full border rounded-lg p-2 h-32"
-                >
-                  {filterOptions.entities.map(entity => (
-                    <option key={entity.key} value={entity.key}>
-                      {entity.label}
-                    </option>
-                  ))}
-                </select>
-                {filters.entities?.length > 0 && (
-                  <div className="mt-2 text-xs text-gray-600">
-                    Selected: {filters.entities.map(e => {
-                      const [, label] = e.split('|')
-                      return label
-                    }).join(', ')}
-                  </div>
-                )}
-              </div>
-              
-              {/* Theme Filter */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Themes
-                  </label>
-                  {filters.themes?.length > 0 && (
-                    <button
-                      onClick={() => handleFilterChange('themes', [])}
-                      className="text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <select
-                  multiple
-                  value={filters.themes || []}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.selectedOptions, option => option.value)
-                    handleFilterChange('themes', selected)
-                  }}
-                  className="w-full border rounded-lg p-2 h-40"
-                >
-                  {filterOptions.themes.map(themeCode => {
-                    const theme = themes.find(t => t.code === themeCode)
-                    return (
-                      <option key={themeCode} value={themeCode}>
-                        {theme?.label || themeCode}
-                      </option>
-                    )
-                  })}
-                </select>
-                {filters.themes?.length > 0 && (
-                  <div className="mt-2 text-xs text-gray-600">
-                    Selected: {filters.themes.map(code => {
-                      const theme = themes.find(t => t.code === code)
-                      return theme?.label || code
-                    }).join(', ')}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {(filters.submitterTypes?.length > 0 || filters.entities?.length > 0 || filters.themes?.length > 0 || filters.searchQuery) && (
+      {/* Search + Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        {/* Search Input */}
+        <div className="relative">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={localSearchQuery}
+            onChange={(e) => {
+              setLocalSearchQuery(e.target.value)
+              debouncedSetSearchQuery(e.target.value)
+            }}
+            placeholder={'Search... "exact phrase"  OR  -exclude'}
+            className="w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+          {localSearchQuery && (
             <button
               onClick={() => {
-                setFilters((prev: FilterOptions) => ({
-                  ...prev,
-                  submitterTypes: [],
-                  themes: [],
-                  entities: [],
-                  searchQuery: ''
-                }))
+                debouncedSetSearchQuery.cancel()
                 setLocalSearchQuery('')
-                setSubmitterTypeSearch('')
-                setEntitySearch('')
+                startTransition(() => {
+                  setFilters((prev: FilterOptions) => ({ ...prev, searchQuery: '' }))
+                  setPage(0)
+                })
               }}
-              className="mt-4 text-sm text-blue-600 hover:text-blue-800"
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
             >
-              Clear all filters
+              <X className="h-5 w-5" />
             </button>
           )}
         </div>
-      )}
-      
+
+        {/* Active Filter Chips */}
+        <ActiveFilterChips
+          searchTokens={searchTokens}
+          themes={filters.themes || []}
+          entities={filters.entities || []}
+          submitterTypes={filters.submitterTypes || []}
+          themeList={themes}
+          entityMap={entities}
+          onRemoveSearchToken={handleRemoveSearchToken}
+          onRemoveTheme={(code) => handleFilterChange('themes', (filters.themes || []).filter((c: string) => c !== code))}
+          onRemoveEntity={(key) => handleFilterChange('entities', (filters.entities || []).filter((k: string) => k !== key))}
+          onRemoveSubmitterType={(value) => handleFilterChange('submitterTypes', (filters.submitterTypes || []).filter((v: string) => v !== value))}
+          onClearAll={handleClearAll}
+          onClickSearchToken={handleClickSearchToken}
+        />
+
+        {/* Add Filter Buttons */}
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <FilterAddButtons
+            themes={themes}
+            entities={entities}
+            submitterTypes={availableSubmitterTypes}
+            selectedThemes={filters.themes || []}
+            selectedEntities={filters.entities || []}
+            selectedSubmitterTypes={filters.submitterTypes || []}
+            onAddTheme={handleToggleTheme}
+            onAddEntity={handleToggleEntity}
+            onAddSubmitterType={handleToggleSubmitterType}
+          />
+        </div>
+      </div>
+
       {/* Comments List */}
       <div className="space-y-4">
-        {paginatedComments.length > 0 ? (
-          paginatedComments.map(comment => (
-            <CommentCard 
-              key={comment.id} 
-              comment={comment} 
-              showThemes={false} 
-              showEntities={false}
-            />
-          ))
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-            <p className="text-gray-500">No comments match your filters</p>
-          </div>
-        )}
+        {commentListJsx}
       </div>
-      
+
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center space-x-2 flex-wrap gap-y-2">
@@ -425,7 +312,7 @@ function CommentBrowser() {
           </select>
         </div>
       )}
-      
+
       {/* Copy Modal */}
       <CopyCommentsModal
         isOpen={showCopyModal}

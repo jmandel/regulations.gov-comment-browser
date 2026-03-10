@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { ExternalLink, Paperclip, Calendar, MapPin, User, Building2, Quote, FileText, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
@@ -490,4 +491,4 @@ function CommentCard({
   )
 }
 
-export default CommentCard 
+export default memo(CommentCard)

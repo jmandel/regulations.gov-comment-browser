@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtractsMap } from '../types'
 import { parseThemeDescription } from '../utils/helpers'
+import { parseSearchQuery, matchesSearchQuery } from '../utils/searchParser'
 
 interface FilterOptions {
   themes: string[]
@@ -162,22 +163,13 @@ const useStore = create<StoreState>((set, get) => ({
       : state.comments
     const originalCount = state.comments.length
     
-    // Apply search
+    // Apply search with boolean query parsing
     if (state.filters.searchQuery) {
-      const query = state.filters.searchQuery.toLowerCase()
-      filtered = filtered.filter(c => {
-        // Search in structured sections
-        const searchInSections = c.structuredSections ? (
-          c.structuredSections.oneLineSummary?.toLowerCase().includes(query) ||
-          c.structuredSections.corePosition?.toLowerCase().includes(query) ||
-          c.structuredSections.detailedContent?.toLowerCase().includes(query)
-        ) : false
-        
-        return searchInSections ||
-          c.submitter?.toLowerCase().includes(query) ||
-          c.id?.toLowerCase().includes(query)
-      })
-      console.log(`Search filter applied: ${originalCount} → ${filtered.length} (query: "${query}")`)
+      const tokens = parseSearchQuery(state.filters.searchQuery)
+      if (tokens.length > 0) {
+        filtered = filtered.filter(c => matchesSearchQuery(c, tokens))
+        console.log(`Search filter applied: ${originalCount} → ${filtered.length} (query: "${state.filters.searchQuery}")`)
+      }
     }
     
     // Apply theme filters

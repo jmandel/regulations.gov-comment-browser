@@ -2,6 +2,7 @@ import { ExternalLink, Paperclip, Calendar, MapPin, User, Quote, Users } from 'l
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import { getRegulationsGovUrl, formatDate } from '../utils/helpers'
 import useStore from '../store/useStore'
 import type { Comment } from '../types'
@@ -263,9 +264,9 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-slate-600 text-white px-2 py-0.5 rounded text-xs mr-2">DETAILED CONTENT</span>
                 </h5>
-                <div className="text-sm pl-4 border-l-2 border-slate-200">
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
+                <div className="text-sm pl-4 border-l-2 border-slate-200 prose prose-sm max-w-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
                   >
                     {displaySections.detailedContent}
                   </ReactMarkdown>
