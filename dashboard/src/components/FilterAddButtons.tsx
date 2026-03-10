@@ -70,7 +70,7 @@ function FilterAddButtons({
   )
 }
 
-interface PickerItem {
+export interface PickerItem {
   key: string
   label: string
   sublabel?: string
