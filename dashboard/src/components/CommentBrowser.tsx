@@ -526,6 +526,7 @@ function CommentBrowser() {
         isOpen={showCopyModal}
         onClose={() => setShowCopyModal(false)}
         title={`Copy ${commentsToCopy.length} Comments for LLM`}
+        contextKey="search"
         comments={commentsToCopy}
       />
 

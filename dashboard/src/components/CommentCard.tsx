@@ -466,6 +466,7 @@ function CommentCard({
             isOpen={showCopyModal}
             onClose={() => setShowCopyModal(false)}
             title="Copy Comment for LLM"
+            contextKey="comment"
             leadInContent={`# Comment ${comment.id}`}
             comments={[comment]}
           />

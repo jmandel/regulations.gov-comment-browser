@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
 import { X, Copy, Check, Download, Share2 } from 'lucide-react'
-import { Comment, ThemeSummary } from '../types'
+import { Comment, ThemeSummary, ThemeExtract } from '../types'
 
 interface CopyCommentsModalProps {
   isOpen: boolean
   onClose: () => void
   title: string
+  contextKey?: string // Unique key per context (e.g., "theme", "entity", "search") for persisting checkbox state
   leadInContent?: string // Theme description, entity definition, etc.
   comments: Comment[]
   themeSummary?: ThemeSummary // Optional theme summary sections
+  themeExtracts?: { [commentId: string]: ThemeExtract } // Per-comment theme-specific extracts
   commentSectionOptions?: CommentSectionOptions // Override default sections
 }
 
@@ -20,6 +22,7 @@ export interface CommentSectionOptions {
   mainConcerns: boolean
   notableExperiences: boolean
   keyQuotations: boolean
+  themeExtracts: boolean
   detailedContent: boolean
   themes: boolean
   entities: boolean
@@ -33,6 +36,7 @@ const defaultCommentSections: CommentSectionOptions = {
   mainConcerns: false,
   notableExperiences: false,
   keyQuotations: true,
+  themeExtracts: true,
   detailedContent: false,
   themes: true,
   entities: true
@@ -49,18 +53,33 @@ interface ThemeSummarySectionOptions {
   analyticalNotes: boolean
 }
 
-function CopyCommentsModal({ 
-  isOpen, 
-  onClose, 
+function loadSavedSections<T>(storageKey: string, defaults: T): T {
+  try {
+    const saved = localStorage.getItem(storageKey)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Merge with defaults so new keys get their default value
+      return { ...defaults, ...parsed }
+    }
+  } catch (_) {}
+  return defaults
+}
+
+function CopyCommentsModal({
+  isOpen,
+  onClose,
   title,
+  contextKey,
   leadInContent,
   comments,
   themeSummary,
+  themeExtracts,
   commentSectionOptions = defaultCommentSections
 }: CopyCommentsModalProps) {
-  const [copied, setCopied] = useState(false)
-  const [commentSections, setCommentSections] = useState<CommentSectionOptions>(commentSectionOptions)
-  const [themeSections, setThemeSections] = useState<ThemeSummarySectionOptions>({
+  const commentStorageKey = contextKey ? `copy-modal-comments-${contextKey}` : ''
+  const themeStorageKey = contextKey ? `copy-modal-theme-${contextKey}` : ''
+
+  const defaultThemeSections: ThemeSummarySectionOptions = {
     executiveSummary: false,
     consensusPoints: false,
     areasOfDebate: false,
@@ -69,7 +88,15 @@ function CopyCommentsModal({
     emergingPatterns: false,
     keyQuotations: false,
     analyticalNotes: false
-  })
+  }
+
+  const [copied, setCopied] = useState(false)
+  const [commentSections, setCommentSections] = useState<CommentSectionOptions>(
+    () => commentStorageKey ? loadSavedSections(commentStorageKey, commentSectionOptions) : commentSectionOptions
+  )
+  const [themeSections, setThemeSections] = useState<ThemeSummarySectionOptions>(
+    () => themeStorageKey ? loadSavedSections(themeStorageKey, defaultThemeSections) : defaultThemeSections
+  )
 
   useEffect(() => {
     if (!isOpen) {
@@ -77,9 +104,19 @@ function CopyCommentsModal({
     }
   }, [isOpen])
 
+  // Persist comment section choices
   useEffect(() => {
-    setCommentSections(commentSectionOptions)
-  }, [commentSectionOptions])
+    if (commentStorageKey) {
+      localStorage.setItem(commentStorageKey, JSON.stringify(commentSections))
+    }
+  }, [commentSections, commentStorageKey])
+
+  // Persist theme summary section choices
+  useEffect(() => {
+    if (themeStorageKey) {
+      localStorage.setItem(themeStorageKey, JSON.stringify(themeSections))
+    }
+  }, [themeSections, themeStorageKey])
 
   if (!isOpen) return null
 
@@ -115,6 +152,7 @@ function CopyCommentsModal({
       mainConcerns: !allChecked,
       notableExperiences: !allChecked,
       keyQuotations: !allChecked,
+      themeExtracts: !allChecked,
       detailedContent: !allChecked,
       themes: !allChecked,
       entities: !allChecked
@@ -168,10 +206,36 @@ function CopyCommentsModal({
       contentParts.push(`**Key Quotations:**\n${sections.keyQuotations}`)
     }
     
+    // Theme-specific extracts (per-comment, per-theme analysis)
+    if (commentSections.themeExtracts && themeExtracts) {
+      const extract = themeExtracts[comment.id]
+      if (extract) {
+        const extractParts: string[] = []
+        if (extract.positions?.length) {
+          extractParts.push(`**Positions:**\n${extract.positions.map(p => `- ${p}`).join('\n')}`)
+        }
+        if (extract.concerns?.length) {
+          extractParts.push(`**Concerns:**\n${extract.concerns.map(c => `- ${c}`).join('\n')}`)
+        }
+        if (extract.recommendations?.length) {
+          extractParts.push(`**Recommendations:**\n${extract.recommendations.map(r => `- ${r}`).join('\n')}`)
+        }
+        if (extract.experiences?.length) {
+          extractParts.push(`**Experiences:**\n${extract.experiences.map(e => `- ${e}`).join('\n')}`)
+        }
+        if (extract.key_quotes?.length) {
+          extractParts.push(`**Key Quotes:**\n${extract.key_quotes.map(q => `- ${q}`).join('\n')}`)
+        }
+        if (extractParts.length > 0) {
+          contentParts.push(`### Theme-Specific Analysis\n${extractParts.join('\n\n')}`)
+        }
+      }
+    }
+
     if (commentSections.detailedContent && sections.detailedContent) {
       contentParts.push(`**Detailed Content:**\n${sections.detailedContent}`)
     }
-    
+
     // Themes
     if (commentSections.themes && comment.themeScores) {
       const directThemes = Object.entries(comment.themeScores)
@@ -621,7 +685,21 @@ function CopyCommentsModal({
                     <span className="text-sm text-gray-700">Key Quotations</span>
                   </label>
                   
-                  <label 
+                  {themeExtracts && (
+                    <label
+                      className="flex items-center space-x-3 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={commentSections.themeExtracts}
+                        onChange={() => handleCommentSectionToggle('themeExtracts')}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <span className="text-sm text-gray-700">Theme-Specific Extracts (positions, concerns, recommendations)</span>
+                    </label>
+                  )}
+
+                  <label
                     className="flex items-center space-x-3 cursor-pointer"
                   >
                     <input

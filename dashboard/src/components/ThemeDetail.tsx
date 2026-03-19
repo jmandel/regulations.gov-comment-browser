@@ -234,9 +234,11 @@ function ThemeDetail() {
         isOpen={showCopyModal}
         onClose={() => setShowCopyModal(false)}
         title="Copy Theme Comments for LLM"
+        contextKey="theme"
         leadInContent={`# Theme Analysis: ${theme.code} - ${theme.label || theme.description}${theme.detailedDescription ? '\n\n## Theme Description\n' + theme.detailedDescription : ''}`}
         comments={displayedComments}
         themeSummary={themeSummary}
+        themeExtracts={extracts}
         commentSectionOptions={{
           metadata: true,
           oneLineSummary: false,
@@ -244,8 +246,9 @@ function ThemeDetail() {
           keyRecommendations: false,
           mainConcerns: false,
           notableExperiences: false,
-          keyQuotations: true,
-          detailedContent: true,
+          keyQuotations: false,
+          themeExtracts: true,
+          detailedContent: false,
           themes: false,
           entities: false
         }}

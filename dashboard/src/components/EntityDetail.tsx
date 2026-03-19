@@ -158,6 +158,7 @@ function EntityDetail() {
           isOpen={showCopyModal}
           onClose={() => setShowCopyModal(false)}
           title="Copy Entity for LLM"
+          contextKey="entity"
           leadInContent={`# Entity: ${entity.label}\n\n## Category: ${category}\n\n## Definition\n${entity.definition}${entity.terms.length > 1 ? '\n\n## Alternative Terms\n' + entity.terms.filter(t => t !== entity.label).map(t => `- ${t}`).join('\n') : ''}\n\n## Mention Count\n${comments.length} comments mention this entity`}
           comments={comments}
           commentSectionOptions={{
@@ -168,6 +169,7 @@ function EntityDetail() {
             mainConcerns: false,
             notableExperiences: false,
             keyQuotations: false,
+            themeExtracts: false,
             detailedContent: false,
             themes: false,
             entities: false

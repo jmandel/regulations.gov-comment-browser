@@ -212,6 +212,7 @@ function EntityBrowser() {
         isOpen={showCopyModal && !!copyEntity}
         onClose={() => { setShowCopyModal(false); setCopyEntity(null); }}
         title={copyEntity ? `Copy comments mentioning "${copyEntity.label}" for LLM` : ''}
+        contextKey="entity-browser"
         comments={copyEntity ? getCommentsForEntity(copyEntity.category, copyEntity.label) : []}
       />
     </div>
