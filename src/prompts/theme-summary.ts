@@ -220,7 +220,7 @@ Return a JSON object with this exact structure:
    - Good: "Acme Health argues that administrative burden..."
    - Bad: "Acme Health (CMS-123-456) argues that administrative burden..." (comment ID is extracted to searate json field)
 
-2. **Extract Comment IDs**: When comment IDs are mentioned (e.g., "Comment CMS-2025-0050-0031" or "as noted in comment 0042"), extract them into the appropriate commentIds arrays. Use fully prefixed ids, e.g.  "CMS-2025-0050-0031". When extracting comment IDs into dedicated JSON fields, *remove them* from narrative.
+2. **Extract Comment IDs**: When comment IDs are mentioned, extract them into the appropriate commentIds arrays. Comment IDs MUST be preserved EXACTLY as they appear in the input, including the full prefix (e.g., if the input says "HHS-ONC-2026-0001-0232", output "HHS-ONC-2026-0001-0232" — never shorten to just "0232"). When extracting comment IDs into dedicated JSON fields, *remove them* from narrative.
 
 3. **Clean Text**: For examle, remove markdown formatting like ** for bold and remove comment IDs from text fields.
 

@@ -19,9 +19,15 @@ async function buildWebsite(documentId: string, options: any) {
   await mkdir(outputDir, { recursive: true });
   await mkdir(join(outputDir, "indexes"), { recursive: true });
   
+  // Look up docket ID from DB metadata (falls back to document ID)
+  const docMeta = db.prepare("SELECT docket_id, title FROM document_metadata LIMIT 1").get() as { docket_id?: string; title?: string } | null;
+  const docketId = docMeta?.docket_id || documentId;
+
   // 1. Generate metadata
   const meta = {
-    documentId,
+    documentId: docketId,
+    sourceDocumentId: documentId,
+    title: docMeta?.title || documentId,
     generatedAt: new Date().toISOString(),
     stats: getStats(db),
   };
@@ -40,7 +46,7 @@ async function buildWebsite(documentId: string, options: any) {
   await writeJson(join(outputDir, "entities.json"), entities);
   
   // 5. Export all comments as single file
-  await exportAllComments(db, outputDir, documentId);
+  await exportAllComments(db, outputDir, docketId);
   
   // 6. Generate cluster report
   await generateClusterReport(db, outputDir);

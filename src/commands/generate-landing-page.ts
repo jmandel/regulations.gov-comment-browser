@@ -75,8 +75,8 @@ async function generateLandingPage(options: any) {
       const metadata = db.prepare(`
         SELECT title, docket_id, agency_name, agency_id, comment_end_date
         FROM document_metadata
-        WHERE document_id = ?
-      `).get(documentId) as any;
+        LIMIT 1
+      `).get() as any;
 
       if (metadata) {
         title = metadata.title || documentId;
@@ -123,7 +123,7 @@ async function generateLandingPage(options: any) {
     }
 
     regulations.push({
-      id: documentId,
+      id: docketId,
       title,
       docketId,
       commentCount: stats.commentCount,
@@ -499,7 +499,7 @@ function generateHTML(regulations: RegulationInfo[]): string {
           <div class="regulation-header">
             <div>
               <h3 class="regulation-title">${escapeHtml(reg.title)}</h3>
-              <p class="regulation-id">Docket: ${reg.docketId} | Document: ${reg.id}</p>
+              <p class="regulation-id">Docket: ${reg.docketId}</p>
             </div>
             <span class="regulation-status status-${reg.status.toLowerCase().replace(/\s+/g, '-')}">${reg.status}</span>
           </div>

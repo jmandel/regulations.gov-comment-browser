@@ -411,7 +411,7 @@ async function loadFromCsv(csvPath: string, options: any) {
 
         if (!options.skipAttachments) {
           try {
-            const resp = await fetch(url);
+            const resp = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", "Accept": "application/pdf,*/*" } });
             if (resp.ok) {
               const buffer = new Uint8Array(await resp.arrayBuffer());
               blob = buffer;
@@ -458,8 +458,8 @@ async function loadFromCsv(csvPath: string, options: any) {
       
       loaded++;
       
-      if (loaded % 100 === 0) {
-        process.stdout.write(`\r✅ Loaded ${loaded} comments`);
+      if (loaded % 5 === 0 || loaded === 1) {
+        process.stdout.write(`\r📥 Loaded ${loaded} comments (${skipped} skipped)...`);
       }
     }
     

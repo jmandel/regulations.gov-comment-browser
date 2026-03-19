@@ -57,6 +57,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
       let title = documentId;
       let agency = "Unknown Agency";
       let lastCommentDate = "";
+      let docketId = documentId;
 
       try {
         const hasMetadata = db.prepare(`
@@ -66,16 +67,19 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
 
         if (hasMetadata) {
           const metadata = db.prepare(`
-            SELECT title, agency_name, agency_id, comment_end_date
+            SELECT title, agency_name, agency_id, comment_end_date, docket_id
             FROM document_metadata
-            WHERE document_id = ?
-          `).get(documentId) as any;
+            LIMIT 1
+          `).get() as any;
 
           if (metadata) {
             title = metadata.title || documentId;
             agency = metadata.agency_name || metadata.agency_id || "Unknown Agency";
             if (metadata.comment_end_date) {
               lastCommentDate = metadata.comment_end_date;
+            }
+            if (metadata.docket_id) {
+              docketId = metadata.docket_id;
             }
           }
         }
@@ -101,7 +105,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
       } catch (_) {}
 
       dockets.push({
-        id: documentId,
+        id: docketId,
         title,
         agency,
         commentCount,
@@ -231,7 +235,7 @@ High-level statistics for the docket.
 
 \`\`\`json
 {
-  "documentId": "HHS-ONC-2025-0005-0001",
+  "documentId": "HHS-ONC-2025-0005",
   "generatedAt": "2026-03-09T00:41:13.931Z",
   "stats": {
     "totalComments": 305,
@@ -355,7 +359,7 @@ All comments with structured summaries, theme scores, and entity tags.
 [
   {
     "id": "HHS-ONC-2025-0005-0002",
-    "documentId": "HHS-ONC-2025-0005-0001",
+    "documentId": "HHS-ONC-2025-0005",
     "submitter": "Jane Doe",
     "submitterType": "Individual",
     "date": "2025-05-15T04:00:00.000Z",

@@ -70,26 +70,47 @@ build_dashboard() {
     # Generate data files for this regulation
     log_info "Generating data files..."
     bun run src/cli.ts build-website "$regulation_id" --output "$TEMP_DATA_DIR"
-    
+
+    # Read docket ID from generated meta.json (falls back to regulation_id)
+    local docket_id
+    docket_id=$(bun -e "console.log(JSON.parse(await Bun.file('$TEMP_DATA_DIR/meta.json').text()).documentId)" 2>/dev/null || echo "$regulation_id")
+
     # Copy data to dashboard public directory
     rm -rf dashboard/public/data
     mkdir -p dashboard/public
     cp -r "$TEMP_DATA_DIR" dashboard/public/data
-    
+
     # Build the dashboard
     log_info "Building React dashboard..."
     cd dashboard
     bun run build
     cd ..
-    
-    # Copy built dashboard to dist directory
-    mkdir -p "$OUTPUT_DIR/$regulation_id"
-    cp -r dashboard/dist/* "$OUTPUT_DIR/$regulation_id/"
-    
+
+    # Copy built dashboard to output directory using docket ID
+    local output_path="$docket_id"
+    mkdir -p "$OUTPUT_DIR/$output_path"
+    cp -r dashboard/dist/* "$OUTPUT_DIR/$output_path/"
+
+    # Create redirect from document ID if it differs from docket ID (backward compat)
+    if [ "$regulation_id" != "$output_path" ]; then
+        log_info "Creating redirect $regulation_id -> $output_path for backward compatibility"
+        mkdir -p "$OUTPUT_DIR/$regulation_id"
+        cat > "$OUTPUT_DIR/$regulation_id/index.html" << REDIRECT_EOF
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="refresh" content="0; url=../$output_path/">
+<script>
+  // Preserve hash fragment (e.g., #/comments/HHS-ONC-2026-0001-0001)
+  window.location.replace('../$output_path/' + window.location.hash);
+</script>
+</head><body>Redirecting to <a href="../$output_path/">$output_path</a>...</body></html>
+REDIRECT_EOF
+    fi
+
     # Clean up temp data
     rm -rf "$TEMP_DATA_DIR"
-    
-    log_info "✅ Dashboard built successfully for $regulation_id"
+
+    log_info "✅ Dashboard built successfully for $regulation_id (deployed as $output_path)"
 }
 
 # Main execution

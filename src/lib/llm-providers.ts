@@ -8,6 +8,17 @@ export interface StreamingOptions {
   debugFilename?: string;
 }
 
+export interface UsageMetadata {
+  promptTokenCount: number;
+  cachedContentTokenCount: number;
+  candidatesTokenCount: number;
+}
+
+export interface GenerationResult {
+  text: string;
+  usageMetadata?: UsageMetadata;
+}
+
 // Helper to handle streaming with optional debug
 async function processStream<T>(
   stream: AsyncIterable<T>,
@@ -156,6 +167,62 @@ export async function generateWithGemini3Flash(prompt: string, options?: Streami
     }
   }
   throw new Error('Max retries exceeded for gemini-3-flash');
+}
+
+// Non-streaming variant that returns usage metadata for cache monitoring
+export async function generateWithGemini3FlashWithMetadata(prompt: string, options?: StreamingOptions): Promise<GenerationResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY environment variable is required");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const config = {
+    responseMimeType: "text/plain" as const,
+  };
+  const contents = [{
+    role: "user" as const,
+    parts: [{ text: prompt }]
+  }];
+
+  const MAX_RETRIES = 5;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        config,
+        contents,
+      });
+
+      const text = response.text || '';
+
+      // Save to debug file if requested
+      if (options?.debugFilename) {
+        debugStreamStart(options.debugFilename);
+        debugStreamWrite(options.debugFilename, text);
+        debugStreamEnd(options.debugFilename);
+      }
+
+      const usageMetadata = response.usageMetadata ? {
+        promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+        cachedContentTokenCount: (response.usageMetadata as any).cachedContentTokenCount || 0,
+        candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+      } : undefined;
+
+      return { text, usageMetadata };
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if ((msg.includes('429') || msg.includes('503')) && attempt < MAX_RETRIES - 1) {
+        const backoff = Math.min(5000 * Math.pow(2, attempt), 60000);
+        console.log(`   🔄 Gemini ${msg.includes('429') ? '429' : '503'}, retrying in ${(backoff/1000).toFixed(0)}s (attempt ${attempt+1}/${MAX_RETRIES})...`);
+        await new Promise(r => setTimeout(r, backoff));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Max retries exceeded for gemini-3-flash-with-metadata');
 }
 
 export async function generateWithClaude(prompt: string, options?: StreamingOptions): Promise<string> {

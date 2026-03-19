@@ -217,7 +217,14 @@ async function summarizeThemesV2(documentId: string, options: any) {
           },
           parseJsonResponse
         );
-        
+
+        // Post-process: fix partial/abbreviated comment IDs
+        const knownIds = new Set(extracts.map(e => e.comment_id));
+        const fixedCount = fixPartialCommentIds(finalSections, knownIds);
+        if (fixedCount > 0) {
+          console.log(`   🔧 Fixed ${fixedCount} partial comment IDs`);
+        }
+
         // Save summary
         withTransaction(db, () => {
           db.prepare(`
@@ -463,4 +470,57 @@ async function processThemeInBatches(
   );
   
   return finalAnalysis;
+}
+
+/**
+ * Fix partial/abbreviated comment IDs in structured JSON.
+ * The LLM sometimes outputs just the suffix (e.g., "0232", "-0241")
+ * instead of the full ID (e.g., "HHS-ONC-2026-0001-0232").
+ * We match partial IDs against the known set of full IDs from the extracts.
+ */
+function fixPartialCommentIds(obj: any, knownIds: Set<string>): number {
+  let fixedCount = 0;
+
+  function fixId(id: string): string {
+    if (typeof id !== 'string' || !id.trim()) return id;
+    if (knownIds.has(id)) return id; // Already a full valid ID
+
+    // Strip leading dash if present (e.g., "-0241" → "0241")
+    const suffix = id.replace(/^-/, '');
+
+    // Find all known IDs ending with this suffix
+    const matches = [...knownIds].filter(full => full.endsWith('-' + suffix));
+    if (matches.length === 1) {
+      fixedCount++;
+      return matches[0];
+    }
+    // Ambiguous or no match — return original
+    return id;
+  }
+
+  function walk(node: any) {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach((_, i) => {
+        if (typeof node[i] === 'object') walk(node[i]);
+      });
+      return;
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'commentId' && typeof value === 'string') {
+        node[key] = fixId(value);
+      } else if (key === 'commentIds' && Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+          if (typeof value[i] === 'string') {
+            value[i] = fixId(value[i]);
+          }
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        walk(value);
+      }
+    }
+  }
+
+  walk(obj);
+  return fixedCount;
 }
