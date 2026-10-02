@@ -61,6 +61,13 @@ function truncateWords(s: string, n: number): string {
   return w.length <= n ? w.join(" ") : w.slice(0, n).join(" ") + " …";
 }
 
+// "See attached" boxes add nothing; keep the typed text only when it says something
+function commentText(comment: string | null, attachments: string | null): string {
+  const typed = htmlToText(comment || "");
+  const att = (attachments || "").trim();
+  return att ? (wordCount(typed) >= 15 ? `${typed}\n\n${att}` : att) : typed;
+}
+
 function loadUnits(db: Database): { units: Unit[]; clustered: boolean } {
   const clustered = checkClusteringStatus(db);
   const rows = db.prepare(clustered ? `
@@ -75,10 +82,7 @@ function loadUnits(db: Database): { units: Unit[]; clustered: boolean } {
   `).all() as { id: string; cluster_id: number | null; size: number; comment: string | null; att: string | null }[];
   const units: Unit[] = [];
   for (const r of rows) {
-    const typed = htmlToText(r.comment || "");
-    const att = (r.att || "").trim();
-    // "See attached" boxes add nothing; keep the typed text only when it says something
-    const text = att ? (wordCount(typed) >= 15 ? `${typed}\n\n${att}` : att) : typed;
+    const text = commentText(r.comment, r.att);
     if (wordCount(text) < (r.size > 1 ? MIN_WORDS_REP : MIN_WORDS)) continue;
     units.push({ id: r.id, clusterId: r.cluster_id, size: r.size, text: truncateWords(text, MAX_WORDS).replace(/ …$/, "") });
   }
@@ -311,10 +315,14 @@ async function tagCampaigns(documentId: string, options: any) {
     WHERE cluster_size >= ? ORDER BY cluster_size DESC
   `).all(minExact) as { cluster_id: number; id: string; size: number }[]).filter(g => !claimedUnits.has(unitOf.get(g.id) ?? -1)) : [];
   if (exactOnly.length > 0) {
-    const getText = db.prepare("SELECT json_extract(attributes_json, '$.comment') AS comment FROM comments WHERE id = ?");
+    const getText = db.prepare(`SELECT json_extract(attributes_json, '$.comment') AS comment,
+      (SELECT group_concat(text, char(10)) FROM attachment_text a WHERE a.comment_id = c.id) AS att FROM comments c WHERE id = ?`);
     const items = exactOnly.map((g, i) => ({
       id: `f${i + 1}`, count: g.size,
-      text: truncateWords(unitOf.has(g.id) ? keep[unitOf.get(g.id)!].text : htmlToText((getText.get(g.id) as { comment: string | null })?.comment || ""), JUDGE_WORDS),
+      text: truncateWords(unitOf.has(g.id) ? keep[unitOf.get(g.id)!].text : (() => {
+        const r = getText.get(g.id) as { comment: string | null; att: string | null } | null;
+        return commentText(r?.comment ?? null, r?.att ?? null);
+      })(), JUDGE_WORDS),
     }));
     const batches = new Map<string, typeof items>();
     for (let i = 0; i < items.length; i += 20) batches.set(`F${i / 20}`, items.slice(i, i + 20));

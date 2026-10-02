@@ -176,6 +176,7 @@ async function clusterFormLetters(documentId: string, options: any) {
       attachmentText.get(r.comment_id)!.push(r.text);
     }
 
+    const hasAttachment = new Set((db.prepare("SELECT DISTINCT comment_id FROM attachments").all() as { comment_id: string }[]).map(r => r.comment_id));
     const docs: Doc[] = [];
     let stubs = 0;
     for (const r of db.prepare("SELECT id, attributes_json FROM comments ORDER BY id").iterate() as Iterable<{ id: string; attributes_json: string }>) {
@@ -183,7 +184,11 @@ async function clusterFormLetters(documentId: string, options: any) {
       const form = htmlToText(attrs.comment || attrs.text || "");
       const att = (attachmentText.get(r.id) || []).join("\n");
       // "See attached" and similar stubs would otherwise look like shared text
-      const formIsStub = att.length > 0 && form.split(/\s+/).filter(Boolean).length < STUB_WORDS;
+      // Any attachment makes a short comment box a stub, even when no text could be extracted from
+      // the attachment (scans, images): otherwise unrelated scanned letters that all say "See
+      // attached file(s)" look like copies of one form letter. Scans are grouped by identical
+      // files in the near-copy pass instead.
+      const formIsStub = hasAttachment.has(r.id) && form.split(/\s+/).filter(Boolean).length < STUB_WORDS;
       if (formIsStub) stubs++;
       docs.push(buildDoc(r.id, formIsStub ? att : `${form}\n${att}`));
     }
