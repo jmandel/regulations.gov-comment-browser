@@ -211,6 +211,43 @@ export function initSchema(db: Database) {
       FOREIGN KEY (comment_id) REFERENCES comments(id)
     );
 
+    -- Triage of short ungrouped comments: which ones carry content worth LLM processing
+    CREATE TABLE IF NOT EXISTS comment_triage (
+      comment_id TEXT PRIMARY KEY,
+      label TEXT NOT NULL CHECK(label IN ('no_substance', 'stance_only', 'substantive')),
+      topic TEXT,   -- for stance_only: what the comment is about, in a few words
+      stance TEXT,  -- for stance_only: support / oppose / mixed / other
+      model TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (comment_id) REFERENCES comments(id)
+    );
+
+    -- Which top-level theme groups each unit addresses (gate before theme extraction)
+    CREATE TABLE IF NOT EXISTS comment_theme_groups (
+      comment_id TEXT NOT NULL,
+      group_code TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (comment_id, group_code),
+      FOREIGN KEY (comment_id) REFERENCES comments(id)
+    );
+    -- Units whose gate call has completed (including ones that address no group)
+    CREATE TABLE IF NOT EXISTS comment_theme_group_status (
+      comment_id TEXT PRIMARY KEY,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Gemini Batch API jobs, so a step can resume polling after a restart
+    CREATE TABLE IF NOT EXISTS batch_jobs (
+      job_name TEXT PRIMARY KEY,      -- Gemini batch resource name (batches/...)
+      task TEXT NOT NULL,             -- pipeline step, e.g. 'condense'
+      label TEXT NOT NULL,            -- caller-chosen identifier for this submission
+      model TEXT NOT NULL,
+      request_keys TEXT NOT NULL,     -- JSON array of request keys, in submission order
+      state TEXT NOT NULL,            -- last seen job state
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Comment clusters based on similarity analysis
     CREATE TABLE IF NOT EXISTS comment_clusters (
       cluster_id INTEGER PRIMARY KEY AUTOINCREMENT,

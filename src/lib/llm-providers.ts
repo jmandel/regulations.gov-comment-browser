@@ -12,6 +12,7 @@ export interface UsageMetadata {
   promptTokenCount: number;
   cachedContentTokenCount: number;
   candidatesTokenCount: number;
+  thoughtsTokenCount?: number;
 }
 
 export interface GenerationResult {
@@ -22,8 +23,10 @@ export interface GenerationResult {
 // Model names accepted by --model / batch-config.json → Gemini API model IDs and per-model config.
 // Defaults (batch-config.json): gemini-3.5-flash-lite for mechanical work (transcription),
 // gemini-3.8-flash for everything else.
-const GEMINI_MODELS: Record<string, { id: string; config?: GenerateContentConfig }> = {
-  "gemini-3.8-flash": { id: "gemini-3.8-flash" },
+// 3.8 Flash can't turn thinking off; "minimal" was the cheapest level with no quality loss in a
+// 2026-10 trial. 3.5 Flash-Lite doesn't think unless given a thinking budget.
+export const GEMINI_MODELS: Record<string, { id: string; config?: GenerateContentConfig }> = {
+  "gemini-3.8-flash": { id: "gemini-3.8-flash", config: { thinkingConfig: { thinkingLevel: "minimal" } as any } },
   "gemini-3.5-flash-lite": { id: "gemini-3.5-flash-lite" },
   // Legacy names, kept so existing commands and configs keep working
   "gemini-3-flash": { id: "gemini-3-flash-preview" },
@@ -66,7 +69,7 @@ async function processStream<T>(
   return result;
 }
 
-function getGeminiClient(): GoogleGenAI {
+export function getGeminiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY environment variable is required");
@@ -74,7 +77,7 @@ function getGeminiClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey });
 }
 
-function resolveGeminiModel(model: string) {
+export function resolveGeminiModel(model: string) {
   const entry = GEMINI_MODELS[model];
   if (!entry) {
     throw new Error(`Unknown Gemini model: ${model}. Available: ${Object.keys(GEMINI_MODELS).join(", ")}`);
@@ -115,6 +118,35 @@ async function generateWithGemini(model: string, parts: Part[], options?: Stream
   });
 }
 
+// Non-streaming call with arbitrary parts and per-call config overrides; returns text and usage.
+// Used by the shared step runner (src/lib/step-runner.ts).
+export async function generateGeminiContent(
+  model: string,
+  parts: Part[],
+  configOverrides?: GenerateContentConfig
+): Promise<GenerationResult> {
+  const { id, config } = resolveGeminiModel(model);
+  const ai = getGeminiClient();
+  return withGeminiRetry(model, async () => {
+    const response = await ai.models.generateContent({
+      model: id,
+      config: { ...config, ...configOverrides },
+      contents: [{ role: "user", parts }],
+    });
+    return { text: response.text || '', usageMetadata: toUsage(response.usageMetadata) };
+  });
+}
+
+export function toUsage(u: any): UsageMetadata | undefined {
+  if (!u) return undefined;
+  return {
+    promptTokenCount: u.promptTokenCount || 0,
+    cachedContentTokenCount: u.cachedContentTokenCount || 0,
+    candidatesTokenCount: u.candidatesTokenCount || 0,
+    thoughtsTokenCount: u.thoughtsTokenCount || 0,
+  };
+}
+
 // Non-streaming variant that returns usage metadata for cache monitoring
 export async function generateWithGeminiMetadata(model: string, prompt: string, options?: StreamingOptions): Promise<GenerationResult> {
   const { id, config } = resolveGeminiModel(model);
@@ -135,11 +167,7 @@ export async function generateWithGeminiMetadata(model: string, prompt: string, 
       debugStreamEnd(options.debugFilename);
     }
 
-    const usageMetadata = response.usageMetadata ? {
-      promptTokenCount: response.usageMetadata.promptTokenCount || 0,
-      cachedContentTokenCount: (response.usageMetadata as any).cachedContentTokenCount || 0,
-      candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
-    } : undefined;
+    const usageMetadata = toUsage(response.usageMetadata);
 
     return { text, usageMetadata };
   });
