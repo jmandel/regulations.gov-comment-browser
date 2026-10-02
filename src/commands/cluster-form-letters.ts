@@ -261,41 +261,10 @@ async function clusterFormLetters(documentId: string, options: any) {
     }
     groups.sort((a, b) => b.length - a.length);
 
-    // Second pass: near-identical copies among comments still ungrouped. Phrases shared by only
-    // 2-3 comments never count as "shared" above, so copies sent by a handful of people (or the same
-    // person twice) are compared on their full text instead, and kept even as pairs.
-    const inGroup = new Set(groups.flat());
-    const nearParent = new Map<number, number>();
-    const nearFind = (x: number): number => {
-      while (nearParent.get(x)! !== x) { nearParent.set(x, nearParent.get(nearParent.get(x)!)!); x = nearParent.get(x)!; }
-      return x;
-    };
-    const nearBuckets = new Map<string, number>();
-    docs.forEach((d, i) => {
-      if (inGroup.has(i) || d.set.size === 0) return;
-      nearParent.set(i, i);
-      const sig = minhash(d.set);
-      for (let b = 0; b < NUM_HASHES / BAND_ROWS; b++) {
-        const key = `${b}:${sig.slice(b * BAND_ROWS, (b + 1) * BAND_ROWS).join(",")}`;
-        const rep = nearBuckets.get(key);
-        if (rep === undefined) nearBuckets.set(key, i);
-        else if (nearFind(rep) !== nearFind(i) && jaccard(docs[rep].set, d.set) >= nearCopyThreshold) nearParent.set(nearFind(i), nearFind(rep));
-      }
-    });
-    const nearComponents = new Map<number, number[]>();
-    for (const i of nearParent.keys()) {
-      const root = nearFind(i);
-      if (!nearComponents.has(root)) nearComponents.set(root, []);
-      nearComponents.get(root)!.push(i);
-    }
-    const nearCopyGroups = [...nearComponents.values()].filter(m => m.length >= 2);
-    const isNearCopy = new Set(nearCopyGroups);
-    groups.push(...nearCopyGroups);
-
-    // Template, representative, and per-member additions for each group
+    // Template, representative, and per-member additions for a group; members adding a lot of
+    // their own text are promoted out. Returns null if too few members remain.
     type Stored = { members: number[]; rep: number; scores: Map<number, number>; additions: Map<number, { count: number; text: string }>; promoted: number[] };
-    const stored: Stored[] = [];
-    for (const members of groups) {
+    const processGroup = (members: number[], minSize: number): Stored | null => {
       const counts = new Map<number, number>();
       for (const m of members) for (const x of docs[m].set) counts.set(x, (counts.get(x) || 0) + 1);
       const template = new Set<number>();
@@ -326,9 +295,54 @@ async function clusterFormLetters(documentId: string, options: any) {
       }
       const promoted = members.filter(m => m !== rep && (additions.get(m)?.count || 0) >= promoteAddedWords);
       const kept = members.filter(m => !promoted.includes(m));
-      if (kept.length >= (isNearCopy.has(members) ? 2 : minClusterSize)) {
-        stored.push({ members: kept, rep, scores, additions, promoted });
+      return kept.length >= minSize ? { members: kept, rep, scores, additions, promoted } : null;
+    };
+
+    const stored: Stored[] = [];
+    for (const members of groups) {
+      const g = processGroup(members, minClusterSize);
+      if (g) stored.push(g);
+    }
+
+    // Second pass: near-identical copies among everything still ungrouped, including members just
+    // promoted out of a group. Phrases shared by only 2-3 comments never count as "shared" above,
+    // so copies sent by a handful of people (or the same person twice) are compared on their full
+    // text and kept even as pairs. Running after promotion also regroups identical variants of a
+    // campaign letter (the same extra paragraphs added by many senders) instead of leaving each
+    // copy as its own unit.
+    const inGroup = new Set(stored.flatMap(g => g.members));
+    const nearParent = new Map<number, number>();
+    const nearFind = (x: number): number => {
+      while (nearParent.get(x)! !== x) { nearParent.set(x, nearParent.get(nearParent.get(x)!)!); x = nearParent.get(x)!; }
+      return x;
+    };
+    const nearBuckets = new Map<string, number>();
+    docs.forEach((d, i) => {
+      if (inGroup.has(i) || d.set.size === 0) return;
+      nearParent.set(i, i);
+      const sig = minhash(d.set);
+      for (let b = 0; b < NUM_HASHES / BAND_ROWS; b++) {
+        const key = `${b}:${sig.slice(b * BAND_ROWS, (b + 1) * BAND_ROWS).join(",")}`;
+        const rep = nearBuckets.get(key);
+        if (rep === undefined) nearBuckets.set(key, i);
+        else if (nearFind(rep) !== nearFind(i) && jaccard(docs[rep].set, d.set) >= nearCopyThreshold) nearParent.set(nearFind(i), nearFind(rep));
       }
+    });
+    const nearComponents = new Map<number, number[]>();
+    for (const i of nearParent.keys()) {
+      const root = nearFind(i);
+      if (!nearComponents.has(root)) nearComponents.set(root, []);
+      nearComponents.get(root)!.push(i);
+    }
+    const promotedAll = new Set(stored.flatMap(g => g.promoted));
+    let nearCopyGroups = 0, regroupedPromoted = 0;
+    for (const members of nearComponents.values()) {
+      if (members.length < 2) continue;
+      const g = processGroup(members, 2);
+      if (!g) continue;
+      stored.push(g);
+      nearCopyGroups++;
+      regroupedPromoted += g.members.filter(m => promotedAll.has(m)).length;
     }
 
     // Store: groups, then every remaining comment as a singleton
@@ -349,7 +363,8 @@ async function clusterFormLetters(documentId: string, options: any) {
         VALUES (?, ?, ?, ?, datetime('now'))
       `);
       const insertAddition = db.prepare(
-        "INSERT INTO form_letter_additions (comment_id, cluster_id, added_word_count, added_text, promoted) VALUES (?, ?, ?, ?, ?)"
+        // OR IGNORE: a promoted member regrouped as a near copy keeps its link to the original campaign
+        "INSERT OR IGNORE INTO form_letter_additions (comment_id, cluster_id, added_word_count, added_text, promoted) VALUES (?, ?, ?, ?, ?)"
       );
 
       for (const g of stored) {
@@ -386,17 +401,16 @@ async function clusterFormLetters(documentId: string, options: any) {
 
     // Report
     const bigAdditions = stored.reduce((n, g) => n + g.members.filter(m => (g.additions.get(m)?.count || 0) >= 50).length, 0);
-    const promotedCount = stored.reduce((n, g) => n + g.promoted.length, 0);
+    const promotedCount = promotedAll.size;
     console.log(`\n✅ Form-letter clustering complete`);
     console.log(`   Comments: ${docs.length}`);
-    const nearStored = stored.filter(g => g.members.length < minClusterSize).length;
-    console.log(`   Form-letter groups: ${stored.length}, covering ${grouped.size} comments (${nearStored} are near-copy pairs/triples)`);
+    console.log(`   Form-letter groups: ${stored.length}, covering ${grouped.size} comments (${nearCopyGroups} from the near-copy pass)`);
     console.log(`   Ungrouped comments: ${docs.length - grouped.size}`);
     console.log(`   Units after collapsing: ${stored.length + docs.length - grouped.size} (${((1 - (stored.length + docs.length - grouped.size) / docs.length) * 100).toFixed(1)}% reduction)`);
     console.log(`   Group members adding ≥50 words of their own: ${bigAdditions}`);
-    console.log(`   Promoted to their own cluster (≥${promoteAddedWords} added words): ${promotedCount}`);
+    console.log(`   Promoted out of a group (≥${promoteAddedWords} added words): ${promotedCount}, of which ${regroupedPromoted} regrouped as identical variants`);
     console.log(`\n📊 Largest groups:`);
-    for (const g of stored.slice(0, 15)) {
+    for (const g of [...stored].sort((a, b) => b.members.length - a.members.length).slice(0, 15)) {
       const preview = docs[g.rep].words.slice(0, 18).join(" ");
       console.log(`   ${String(g.members.length).padStart(5)}  ${docs[g.rep].id}  ${preview}…`);
     }
