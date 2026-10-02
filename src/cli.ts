@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { loadCommentsCommand } from "./commands/load-comments";
 import { clusterCommentsFastCommand } from "./commands/cluster-comments-fast";
+import { clusterFormLettersCommand } from "./commands/cluster-form-letters";
 import { transcribeCommand } from "./commands/transcribe";
 import { condenseCommand } from "./commands/condense";
 import { discoverThemesCommand } from "./commands/discover-themes";
@@ -24,6 +25,7 @@ const program = new Command()
 // Register all commands
 program.addCommand(loadCommentsCommand);
 program.addCommand(clusterCommentsFastCommand);
+program.addCommand(clusterFormLettersCommand);
 program.addCommand(transcribeCommand);
 program.addCommand(condenseCommand);
 program.addCommand(discoverThemesCommand);

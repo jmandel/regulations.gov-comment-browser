@@ -1,10 +1,6 @@
 import { Database } from "bun:sqlite";
 import type { RawComment, CommentAttributes, Attachment, EnrichedComment, ParsedTheme } from "../types";
 import { countWords } from "./batch-processor";
-import { mkdtemp, writeFile, unlink } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
-import { $ } from "bun";
 
 // Load comments and attachments from database
 export function loadComments(db: Database, limit?: number): {
@@ -602,7 +598,7 @@ function selectBestAttachmentFormat(attachments: Attachment[]): Attachment | nul
   return bestAttachment || attachments[0];
 }
 
-async function extractTextFromAttachment(attachment: Attachment): Promise<string> {
+export async function extractTextFromAttachment(attachment: Attachment): Promise<string> {
   if (!attachment.blob_data) {
     return '';
   }
@@ -622,63 +618,45 @@ async function extractTextFromAttachment(attachment: Attachment): Promise<string
   }
 }
 
-async function extractDocxText(buffer: Buffer | Uint8Array): Promise<string> {
-  // Create a temporary directory and file
-  const tempDir = await mkdtemp(join(tmpdir(), 'docx-extract-'));
-  const tempDocxPath = join(tempDir, 'temp.docx');
-  
+// Run a text-extraction tool with the file on stdin. Uses Bun.spawn rather than the Bun shell
+// ($``), which occasionally never resolved under concurrency; the timeout kills a stuck child.
+async function runTextTool(cmd: string[], input: Uint8Array, timeoutMs = 60_000): Promise<string> {
+  const proc = Bun.spawn(cmd, { stdin: input, stdout: "pipe", stderr: "pipe" });
+  const timer = setTimeout(() => proc.kill(), timeoutMs);
   try {
-    // Write DOCX buffer to temporary file
-    await writeFile(tempDocxPath, buffer);
-    
-    // Use pandoc to extract plain text from DOCX
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    if (exitCode !== 0) {
+      throw new Error(`${cmd[0]} exited with ${proc.signalCode ?? exitCode}: ${stderr.trim()}`);
+    }
+    return stdout.trim();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function extractDocxText(buffer: Buffer | Uint8Array): Promise<string> {
+  try {
     // -t plain for plain text output, --wrap=none to avoid line wrapping
-    const result = await $`pandoc -f docx -t plain --wrap=none ${tempDocxPath}`.text();
-    
-    return result.trim();
+    return await runTextTool(["pandoc", "-f", "docx", "-t", "plain", "--wrap=none"], buffer);
   } catch (error) {
-    console.error('Error extracting DOCX text:', error);
+    console.error('Error extracting DOCX text:', (error as Error).message);
     // Fallback to empty string if pandoc fails
     return '';
-  } finally {
-    // Clean up temporary file
-    try {
-      await unlink(tempDocxPath);
-      // Remove the temporary directory
-      await $`rmdir ${tempDir}`.quiet();
-    } catch {
-      // Ignore cleanup errors
-    }
   }
 }
 
 async function extractPdfText(buffer: Buffer | Uint8Array): Promise<string> {
-  // Create a temporary directory and file
-  const tempDir = await mkdtemp(join(tmpdir(), 'pdf-extract-'));
-  const tempPdfPath = join(tempDir, 'temp.pdf');
-  
   try {
-    // Write PDF buffer to temporary file
-    await writeFile(tempPdfPath, buffer);
-    
-    // Use pdftotext to extract text
     // -layout preserves the layout, -enc UTF-8 ensures proper encoding
-    const result = await $`pdftotext -layout -enc UTF-8 ${tempPdfPath} -`.text();
-    
-    return result.trim();
+    return await runTextTool(["pdftotext", "-layout", "-enc", "UTF-8", "-", "-"], buffer);
   } catch (error) {
-    console.error('Error extracting PDF text:', error);
+    console.error('Error extracting PDF text:', (error as Error).message);
     // Fallback to empty string if pdftotext fails
     return '';
-  } finally {
-    // Clean up temporary file
-    try {
-      await unlink(tempPdfPath);
-      // Remove the temporary directory
-      await $`rmdir ${tempDir}`.quiet();
-    } catch {
-      // Ignore cleanup errors
-    }
   }
 }
 

@@ -191,6 +191,26 @@ export function initSchema(db: Database) {
     -- Index for efficient theme-based queries
     CREATE INDEX IF NOT EXISTS idx_theme_extracts_theme ON comment_theme_extracts(theme_code);
     
+    -- Plain text extracted locally (pdftotext/pandoc) from attachments, cached for clustering
+    CREATE TABLE IF NOT EXISTS attachment_text (
+      attachment_id TEXT NOT NULL,
+      format TEXT NOT NULL,
+      comment_id TEXT NOT NULL,
+      text TEXT NOT NULL,
+      PRIMARY KEY (attachment_id, format)
+    );
+    CREATE INDEX IF NOT EXISTS idx_attachment_text_comment ON attachment_text(comment_id);
+
+    -- Text a form-letter cluster member adds beyond the cluster's shared template
+    CREATE TABLE IF NOT EXISTS form_letter_additions (
+      comment_id TEXT PRIMARY KEY,
+      cluster_id INTEGER NOT NULL,
+      added_word_count INTEGER NOT NULL,
+      added_text TEXT NOT NULL,
+      promoted INTEGER NOT NULL DEFAULT 0, -- 1 = added so much it was split out as its own singleton cluster
+      FOREIGN KEY (comment_id) REFERENCES comments(id)
+    );
+
     -- Comment clusters based on similarity analysis
     CREATE TABLE IF NOT EXISTS comment_clusters (
       cluster_id INTEGER PRIMARY KEY AUTOINCREMENT,

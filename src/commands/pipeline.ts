@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { basename, extname } from "path";
 import { loadCommentsCommand } from "./load-comments";
 import { clusterCommentsFastCommand } from "./cluster-comments-fast";
+import { clusterFormLettersCommand } from "./cluster-form-letters";
 import { transcribeCommand } from "./transcribe";
 import { condenseCommand } from "./condense";
 import { discoverThemesCommand } from "./discover-themes";
@@ -17,16 +18,19 @@ export const pipelineCommand = new Command("pipeline")
   .description("Run the complete analysis pipeline: load, cluster, condense, discover themes, extract theme content, summarize themes, discover entities, build website, and vacuum database")
   .argument("<source-arg>", "Source argument (e.g., CMS-2025-0050-0031 or path to CSV)")
   .option("-s, --skip-attachments", "Skip downloading attachments")
+  .option("--mirrulations", "Load comments from the Mirrulations S3 mirror instead of the regulations.gov API (best for large dockets)")
+  .option("--whole-docket", "With --mirrulations: include comments on every document in the docket")
   .option("-d, --debug", "Enable debug mode for all steps")
   .option("-o, --output <dir>", "Output directory for website files", "dist/data")
   .option("-l, --limit-total-comment-load <N>", "Limit initial number of comments loaded")
   .option("--start-at <step>", "Start at a specific step (1-10): 1=load, 2=cluster, 3=transcribe, 4=condense, 5=discover-themes, 6=extract-theme-content, 7=summarize-themes, 8=discover-entities, 9=build-website, 10=vacuum-db")
   .option("-c, --concurrency <N>", "Number of concurrent operations")
   .option("--max-crashes <N>", "Maximum number of crashes before giving up (default: 10)", parseInt)
-  .option("-m, --model <model>", "AI model to use (gemini-pro, gemini-flash, gemini-flash-lite, claude)")
+  .option("-m, --model <model>", "Override the per-step models in batch-config.json for every step (e.g. gemini-3.8-flash, gemini-3.5-flash-lite, claude)")
   .option("--no-clustering", "Skip clustering entirely (process all comments)")
   .option("--recluster", "Force reclustering even if it exists")
-  .option("--similarity-threshold <N>", "Similarity threshold for clustering (default: 0.8)", parseFloat)
+  .option("--cluster-method <method>", "Clustering method: form-letters (shared-template detection, default) or fast (whole-comment n-gram similarity)", "form-letters")
+  .option("--similarity-threshold <N>", "Similarity threshold for clustering (default: 0.5 for form-letters, 0.8 for fast)", parseFloat)
   .action(async (sourceArg: string, options: any) => {
     // Detect if first argument is a CSV path (contains '.' or '/' or ends with .csv)
     const isCsv = sourceArg.includes("/") || sourceArg.toLowerCase().endsWith(".csv");
@@ -54,6 +58,8 @@ export const pipelineCommand = new Command("pipeline")
             'bun', 'cli.ts', 
             loadSource,
             ...(options.skipAttachments ? ['--skip-attachments'] : []),
+            ...(options.mirrulations ? ['--mirrulations'] : []),
+            ...(options.wholeDocket ? ['--whole-docket'] : []),
             ...(options.debug ? ['--debug'] : []),
             ...(options.limitTotalCommentLoad ? ['--limit', options.limitTotalCommentLoad] : []),
           ]);
@@ -79,7 +85,8 @@ export const pipelineCommand = new Command("pipeline")
             return;
           }
           
-          await clusterCommentsFastCommand.parseAsync([
+          const clusterCommand = options.clusterMethod === "fast" ? clusterCommentsFastCommand : clusterFormLettersCommand;
+          await clusterCommand.parseAsync([
             'bun', 'cli.ts',
             documentId,
             ...(options.similarityThreshold ? ['--similarity-threshold', options.similarityThreshold] : []),
