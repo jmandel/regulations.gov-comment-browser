@@ -23,7 +23,7 @@ import { htmlToText } from "../lib/text";
 // as cluster-comments-fast, so downstream steps work unchanged. Every comment gets a
 // membership row (ungrouped comments are singleton clusters).
 
-const SHINGLE = 5;              // words per phrase
+export const SHINGLE = 5;              // words per phrase
 const MIN_CORE_SHINGLES = 30;   // a comment needs this much shared text to join a group...
 const SHORT_SHARED_FRACTION = 0.8; // ...unless it is shorter than that and this much of it is shared
 const STUB_WORDS = 40;          // form text this short is dropped when attachments carry the content
@@ -53,7 +53,7 @@ function fmix32(h: number): number {
   return h >>> 0;
 }
 
-type Doc = {
+export type Doc = {
   id: string;
   words: string[];          // original tokens (for reconstructing added text)
   shingles: Uint32Array;    // hash of the phrase starting at each word position
@@ -61,7 +61,7 @@ type Doc = {
   core: Set<number>;
 };
 
-function buildDoc(id: string, text: string): Doc {
+export function buildDoc(id: string, text: string): Doc {
   const words: string[] = [];
   const norm: string[] = [];
   for (const tok of text.split(/\s+/)) {
@@ -80,7 +80,7 @@ function buildDoc(id: string, text: string): Doc {
   return { id, words, shingles, set: new Set(shingles), core: new Set() };
 }
 
-function jaccard(a: Set<number>, b: Set<number>): number {
+export function jaccard(a: Set<number>, b: Set<number>): number {
   if (a.size > b.size) [a, b] = [b, a];
   let inter = 0;
   for (const x of a) if (b.has(x)) inter++;
@@ -89,7 +89,7 @@ function jaccard(a: Set<number>, b: Set<number>): number {
 }
 
 // Fraction of `template` present in `s`
-function coverage(s: Set<number>, template: Set<number>): number {
+export function coverage(s: Set<number>, template: Set<number>): number {
   if (template.size === 0) return 0;
   let inter = 0;
   for (const x of template) if (s.has(x)) inter++;

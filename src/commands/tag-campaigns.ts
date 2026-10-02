@@ -62,27 +62,35 @@ function truncateWords(s: string, n: number): string {
 }
 
 // "See attached" boxes add nothing; keep the typed text only when it says something
-function commentText(comment: string | null, attachments: string | null): string {
+// Scans have no extracted attachment text; their transcript (when transcription has run) stands in
+function commentText(comment: string | null, attachments: string | null, transcript?: string | null): string {
   const typed = htmlToText(comment || "");
-  const att = (attachments || "").trim();
+  const att = (attachments || "").trim() || (transcript || "").trim();
   return att ? (wordCount(typed) >= 15 ? `${typed}\n\n${att}` : att) : typed;
 }
+
+// Transcript of a comment that has attachments but no extracted attachment text (a scan)
+const scanTranscripts = `(SELECT t.markdown FROM transcriptions t WHERE t.comment_id = c.id AND t.status = 'completed'
+           AND EXISTS (SELECT 1 FROM attachments a WHERE a.comment_id = c.id)
+           AND NOT EXISTS (SELECT 1 FROM attachment_text x WHERE x.comment_id = c.id AND x.text <> '')) AS transcript`;
 
 function loadUnits(db: Database): { units: Unit[]; clustered: boolean } {
   const clustered = checkClusteringStatus(db);
   const rows = db.prepare(clustered ? `
     SELECT cc.representative_comment_id AS id, cc.cluster_id, cc.cluster_size AS size,
            json_extract(c.attributes_json, '$.comment') AS comment,
-           (SELECT group_concat(text, char(10)) FROM attachment_text a WHERE a.comment_id = c.id) AS att
+           (SELECT group_concat(text, char(10)) FROM attachment_text a WHERE a.comment_id = c.id) AS att,
+           ${scanTranscripts}
     FROM comment_clusters cc JOIN comments c ON c.id = cc.representative_comment_id
   ` : `
     SELECT c.id, NULL AS cluster_id, 1 AS size, json_extract(c.attributes_json, '$.comment') AS comment,
-           (SELECT group_concat(text, char(10)) FROM attachment_text a WHERE a.comment_id = c.id) AS att
+           (SELECT group_concat(text, char(10)) FROM attachment_text a WHERE a.comment_id = c.id) AS att,
+           ${scanTranscripts}
     FROM comments c
-  `).all() as { id: string; cluster_id: number | null; size: number; comment: string | null; att: string | null }[];
+  `).all() as { id: string; cluster_id: number | null; size: number; comment: string | null; att: string | null; transcript: string | null }[];
   const units: Unit[] = [];
   for (const r of rows) {
-    const text = commentText(r.comment, r.att);
+    const text = commentText(r.comment, r.att, r.transcript);
     if (wordCount(text) < (r.size > 1 ? MIN_WORDS_REP : MIN_WORDS)) continue;
     units.push({ id: r.id, clusterId: r.cluster_id, size: r.size, text: truncateWords(text, MAX_WORDS).replace(/ …$/, "") });
   }
@@ -315,10 +323,11 @@ async function tagCampaigns(documentId: string, options: any) {
     WHERE cluster_size >= ? ORDER BY cluster_size DESC
   `).all(minExact) as { cluster_id: number; id: string; size: number }[]).filter(g => !claimedUnits.has(unitOf.get(g.id) ?? -1)) : [];
   const getText = db.prepare(`SELECT json_extract(attributes_json, '$.comment') AS comment,
-    (SELECT group_concat(text, char(10)) FROM attachment_text a WHERE a.comment_id = c.id) AS att FROM comments c WHERE id = ?`);
+    (SELECT group_concat(text, char(10)) FROM attachment_text a WHERE a.comment_id = c.id) AS att,
+    ${scanTranscripts} FROM comments c WHERE id = ?`);
   const repText = (id: string) => {
-    const r = getText.get(id) as { comment: string | null; att: string | null } | null;
-    return commentText(r?.comment ?? null, r?.att ?? null);
+    const r = getText.get(id) as { comment: string | null; att: string | null; transcript: string | null } | null;
+    return commentText(r?.comment ?? null, r?.att ?? null, r?.transcript ?? null);
   };
   // A copy group with no readable letter (e.g. identical scans behind "See attached") can't be
   // judged or named as a campaign; leave it as a plain form-letter group

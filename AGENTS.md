@@ -74,20 +74,21 @@ Re-running any load is safe: comments already in the DB are skipped by ID. Attac
 
 2. **Use `--no-clustering` for small dockets.** Dockets under ~1000 comments don't benefit from clustering and it can cause problems (especially with many attachment-only comments). Only enable clustering for 1000+ comment dockets.
 
-### Pipeline steps (1-12)
+### Pipeline steps (1-13)
 
 1. **load** - Load comments from regulations.gov API, Mirrulations or CSV (downloads attachments)
 2. **cluster** - Group form letters (skipped with `--no-clustering`; see "Form-letter clustering" below)
-3. **tag-campaigns** - Optional (`--tag-campaigns`): tag organized campaigns, including paraphrased ones that clustering can't see. Tags only; units are unchanged. See "Campaign tagging" below
-4. **triage** - Label short ungrouped typed comments (<80 words) `no_substance` / `stance_only` / `substantive`, batched ~100 per Flash-Lite call. Condense skips the first two; theme extraction skips `no_substance` and reads `stance_only` comments' raw text so they still count toward themes
-5. **transcribe** - Convert attachments/PDFs to clean markdown. Comments without attachments are stored as-is with no LLM call
-6. **condense** - Structurally summarize each comment
-7. **discover-themes** - Build hierarchical taxonomy of policy themes from a sample: every form-letter template, promoted member and attachment letter, plus `thresholds.typedSample` (1,000) seeded-random typed comments (`--typed-sample`, `--seed`; triaged-out comments excluded). On PFS: ~4,870 units, 15 batches, 3 merges
-8. **extract-theme-content** - Extract theme-specific text from each comment, in two phases (see below)
-9. **summarize-themes** - Synthesize extracts into narrative theme analysis, in phases across all themes: per-batch summaries, level-by-level 4-way merges, then JSON structuring (includes post-processing to fix partial comment IDs). Sub-themes need ≥5 extracts (`thresholds.minCommentsPerTheme`). Top-level themes with sub-themes instead get a *group report* (Phase 4) synthesized from their sub-themes' reports plus their direct extracts — extraction files content under the most specific theme, so a top-level theme's own extracts are a small slice. Group reports are marked `reportType: "group"` and rebuilt when a sub-theme is re-summarized (or with `--force`); ~$1.50 for 11 groups on the 1-in-20 PFS sample
-10. **discover-entities** - Build an entity taxonomy from a seeded sample in one call, then tag every unit's text by term matching (local, no LLM). Entities need mentions in min(1%, 10) units
-11. **build-website** - Export analysis for the web dashboard (uses docket ID from DB metadata for output paths). Writes a lean `comments-index.json` loaded at startup (form-letter members point to their representative plus a snippet of their own added text) and on-demand data: `comment-details/` and `comment-text/` shards (condensed sections; full text from the transcription), `theme-extracts/<code>.json`, a `search/` word index, and `campaigns.json` (when step 3 ran; each index entry carries its `campaign` id). At PFS scale (43k comments) startup downloads ~3.4 MB gzipped
-12. **vacuum-db** - Optimize SQLite database
+3. **triage** - Label short ungrouped typed comments (<80 words) `no_substance` / `stance_only` / `substantive`, batched ~100 per Flash-Lite call. Condense skips the first two; theme extraction skips `no_substance` and reads `stance_only` comments' raw text so they still count toward themes
+4. **transcribe** - Convert attachments/PDFs to clean markdown. Comments without attachments are stored as-is with no LLM call
+5. **match-scans** - After transcription, match ungrouped scanned submissions (no extractable text, so clustering could only group identical files) to form-letter groups by their transcripts and move matches into the group, so only the representative is condensed and extracted. A match needs ≥50% of the group's template in the scan and ≥30% of the scan from the template; templates under 40 phrases are ignored (a full letter quoting the rule's title in its RE: line otherwise matched a title-only template). Scans matching each other (Jaccard ≥0.8) form new groups. On PFS: 139 scans joined 39 groups and 30 formed 11 new groups
+6. **tag-campaigns** - Optional (`--tag-campaigns`): tag organized campaigns, including paraphrased ones that clustering can't see. Runs after transcription and scan matching so scanned letters are judged by their transcripts. Tags only; units are unchanged. See "Campaign tagging" below
+7. **condense** - Structurally summarize each comment
+8. **discover-themes** - Build hierarchical taxonomy of policy themes from a sample: every form-letter template, promoted member and attachment letter, plus `thresholds.typedSample` (1,000) seeded-random typed comments (`--typed-sample`, `--seed`; triaged-out comments excluded). On PFS: ~4,870 units, 15 batches, 3 merges
+9. **extract-theme-content** - Extract theme-specific text from each comment, in two phases (see below)
+10. **summarize-themes** - Synthesize extracts into narrative theme analysis, in phases across all themes: per-batch summaries, level-by-level 4-way merges, then JSON structuring (includes post-processing to fix partial comment IDs). Sub-themes need ≥5 extracts (`thresholds.minCommentsPerTheme`). Top-level themes with sub-themes instead get a *group report* (Phase 4) synthesized from their sub-themes' reports plus their direct extracts — extraction files content under the most specific theme, so a top-level theme's own extracts are a small slice. Group reports are marked `reportType: "group"` and rebuilt when a sub-theme is re-summarized (or with `--force`); ~$1.50 for 11 groups on the 1-in-20 PFS sample
+11. **discover-entities** - Build an entity taxonomy from a seeded sample in one call, then tag every unit's text by term matching (local, no LLM). Entities need mentions in min(1%, 10) units
+12. **build-website** - Export analysis for the web dashboard (uses docket ID from DB metadata for output paths). Writes a lean `comments-index.json` loaded at startup (form-letter members point to their representative plus a snippet of their own added text) and on-demand data: `comment-details/` and `comment-text/` shards (condensed sections; full text from the transcription), `theme-extracts/<code>.json`, a `search/` word index, and `campaigns.json` (when step 6 ran; each index entry carries its `campaign` id). At PFS scale (43k comments) startup downloads ~3.4 MB gzipped
+13. **vacuum-db** - Optimize SQLite database
 
 ### Models and cost
 
@@ -177,7 +178,7 @@ sqlite3 dbs/<id>.sqlite "
 
 ### Campaign tagging
 
-`tag-campaigns` (`src/commands/tag-campaigns.ts`, pipeline step 3 with `--tag-campaigns`; off by default because it costs ~$3–4 and ~4 min of CPU at PFS scale, and its precision is good but not exact) finds organized campaigns, including *paraphrased* ones: senders given a brief or talking points (often AI-personalized) whose letters share an ask and structure but little wording.
+`tag-campaigns` (`src/commands/tag-campaigns.ts`, pipeline step 6 with `--tag-campaigns`; off by default because it costs ~$3–4 and ~4 min of CPU at PFS scale, and its precision is good but not exact) finds organized campaigns, including *paraphrased* ones: senders given a brief or talking points (often AI-personalized) whose letters share an ask and structure but little wording.
 
 ```bash
 bun run src/cli.ts tag-campaigns <document-id> -c 20 [--report groups.json]
