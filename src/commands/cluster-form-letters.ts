@@ -328,6 +328,22 @@ async function clusterFormLetters(documentId: string, options: any) {
         else if (nearFind(rep) !== nearFind(i) && jaccard(docs[rep].set, d.set) >= nearCopyThreshold) nearParent.set(nearFind(i), nearFind(rep));
       }
     });
+    // Comments that share a byte-identical attachment file are copies too. This is the only way to
+    // group scans, which have no extracted text to compare.
+    const docIndex = new Map(docs.map((d, i) => [d.id, i]));
+    const fileOwner = new Map<string, number>();
+    let sameFileLinks = 0;
+    for (const r of db.prepare("SELECT comment_id, blob_data FROM attachments WHERE blob_data IS NOT NULL").iterate() as Iterable<{ comment_id: string; blob_data: Uint8Array }>) {
+      const i = docIndex.get(r.comment_id);
+      if (i === undefined || inGroup.has(i)) continue;
+      if (!nearParent.has(i)) nearParent.set(i, i);
+      const h = Bun.hash(r.blob_data).toString();
+      const prev = fileOwner.get(h);
+      if (prev === undefined) fileOwner.set(h, i);
+      else if (nearFind(prev) !== nearFind(i)) { nearParent.set(nearFind(i), nearFind(prev)); sameFileLinks++; }
+    }
+    console.log(`   Near-copy pass: ${sameFileLinks} links from identical attachment files`);
+
     const nearComponents = new Map<number, number[]>();
     for (const i of nearParent.keys()) {
       const root = nearFind(i);
