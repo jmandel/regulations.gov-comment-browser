@@ -43,7 +43,9 @@ export interface BatchOptions {
 const API = "https://generativelanguage.googleapis.com";
 const MAX_FILE_BYTES = 1_000_000_000; // API limit is 2 GB per input file; stay well under it
 const MAX_POLL_MS = 5 * 60_000;
-const FAILED_STATES = new Set(["FAILED", "CANCELLED", "EXPIRED"]);
+// SUCCEEDED_WITH_ERRORS is ours: the job finished but some requests in it failed. Such a job is
+// never reused, so a retry resubmits the failed requests instead of re-reading the same errors.
+const FAILED_STATES = new Set(["FAILED", "CANCELLED", "EXPIRED", "SUCCEEDED_WITH_ERRORS"]);
 
 // Fields of the SDK's flat GenerateContentConfig that are top-level in a REST GenerateContentRequest;
 // everything else belongs in generationConfig.
@@ -212,6 +214,8 @@ export async function runGeminiBatch(requests: LlmRequest[], opts: BatchOptions)
   const start = Date.now();
   let delay = opts.pollIntervalMs ?? 30_000;
   const deliver = async (job: Job, body: any) => {
+    let errors = 0;
+    const onResult = async (r: BatchResult) => { if (r.error) errors++; await opts.onResult(r); };
     const output = body?.response ?? body?.metadata?.output ?? {};
     const seen = new Set<string>();
     const wanted = new Set(job.keys);
@@ -225,16 +229,17 @@ export async function runGeminiBatch(requests: LlmRequest[], opts: BatchOptions)
         if (typeof key !== "string" || !wanted.has(key) || seen.has(key)) continue;
         seen.add(key);
         if (r.error) {
-          await opts.onResult({ key, error: `Batch request error ${r.error.code ?? ""}: ${r.error.message ?? JSON.stringify(r.error)}` });
+          await onResult({ key, error: `Batch request error ${r.error.code ?? ""}: ${r.error.message ?? JSON.stringify(r.error)}` });
           continue;
         }
         const { text: out, error } = extractText(r.response);
-        await opts.onResult(error ? { key, error } : { key, text: out, usage: toUsage(r.response?.usageMetadata) });
+        await onResult(error ? { key, error } : { key, text: out, usage: toUsage(r.response?.usageMetadata) });
       }
     }
     for (const key of job.keys) {
-      if (!seen.has(key)) await opts.onResult({ key, error: `No result for request in batch ${job.name}` });
+      if (!seen.has(key)) await onResult({ key, error: `No result for request in batch ${job.name}` });
     }
+    if (errors > 0) setState.run("SUCCEEDED_WITH_ERRORS", job.name);
   };
 
   while (jobs.some(j => !j.done)) {
@@ -279,7 +284,8 @@ async function deleteInputFile(job: any): Promise<void> {
   try {
     await rest("DELETE", `v1beta/${fileName}`);
   } catch (e) {
-    console.log(`   ⚠️  Could not delete batch input ${fileName}: ${(e as Error).message.slice(0, 200)}`);
+    // 403/404: already deleted (e.g. when re-reading a finished job's results after a restart)
+    if (!/→ 40[34]/.test((e as Error).message)) console.log(`   ⚠️  Could not delete batch input ${fileName}: ${(e as Error).message.slice(0, 200)}`);
   }
 }
 

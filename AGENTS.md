@@ -99,12 +99,12 @@ Per-step models live in `batch-config.json` (`tasks.<step>.model`, or `tasks.<st
 | transcribe | `gemini-3.5-flash-lite`; failures retried once on `gemini-3.8-flash` (`models.fallback`) | Thinking budget and 3.8 Flash changed nothing in a trial (same length and source overlap, 2–5× cost). Flash-Lite occasionally returns an empty response for an ordinary letter |
 | condense | typed → `gemini-3.5-flash-lite`, attachment letters and promoted members → `gemini-3.8-flash-nothink` | Flash-Lite matched 3.8 on typed comments but omitted recommendations in long multi-issue letters |
 | extract-theme-content | gate → `gemini-3.5-flash-lite`; extraction → `gemini-3.8-flash-nothink` | Flash-Lite as extractor over-split themes in a blind comparison |
-| discover-themes | `gemini-3.8-flash` (minimal thinking) | Without thinking it found fewer themes and missed issues (won 3 of 4 blind comparisons with thinking) |
-| summarize-themes | `gemini-3.8-flash` (minimal thinking) | Slightly better summaries and JSON structuring with thinking (7.69 vs 7.31); ~$3.6 difference at PFS scale |
+| discover-themes | `gemini-3.8-flash` (low thinking) | Without thinking it found fewer themes and missed issues (won 3 of 4 blind comparisons with thinking) |
+| summarize-themes | `gemini-3.8-flash` (low thinking) | Slightly better summaries and JSON structuring with thinking (7.69 vs 7.31); ~$3.6 difference at PFS scale |
 | discover-entities | `gemini-3.8-flash-nothink` | Won both blind comparisons and kept more entities |
 | tag-campaigns | judge/merge/expand → `gemini-3.8-flash-nothink`; naming → `gemini-3.5-flash-lite`; embeddings `gemini-embedding-2` | Flash-Lite as judge accepted 71% of candidate groups, including plainly independent dermatology letters; 3.8 Flash without thinking matched hand review far better |
 
-Thinking: 3.5 Flash-Lite doesn't think unless given a budget. `gemini-3.8-flash` defaults to `thinkingLevel: minimal`, which still spends ~1–2k thought tokens per call, often more than the visible output. `gemini-3.8-flash-nothink` (same model, `thinkingBudget: 0`, both in `GEMINI_MODELS` in `src/lib/llm-providers.ts`) produces no thought tokens; on attachment-letter condensing and theme extraction it cut cost 41–61% with equal or better blind-judged quality (extraction completeness 4.74 vs 4.35/5, half the omissions). Theme discovery, summaries and entities still use minimal thinking (untested without it).
+Thinking: 3.5 Flash-Lite doesn't think unless given a budget. `gemini-3.8-flash` defaults to `thinkingLevel: low` (the Batch API rejects `minimal`, which live calls accept; low matched minimal in trials with slightly more thought tokens), which spends ~1–2k thought tokens per call, often more than the visible output. `gemini-3.8-flash-nothink` (same model, `thinkingBudget: 0`, both in `GEMINI_MODELS` in `src/lib/llm-providers.ts`) produces no thought tokens; on attachment-letter condensing and theme extraction it cut cost 41–61% with equal or better blind-judged quality (extraction completeness 4.74 vs 4.35/5, half the omissions). Theme discovery and summaries keep low thinking; they were better with thinking than without.
 
 All per-comment LLM calls go through `runLlmRequests` (`src/lib/step-runner.ts`): live (parallel with retries) or `--batch` (`src/lib/gemini-batch.ts`: uploads a JSONL file, polls, records jobs in `batch_jobs` so a restarted step resumes the same job instead of paying twice, deletes the input file when done). Text-only results are cached in `llm_cache`. Each step prints tokens (input, cached, output, thoughts) and estimated cost at the end.
 
@@ -196,3 +196,6 @@ Thresholds and evidence (CMS-2026-2377, 15.4k units): random-pair cosine median 
 
 Dashboard: a Campaigns tab (list with exact vs reworded counts, detail page with form-letter groups and reworded letters), a campaign badge on comment cards and details, a `campaign:` picker in comment search (also `#/comments?campaign=<id>`), and an Overview panel.
 
+### Gemini sampling settings
+
+No temperature/top_p/top_k is set anywhere: Gemini 3.x models are meant to run at their default (temperature 1.0), and the sampling parameters are deprecated on 3.6 Flash and 3.5 Flash-Lite. All quality trials above ran at the defaults. Re-runs are kept stable by `llm_cache`, not by low temperature.
