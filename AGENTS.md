@@ -151,11 +151,12 @@ How it works (`src/commands/cluster-form-letters.ts`):
 - Text per comment = comment field + attachment text. Attachment text is extracted locally (`pdftotext`, `pandoc`; no LLM) and cached in `attachment_text`, so reruns take under a minute.
 - "See attached"-style stubs (<40 words of form text when attachments have text) are dropped so they can't link unrelated letters.
 - A 5-word phrase is *shared* if it appears in ≥5 comments (`--min-shared-df`). Comments whose text is ≥30% shared (`--min-shared-fraction`), or short comments (<30 phrases) that are ≥80% shared, are linked when their shared text has Jaccard ≥0.5 (`--similarity-threshold`), via MinHash LSH + union-find, then split around a medoid so chained campaigns don't merge. Groups under 4 (`--min-cluster-size`) become singletons.
+- Second pass: among comments still ungrouped, near-identical copies (full-text Jaccard ≥0.8, `--near-copy-threshold`) are grouped even as pairs. Phrases shared by only 2–3 comments never count as "shared" above, so this catches duplicate submissions (often the same organization submitting twice) and copies sent by a handful of people.
 - Each group's template = phrases in ≥50% of members; the representative is the member closest to the template. Each member's own added text goes in `form_letter_additions`.
 - Members adding ≥300 words (`--promote-added-words`), typically organizations that used a campaign letter and appended their own material, are promoted to their own singleton cluster (`form_letter_additions.promoted = 1` keeps the link).
 - Every comment gets a membership row (ungrouped comments are singletons).
 
-Reference run: CMS-2026-2377 (CY2027 PFS, 43.1k comments) → 320 groups covering 23.4k comments, 20.0k units after collapsing, 349 promoted members; ~3 min including text extraction, ~40 s with cached text. Of the ungrouped, ~8k typed comments share <10% of their text with other comments, i.e. word overlap can't collapse them further (paraphrased campaigns would need semantic similarity).
+Reference run: CMS-2026-2377 (CY2027 PFS, 43,082 comments) → 845 groups (incl. 507 near-copy pairs/triples) covering 24.5k comments, 19,403 units after collapsing, 349 promoted members; ~3 min including text extraction, ~40 s with cached text. Of the ungrouped, ~8k typed comments share <10% of their text with other comments, i.e. word overlap can't collapse them further (paraphrased campaigns would need semantic similarity).
 
 Check group tightness after clustering — `similarity_score` is the member's coverage of its group template, so loose groups show low average coverage or large additions:
 ```bash
