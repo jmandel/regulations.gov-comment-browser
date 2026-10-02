@@ -310,19 +310,25 @@ async function tagCampaigns(documentId: string, options: any) {
     method: "paraphrase", expanded: 0,
   }));
   const claimedUnits = new Set(accepted.flatMap(j => j.units));
-  const exactOnly = clustered ? (db.prepare(`
+  let exactOnly = clustered ? (db.prepare(`
     SELECT cluster_id, representative_comment_id AS id, cluster_size AS size FROM comment_clusters
     WHERE cluster_size >= ? ORDER BY cluster_size DESC
   `).all(minExact) as { cluster_id: number; id: string; size: number }[]).filter(g => !claimedUnits.has(unitOf.get(g.id) ?? -1)) : [];
+  const getText = db.prepare(`SELECT json_extract(attributes_json, '$.comment') AS comment,
+    (SELECT group_concat(text, char(10)) FROM attachment_text a WHERE a.comment_id = c.id) AS att FROM comments c WHERE id = ?`);
+  const repText = (id: string) => {
+    const r = getText.get(id) as { comment: string | null; att: string | null } | null;
+    return commentText(r?.comment ?? null, r?.att ?? null);
+  };
+  // A copy group with no readable letter (e.g. identical scans behind "See attached") can't be
+  // judged or named as a campaign; leave it as a plain form-letter group
+  const unreadable = exactOnly.filter(g => !unitOf.has(g.id) && wordCount(repText(g.id)) < MIN_WORDS_REP);
+  if (unreadable.length > 0) console.log(`   Skipping ${unreadable.length} copy groups with no readable text`);
+  exactOnly = exactOnly.filter(g => !unreadable.includes(g));
   if (exactOnly.length > 0) {
-    const getText = db.prepare(`SELECT json_extract(attributes_json, '$.comment') AS comment,
-      (SELECT group_concat(text, char(10)) FROM attachment_text a WHERE a.comment_id = c.id) AS att FROM comments c WHERE id = ?`);
     const items = exactOnly.map((g, i) => ({
       id: `f${i + 1}`, count: g.size,
-      text: truncateWords(unitOf.has(g.id) ? keep[unitOf.get(g.id)!].text : (() => {
-        const r = getText.get(g.id) as { comment: string | null; att: string | null } | null;
-        return commentText(r?.comment ?? null, r?.att ?? null);
-      })(), JUDGE_WORDS),
+      text: truncateWords(unitOf.has(g.id) ? keep[unitOf.get(g.id)!].text : repText(g.id), JUDGE_WORDS),
     }));
     const batches = new Map<string, typeof items>();
     for (let i = 0; i < items.length; i += 20) batches.set(`F${i / 20}`, items.slice(i, i + 20));
