@@ -1,7 +1,6 @@
 {
   "$schema": "./batch-config-schema.json",
   "description": "Task-specific batching and concurrency configuration",
-  
   "global": {
     "concurrency": {
       "default": 5,
@@ -13,22 +12,32 @@
     },
     "defaultModel": "gemini-3.8-flash"
   },
-  
   "tasks": {
     "transcribe": {
       "concurrency": 5,
       "model": "gemini-3.5-flash-lite",
       "batching": false,
-      "description": "Transcribes comments and attachments into clean markdown"
+      "description": "Transcribes comments with attachments into clean markdown; typed-only comments are stored as-is without an LLM call"
     },
-
+    "triage": {
+      "concurrency": 10,
+      "model": "gemini-3.5-flash-lite",
+      "thresholds": {
+        "maxWords": 80,
+        "batchSize": 100
+      },
+      "description": "Labels short ungrouped typed comments as no_substance / stance_only / substantive so only substantive ones get condensed"
+    },
     "condense": {
       "concurrency": 5,
       "model": "gemini-3.8-flash",
       "batching": false,
-      "description": "Extracts structured metadata sections from transcriptions"
+      "description": "Extracts structured sections; Flash-Lite for typed comments, 3.8 Flash for attachment letters (Flash-Lite omitted recommendations in long letters in a 2026-10 trial)",
+      "models": {
+        "typed": "gemini-3.5-flash-lite",
+        "attachment": "gemini-3.8-flash"
+      }
     },
-    
     "discoverThemes": {
       "concurrency": 5,
       "mergeWidth": 10,
@@ -39,14 +48,22 @@
         "description": "Large batches for initial theme discovery"
       }
     },
-    
     "extractThemeContent": {
       "concurrency": 10,
       "model": "gemini-3.8-flash",
       "batching": false,
-      "description": "Extracts theme-specific content from individual comments"
+      "description": "Gate: which top-level theme groups a unit addresses; then extract only those groups. Short units are batched several per call",
+      "models": {
+        "gate": "gemini-3.5-flash-lite",
+        "short": "gemini-3.8-flash",
+        "long": "gemini-3.8-flash"
+      },
+      "thresholds": {
+        "shortMaxWords": 400,
+        "shortBatchSize": 15,
+        "gateBatchSize": 40
+      }
     },
-    
     "summarizeThemes": {
       "concurrency": 4,
       "mergeWidth": 4,
@@ -61,7 +78,6 @@
         "maxHierarchyDepth": 2
       }
     },
-    
     "discoverEntities": {
       "concurrency": 3,
       "model": "gemini-3.8-flash",
@@ -78,7 +94,7 @@
         },
         "entityExtraction": {
           "model": "gemini-3.8-flash",
-          "concurrency": 20,  
+          "concurrency": 20,
           "batching": {
             "triggerWordLimit": 1000,
             "batchWordLimit": 1000,
@@ -90,7 +106,6 @@
         }
       }
     },
-    
     "loadComments": {
       "rateLimiting": {
         "apiCallDelay": 1200,
@@ -100,7 +115,6 @@
       }
     }
   },
-  
   "pipeline": {
     "errorHandling": {
       "maxCrashes": 10,
@@ -108,7 +122,6 @@
       "description": "Pipeline-level error recovery settings"
     }
   },
-  
   "models": {
     "gemini-pro": {
       "concurrency": 3.0,

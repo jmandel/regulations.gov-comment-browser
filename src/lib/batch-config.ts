@@ -11,6 +11,7 @@ export interface TaskConfig {
   concurrency?: number;
   mergeWidth?: number;
   model?: string;
+  models?: Record<string, string>;  // per-role models within a task, e.g. { typed: ..., attachment: ... }
   batching?: boolean | BatchConfig;
   validation?: Record<string, any>;
   thresholds?: Record<string, any>;
@@ -44,6 +45,8 @@ export interface BatchConfigFile {
     defaultModel?: string;
   };
   tasks: {
+    transcribe?: TaskConfig;
+    triage?: TaskConfig;
     condense?: TaskConfig;
     discoverThemes?: TaskConfig;
     summarizeThemes?: TaskConfig;
@@ -183,4 +186,11 @@ export function getTaskModel(taskName: keyof BatchConfigFile['tasks'], cliModel?
   
   // 5. Hardcoded fallback
   return 'gemini-pro';
+}
+
+// Model for one role within a task: CLI override > tasks.<task>.models.<role> > task model > global default
+export function getTaskRoleModel(taskName: keyof BatchConfigFile['tasks'], role: string, cliModel?: string): string {
+  if (cliModel) return cliModel;
+  const taskConfig = (loadBatchConfig().tasks[taskName] || {}) as TaskConfig;
+  return taskConfig.models?.[role] || getTaskModel(taskName);
 }
