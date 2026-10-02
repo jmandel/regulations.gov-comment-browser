@@ -5,6 +5,7 @@ import { initDebug, debugSave } from "../lib/debug";
 import { UsageTally } from "../lib/ai-client";
 import { THEME_SUMMARY_FROM_EXTRACTS_PROMPT, EXTRACT_MERGE_PROMPT } from "../prompts/theme-extract";
 import { THEME_SUMMARY_STRUCTURE_PROMPT } from "../prompts/theme-summary";
+import { THEME_GROUP_SUMMARY_PROMPT } from "../prompts/theme-group";
 import { parseJsonResponse } from "../lib/json-parser";
 import { getTaskConfig, getTaskRoleModel, getBatchOptions } from "../lib/batch-config";
 import { createEvenBatches, countWords } from "../lib/batch-processor";
@@ -31,6 +32,7 @@ export const summarizeThemesV2Command = new Command("summarize-themes-v2")
   .option("-m, --model <model>", "AI model to use for every call (overrides config)")
   .option("--use-clustering", "Use only cluster representatives' extracts (weighted by cluster size)")
   .option("--batch", "Run calls through the Gemini Batch API (half price, minutes-to-hours per phase)")
+  .option("--force", "Rebuild top-level group reports even if they are up to date")
   .action(summarizeThemesV2);
 
 interface ExtractRow {
@@ -41,7 +43,15 @@ interface ExtractRow {
   attributes_json: string;
 }
 
-interface ThemeRow { code: string; description: string; detailed_guidelines?: string; extract_count: number }
+interface ThemeRow { code: string; description: string; detailed_guidelines?: string; extract_count?: number }
+
+interface StructureItem {
+  theme: ThemeRow;
+  analysis: string;
+  knownIds: Set<string>;
+  commentCount: number;
+  extraSections?: Record<string, unknown>;
+}
 
 interface ThemeWork {
   theme: ThemeRow;
@@ -87,21 +97,16 @@ async function summarizeThemesV2(documentId: string, options: any) {
   themeQuery += ` GROUP BY th.code HAVING extract_count >= ? ORDER BY extract_count DESC`;
   queryParams.push(minComments);
 
-  const themes = db.prepare(themeQuery).all(...queryParams) as ThemeRow[];
-  if (themes.length === 0) {
-    console.log("❌ No themes found with sufficient extracts");
-    db.close();
-    return;
-  }
-  console.log(`📊 Found ${themes.length} themes with ≥${minComments} extracts`);
+  // Themes with sub-themes get a group report (Phase 4) built from their sub-themes' reports instead
+  // of a report from their own few direct extracts
+  const allThemes = db.prepare("SELECT code, description, detailed_guidelines, parent_code FROM theme_hierarchy").all() as (ThemeRow & { parent_code: string | null })[];
+  const groupCodes = new Set(allThemes.filter(t => !t.parent_code && allThemes.some(c => c.parent_code === t.code)).map(t => t.code));
+
+  const themes = (db.prepare(themeQuery).all(...queryParams) as ThemeRow[]).filter(t => !groupCodes.has(t.code));
+  console.log(`📊 Found ${themes.length} themes with ≥${minComments} extracts (plus ${groupCodes.size} top-level themes that get group reports)`);
 
   const existingCodes = new Set((db.prepare("SELECT theme_code FROM theme_summaries").all() as { theme_code: string }[]).map(s => s.theme_code));
   const themesToProcess = themes.filter(t => !existingCodes.has(t.code));
-  if (themesToProcess.length === 0) {
-    console.log("✅ All themes already summarized");
-    db.close();
-    return;
-  }
   console.log(`🆕 ${themesToProcess.length} themes need summarization`);
 
   const concurrency = options.concurrency || taskConfig.concurrency || 4;
@@ -144,7 +149,7 @@ async function summarizeThemesV2(documentId: string, options: any) {
       parts: [{ text: buildSummaryPrompt(theme, b.items) }],
     }));
   }
-  console.log(`📋 Phase 1: ${phase1.length} summary calls for ${work.length} themes (largest theme: ${Math.max(...batchCount.values())} batches)`);
+  if (phase1.length > 0) console.log(`📋 Phase 1: ${phase1.length} summary calls for ${work.length} themes (largest theme: ${Math.max(...batchCount.values())} batches)`);
   const byCode = new Map(work.map(w => [w.theme.code, w]));
   const p1 = await runText(db, phase1, 'theme-summary', mode, concurrency, tally, options.debug);
   for (const w of work) {
@@ -185,35 +190,115 @@ async function summarizeThemesV2(documentId: string, options: any) {
   }
 
   // ---- Phase 3: structure to JSON and save (parse failures are retried once) ----
-  const insert = db.prepare(`INSERT INTO theme_summaries (theme_code, structured_sections, comment_count, word_count) VALUES (?, ?, ?, ?)`);
-  let pending = active;
-  for (let attempt = 1; attempt <= 2 && pending.length > 0; attempt++) {
-    const requests: LlmRequest[] = pending.map(w => ({
-      key: w.theme.code,
-      model: models.structure,
-      parts: [{ text: THEME_SUMMARY_STRUCTURE_PROMPT
-        .replace('{THEME_ANALYSIS}', () => w.analyses[0])
-        .replace('{THEME_CODE}', w.theme.code)
-        .replace('{THEME_DESCRIPTION}', () => fullDescription(w.theme)) }],
-      // the retry differs from the first attempt so it isn't served from a stale cache
-      config: attempt > 1 ? { responseMimeType: "application/json" } : undefined,
-    }));
-    console.log(`🧱 Phase 3: structuring ${requests.length} summaries${attempt > 1 ? ' (retry)' : ''}`);
-    const saved = new Set<string>();
-    const summary = await runLlmRequests(requests, async (req, res) => {
-      const w = byCode.get(req.key)!;
-      const sections = parseJsonResponse(res.text);
-      if (!sections || typeof sections !== 'object') throw new Error('structured summary is not a JSON object');
-      const fixed = fixPartialCommentIds(sections, new Set(w.extracts.map(e => e.comment_id)));
-      if (fixed > 0) console.log(`   🔧 ${req.key}: fixed ${fixed} partial comment IDs`);
-      withTransaction(db, () => insert.run(req.key, JSON.stringify(sections), w.extracts.length, 0));
-      saved.add(req.key);
-      if (options.debug) await debugSave(`theme_summary_v2_structured_${req.key}.json`, sections);
-    }, { db, task: 'theme-summary-structure', mode, concurrency, label: `theme-summary-structure:${attempt}` });
-    tally.addSummary('theme-summary-structure', summary);
-    pending = pending.filter(w => !saved.has(w.theme.code));
+  const insert = db.prepare(`INSERT OR REPLACE INTO theme_summaries (theme_code, structured_sections, comment_count, word_count) VALUES (?, ?, ?, ?)`);
+  const structureAndSave = async (items: StructureItem[], phase: string) => {
+    const byKey = new Map(items.map(i => [i.theme.code, i]));
+    let pending = items;
+    for (let attempt = 1; attempt <= 2 && pending.length > 0; attempt++) {
+      const requests: LlmRequest[] = pending.map(i => ({
+        key: i.theme.code,
+        model: models.structure,
+        parts: [{ text: THEME_SUMMARY_STRUCTURE_PROMPT
+          .replace('{THEME_ANALYSIS}', () => i.analysis)
+          .replace('{THEME_CODE}', i.theme.code)
+          .replace('{THEME_DESCRIPTION}', () => fullDescription(i.theme)) }],
+        // the retry differs from the first attempt so it isn't served from a stale cache
+        config: attempt > 1 ? { responseMimeType: "application/json" } : undefined,
+      }));
+      console.log(`🧱 ${phase}: structuring ${requests.length} summaries${attempt > 1 ? ' (retry)' : ''}`);
+      const saved = new Set<string>();
+      const summary = await runLlmRequests(requests, async (req, res) => {
+        const item = byKey.get(req.key)!;
+        const sections = parseJsonResponse(res.text);
+        if (!sections || typeof sections !== 'object') throw new Error('structured summary is not a JSON object');
+        const fixed = fixPartialCommentIds(sections, item.knownIds);
+        if (fixed > 0) console.log(`   🔧 ${req.key}: fixed ${fixed} partial comment IDs`);
+        Object.assign(sections, item.extraSections || {});
+        withTransaction(db, () => insert.run(req.key, JSON.stringify(sections), item.commentCount, 0));
+        saved.add(req.key);
+        if (options.debug) await debugSave(`theme_summary_v2_structured_${req.key}.json`, sections);
+      }, { db, task: 'theme-summary-structure', mode, concurrency, label: `theme-summary-structure:${phase}:${attempt}` });
+      tally.addSummary('theme-summary-structure', summary);
+      pending = pending.filter(i => !saved.has(i.theme.code));
+    }
+    for (const i of pending) console.error(`   ❌ ${i.theme.code}: could not structure summary`);
+  };
+  await structureAndSave(active.map(w => ({
+    theme: w.theme,
+    analysis: w.analyses[0],
+    knownIds: new Set(w.extracts.map(e => e.comment_id)),
+    commentCount: w.extracts.length,
+  })), 'Phase 3');
+
+  // ---- Phase 4: group reports for top-level themes ----
+  const summarizedNow = new Set(active.map(w => w.theme.code));
+  const reports = new Map((db.prepare("SELECT theme_code, structured_sections FROM theme_summaries").all() as { theme_code: string; structured_sections: string }[]).map(r => [r.theme_code, r.structured_sections]));
+  const subtreeStmt = db.prepare(`
+    SELECT cte.comment_id, MAX(cte.cluster_size) AS cluster_size FROM comment_theme_extracts cte
+    WHERE (cte.theme_code = ? OR cte.theme_code LIKE ? || '.%') ${repFilter}
+    GROUP BY cte.comment_id`);
+  const subtree = (code: string) => {
+    const rows = subtreeStmt.all(code, code) as { comment_id: string; cluster_size: number }[];
+    return { ids: rows.map(r => r.comment_id), units: rows.length, submissions: rows.reduce((n, r) => n + (r.cluster_size || 1), 0) };
+  };
+  const groupItems: { theme: ThemeRow; prompt: string; knownIds: Set<string>; commentCount: number; subThemes: string[] }[] = [];
+  for (const code of [...groupCodes].sort((a, b) => Number(a) - Number(b))) {
+    const theme = allThemes.find(t => t.code === code)!;
+    const children = allThemes.filter(c => c.parent_code === code).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    const existing = reports.get(code);
+    const isGroupReport = existing ? JSON.parse(existing).reportType === 'group' : false;
+    const stale = !isGroupReport || children.some(c => summarizedNow.has(c.code)) || options.force;
+    if (!stale || (options.themes && !options.themes.split(',').map((t: string) => t.trim()).includes(code) && !children.some(c => summarizedNow.has(c.code)))) continue;
+
+    const direct = extractStmt.all(code) as ExtractRow[];
+    const withReports = children.filter(c => reports.has(c.code));
+    if (withReports.length === 0 && direct.length < minComments) continue;
+
+    const childBlocks = children.map(c => {
+      const t = subtree(c.code);
+      const header = `### Sub-theme ${c.code}: ${fullDescription(c)}
+${t.submissions} submissions from ${t.units} distinct comments or form-letter groups`;
+      const report = reports.get(c.code);
+      if (!report) return `${header}
+(No report: too few comments for a synthesized analysis.)`;
+      const { analyticalNotes, ...sections } = JSON.parse(report);
+      return `${header}
+${JSON.stringify(sections, null, 1)}`;
+    });
+    let directWords = 0;
+    const directBlocks: string[] = [];
+    for (const e of direct) {
+      const block = formatExtractBlock(e);
+      directWords += countWords(block);
+      if (directWords > 15000) break;
+      directBlocks.push(block);
+    }
+    const all = subtree(code);
+    groupItems.push({
+      theme,
+      knownIds: new Set(all.ids),
+      commentCount: all.units,
+      subThemes: children.map(c => c.code),
+      prompt: THEME_GROUP_SUMMARY_PROMPT
+        .replace('{THEME_CODE}', code)
+        .replace('{THEME_DESCRIPTION}', () => fullDescription(theme))
+        .replace('{SUBTHEME_REPORTS}', () => childBlocks.join('\n\n---\n\n'))
+        .replace('{DIRECT_EXTRACTS}', () => directBlocks.length ? directBlocks.join('\n\n---\n\n') : '(none)'),
+    });
   }
-  for (const w of pending) console.error(`   ❌ ${w.theme.code}: could not structure summary`);
+  if (groupItems.length > 0) {
+    console.log(`🗂️  Phase 4: ${groupItems.length} group reports for top-level themes`);
+    const res = await runText(db, groupItems.map(g => ({ key: g.theme.code, model: models.merge, parts: [{ text: g.prompt }] })),
+      'theme-group-summary', mode, concurrency, tally, options.debug);
+    await structureAndSave(groupItems.filter(g => res.has(g.theme.code)).map(g => ({
+      theme: g.theme,
+      analysis: res.get(g.theme.code)!,
+      knownIds: g.knownIds,
+      commentCount: g.commentCount,
+      extraSections: { reportType: 'group', subThemes: g.subThemes },
+    })), 'Phase 4');
+    for (const g of groupItems) if (!res.has(g.theme.code)) console.error(`   ❌ ${g.theme.code}: group report failed; rerun to retry`);
+  }
 
   const summaryCount = db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get() as { count: number };
   console.log("\n✅ Theme summarization complete!");

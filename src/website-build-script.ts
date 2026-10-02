@@ -45,16 +45,19 @@ async function buildWebsite(documentId: string, options: any) {
   const entities = getEntityTaxonomy(db);
   await writeJson(join(outputDir, "entities.json"), entities);
   
-  // 5. Export all comments as single file
+  // 5. Export organized campaigns (tag-campaigns); [] when the step wasn't run
+  await writeJson(join(outputDir, "campaigns.json"), getCampaigns(db));
+
+  // 6. Export all comments as single file
   await exportAllComments(db, outputDir, docketId);
   
-  // 6. Generate cluster report
+  // 7. Generate cluster report
   await generateClusterReport(db, outputDir);
   
-  // 7. Generate indexes for efficient lookups
+  // 8. Generate indexes for efficient lookups
   await generateIndexes(db, outputDir);
 
-  // 8. Export theme extracts (per-comment, per-theme analysis)
+  // 9. Export theme extracts (per-comment, per-theme analysis)
   await exportThemeExtracts(db, outputDir);
 
   console.log(`✅ Website data built in ${outputDir}`);
@@ -108,7 +111,36 @@ function getStats(db: any) {
         `).get().count || db.prepare("SELECT COUNT(DISTINCT comment_id) as count FROM comment_theme_extracts").get().count
       : db.prepare("SELECT COUNT(DISTINCT comment_id) as count FROM comment_theme_extracts").get().count,
     themeSummaries: db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get().count,
+    // Each comment is in at most one campaign, so these are distinct comment counts
+    ...(hasTable(db, "campaigns") ? (() => {
+      const c = db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(total_count), 0) AS total, COALESCE(SUM(paraphrase_count), 0) AS para,
+        COALESCE(SUM(paraphrase_count > 0), 0) AS withPara FROM campaigns`).get();
+      return c.n > 0 ? { campaigns: c.n, campaignComments: c.total, paraphrasedCampaignComments: c.para, paraphraseCampaigns: c.withPara } : {};
+    })() : {}),
   };
+}
+
+function hasTable(db: any, name: string): boolean {
+  return !!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(name);
+}
+
+// Campaigns from tag-campaigns, largest first. Members are found through comments-index.json
+// (each comment's `campaign` field), so this file stays small.
+function getCampaigns(db: any) {
+  if (!hasTable(db, "campaigns")) return [];
+  const reps = new Map<number, string>();
+  if (hasTable(db, "comment_campaigns")) {
+    // A typical member to show: the most central paraphrased letter, else any exact copy
+    for (const r of db.prepare(`SELECT campaign_id, comment_id FROM comment_campaigns ORDER BY campaign_id, how = 'paraphrase' DESC, similarity DESC`).all() as any[]) {
+      if (!reps.has(r.campaign_id)) reps.set(r.campaign_id, r.comment_id);
+    }
+  }
+  return (db.prepare(`SELECT id, name, description, method, evidence, total_count, exact_count, paraphrase_count, unit_count
+    FROM campaigns ORDER BY total_count DESC, id`).all() as any[]).map(c => ({
+    id: c.id, name: c.name, description: c.description, method: c.method, evidence: c.evidence,
+    total: c.total_count, exact: c.exact_count, paraphrased: c.paraphrase_count, units: c.unit_count,
+    example: reps.get(c.id),
+  }));
 }
 
 function getThemeHierarchy(db: any) {
@@ -258,12 +290,20 @@ function getThemeSummaries(db: any) {
   
   // Parse structured sections and create a map
   const summaryMap: any = {};
+  // Group reports (top-level themes) cover their whole subtree, not just their direct extracts
+  const subtreeCount = db.prepare(`
+    SELECT COALESCE(SUM(size), 0) AS n FROM (
+      SELECT MAX(${hasClusteringData ? 'COALESCE(cluster_size, 1)' : '1'}) AS size FROM comment_theme_extracts
+      WHERE theme_code = ? OR theme_code LIKE ? || '.%' GROUP BY comment_id)`);
   for (const summary of summaries) {
     const sections = JSON.parse(summary.structured_sections);
-    
+    const commentCount = sections.reportType === 'group'
+      ? (subtreeCount.get(summary.theme_code, summary.theme_code) as { n: number }).n
+      : summary.comment_count;
+
     summaryMap[summary.theme_code] = {
       themeDescription: summary.theme_description,
-      commentCount: summary.comment_count,
+      commentCount,
       wordCount: summary.word_count,
       sections: sections
     };
@@ -414,6 +454,14 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
     }
   }
 
+  // Campaign tags (tag-campaigns): comment -> campaign id, and whether it's a reworded letter
+  const campaignOf = new Map<string, { id: number; paraphrase: boolean }>();
+  if (hasTable(db, "comment_campaigns")) {
+    for (const r of db.prepare(`SELECT comment_id, campaign_id, how FROM comment_campaigns`).all() as any[]) {
+      campaignOf.set(r.comment_id, { id: r.campaign_id, paraphrase: r.how === "paraphrase" });
+    }
+  }
+
   const isMember = (r: any) => hasClusteringData && r.is_representative !== 1 && r.representative_comment_id && r.representative_comment_id !== r.id;
 
   // Assign units to shards in ID order; members' added text goes in their representative's detail shard
@@ -511,6 +559,11 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
     const location = [attrs.city, attrs.stateProvinceRegion, attrs.country].filter(Boolean).join(', ');
     if (location) entry.location = location;
     if ((attachmentCounts.get(r.id) || 0) > 0) entry.hasAttachments = true;
+    const camp = campaignOf.get(r.id);
+    if (camp) {
+      entry.campaign = camp.id;
+      if (camp.paraphrase) entry.campaignParaphrase = true;
+    }
     if (member) {
       entry.rep = repId;
       const add = additions.get(r.id);
@@ -619,11 +672,11 @@ async function generateClusterReport(db: any, outputDir: string) {
     summary: {
       totalClusters: clusters.length,
       totalCommentsClustered: db.prepare("SELECT COUNT(*) as count FROM comment_cluster_membership").get().count,
-      singletons: distribution.find(d => d.cluster_size === 1)?.count || 0,
-      largestClusterSize: Math.max(...distribution.map(d => d.cluster_size)),
+      singletons: distribution.find((d: any) => d.cluster_size === 1)?.count || 0,
+      largestClusterSize: Math.max(...distribution.map((d: any) => d.cluster_size)),
       distribution: distribution
     },
-    clusters: clusters.map(c => ({
+    clusters: clusters.map((c: any) => ({
       id: c.cluster_id,
       size: c.cluster_size,
       representative: c.representative_comment_id,
