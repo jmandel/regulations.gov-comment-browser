@@ -55,7 +55,7 @@
       "concurrency": 10,
       "model": "gemini-3.8-flash",
       "batching": false,
-      "description": "Gate: which top-level theme groups a unit addresses; then extract only those groups. Short units are batched several per call",
+      "description": "Short units: Flash-Lite gate picks theme groups, then batched extraction per group. Long units: one call each with the whole taxonomy (no gate)",
       "models": {
         "gate": "gemini-3.5-flash-lite",
         "short": "gemini-3.8-flash-nothink",
@@ -64,7 +64,8 @@
       "thresholds": {
         "shortMaxWords": 400,
         "shortBatchSize": 15,
-        "gateBatchSize": 40
+        "gateBatchSize": 40,
+        "longMode": "full"
       }
     },
     "summarizeThemes": {
