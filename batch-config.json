@@ -11,20 +11,20 @@
       "default": 10,
       "description": "Default number of items to merge at once in hierarchical tasks"
     },
-    "defaultModel": "gemini-3-flash"
+    "defaultModel": "gemini-3.8-flash"
   },
   
   "tasks": {
     "transcribe": {
       "concurrency": 5,
-      "model": "gemini-3-flash",
+      "model": "gemini-3.5-flash-lite",
       "batching": false,
       "description": "Transcribes comments and attachments into clean markdown"
     },
 
     "condense": {
       "concurrency": 5,
-      "model": "gemini-3-flash",
+      "model": "gemini-3.8-flash",
       "batching": false,
       "description": "Extracts structured metadata sections from transcriptions"
     },
@@ -32,7 +32,7 @@
     "discoverThemes": {
       "concurrency": 5,
       "mergeWidth": 10,
-      "model": "gemini-3-flash",
+      "model": "gemini-3.8-flash",
       "batching": {
         "triggerWordLimit": 250000,
         "batchWordLimit": 150000,
@@ -42,7 +42,7 @@
     
     "extractThemeContent": {
       "concurrency": 10,
-      "model": "gemini-3-flash",
+      "model": "gemini-3.8-flash",
       "batching": false,
       "description": "Extracts theme-specific content from individual comments"
     },
@@ -50,7 +50,7 @@
     "summarizeThemes": {
       "concurrency": 4,
       "mergeWidth": 4,
-      "model": "gemini-3-flash",
+      "model": "gemini-3.8-flash",
       "batching": {
         "triggerWordLimit": 50000,
         "batchWordLimit": 40000,
@@ -64,11 +64,11 @@
     
     "discoverEntities": {
       "concurrency": 3,
-      "model": "gemini-3-flash",
+      "model": "gemini-3.8-flash",
       "stages": {
         "categoryDiscovery": {
           "mergeWidth": 10,
-          "model": "gemini-3-flash",
+          "model": "gemini-3.8-flash",
           "batching": {
             "triggerWordLimit": 50000,
             "batchWordLimit": 50000,
@@ -77,7 +77,7 @@
           "description": "Uses hierarchical merging to combine category lists from multiple batches"
         },
         "entityExtraction": {
-          "model": "gemini-3-flash",
+          "model": "gemini-3.8-flash",
           "concurrency": 20,  
           "batching": {
             "triggerWordLimit": 1000,

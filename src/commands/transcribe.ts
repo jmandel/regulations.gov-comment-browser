@@ -53,7 +53,7 @@ async function docxToText(blob: Uint8Array): Promise<string> {
 }
 
 // Build multimodal Part[] for a comment and its attachments
-async function buildTranscriptionParts(
+export async function buildTranscriptionParts(
   comment: RawComment,
   attachments: Map<string, Attachment[]>,
 ): Promise<{ parts: Part[]; description: string } | null> {

@@ -7,7 +7,7 @@ import { buildBatchedThemeExtractPrompt } from "../prompts/theme-extract";
 import { parseJsonResponse } from "../lib/json-parser";
 import { runPool } from "../lib/worker-pool";
 import { getTaskConfig, getTaskModel } from "../lib/batch-config";
-import { generateWithGemini3FlashWithMetadata, type UsageMetadata } from "../lib/llm-providers";
+import { generateWithGeminiMetadata, type UsageMetadata } from "../lib/llm-providers";
 import { createHash } from "crypto";
 import { debugSave } from "../lib/debug";
 
@@ -307,7 +307,7 @@ async function extractThemeContent(documentId: string, options: any) {
               await debugSave(`${debugPrefix}_prompt.txt`, prompt);
             }
 
-            const result = await generateWithGemini3FlashWithMetadata(prompt, streamingOptions);
+            const result = await generateWithGeminiMetadata(effectiveModel, prompt, streamingOptions);
             rawResult = result.text;
 
             // Track cache stats

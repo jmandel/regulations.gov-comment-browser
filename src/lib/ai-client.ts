@@ -2,7 +2,7 @@ import { debugSave } from "./debug";
 import { parseJsonResponse } from "./json-parser";
 import { createHash } from "crypto";
 import { Database } from "bun:sqlite";
-import { getGenerationFunction, getMultimodalGenerationFunction } from "./llm-providers";
+import { getGenerationFunction, getMultimodalGenerationFunction, DEFAULT_MODEL } from "./llm-providers";
 import type { Part } from "@google/genai";
 
 export interface CacheMetadata {
@@ -67,7 +67,7 @@ export class AIClient {
     const activeCount = AIClient.activeJobs.size;
     const activeList = Array.from(AIClient.activeJobs).join(', ');
     
-    const modelName = this.modelKey || "gemini-3-flash";
+    const modelName = this.modelKey || DEFAULT_MODEL;
     console.log(`🤖 [${workerId}] Starting ${modelName} call (${activeCount} active: ${activeList})`);
     
     try {
@@ -203,7 +203,7 @@ export class AIClient {
     AIClient.activeJobs.add(workerId);
     const activeCount = AIClient.activeJobs.size;
     const activeList = Array.from(AIClient.activeJobs).join(', ');
-    const modelName = this.modelKey || "gemini-3-flash";
+    const modelName = this.modelKey || DEFAULT_MODEL;
     console.log(`🤖 [${workerId}] Starting ${modelName} multimodal call (${activeCount} active: ${activeList})`);
 
     try {
