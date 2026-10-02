@@ -40,7 +40,7 @@ bun run src/cli.ts pipeline <document-id> -c 20 --no-clustering
 
 - `<document-id>`: Document ID from regulations.gov (e.g., `CMS-2025-0058-0002`) or CSV file path
 - Add `--mirrulations` for large dockets (see below)
-- Models come from `batch-config.json` per step. `-m <model>` overrides all steps at once; accepted names are `gemini-3.8-flash`, `gemini-3.5-flash-lite`, legacy `gemini-3-flash` (3 Flash preview), `gemini-pro`/`gemini-flash`/`gemini-flash-lite` (2.5), and `claude`. Add new models in `GEMINI_MODELS` in `src/lib/llm-providers.ts`
+- Models come from `batch-config.json` per step. `-m <model>` overrides all steps at once; accepted names are `gemini-3.8-flash`, `gemini-3.8-flash-nothink`, `gemini-3.5-flash-lite`, legacy `gemini-3-flash` (3 Flash preview), and `gemini-pro`/`gemini-flash`/`gemini-flash-lite` (2.5). Add new models in `GEMINI_MODELS` in `src/lib/llm-providers.ts`
 - `-c 20`: Concurrency — safe with Gemini Tier 1 rate limits (2000 RPM)
 - `--no-clustering`: Use for dockets under ~1000 comments (most dockets)
 - The DB is created at `dbs/<document-id>.sqlite`

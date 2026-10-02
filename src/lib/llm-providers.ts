@@ -175,48 +175,6 @@ export async function generateWithGeminiMetadata(model: string, prompt: string, 
   });
 }
 
-export async function generateWithClaude(prompt: string, options?: StreamingOptions): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY environment variable is required");
-  }
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 8192,
-      temperature: 0,
-      messages: [{
-        role: "user",
-        content: prompt
-      }]
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Claude API error: ${response.status} - ${error}`);
-  }
-
-  const data = await response.json() as { content: Array<{ text: string }> };
-  const result = data.content[0].text;
-
-  // Save to debug file if requested (Claude doesn't stream)
-  if (options?.debugFilename) {
-    debugStreamStart(options.debugFilename);
-    debugStreamWrite(options.debugFilename, result);
-    debugStreamEnd(options.debugFilename);
-  }
-
-  return result;
-}
-
 export type GenerationFunction = (prompt: string, options?: StreamingOptions) => Promise<string>;
 
 // Multimodal generation (accepts Part[] with inline binary data)
@@ -231,9 +189,8 @@ export function getMultimodalGenerationFunction(model: string): MultimodalGenera
 
 // Get the appropriate generation function based on model selection
 export function getGenerationFunction(model: string = DEFAULT_MODEL): GenerationFunction {
-  if (model === "claude") return generateWithClaude;
   if (!GEMINI_MODELS[model]) {
-    throw new Error(`Unknown model: ${model}. Available: ${[...Object.keys(GEMINI_MODELS), "claude"].join(", ")}`);
+    throw new Error(`Unknown model: ${model}. Available: ${Object.keys(GEMINI_MODELS).join(", ")}`);
   }
   return (prompt, options) => generateWithGemini(model, [{ text: prompt }], options);
 }
