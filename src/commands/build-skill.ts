@@ -220,7 +220,7 @@ require searching. Here's the decision tree:
 
 ### General principle
 **Strongly prefer the full comments as your primary source.** The \`comments.json\` file contains
-each commenter's \`detailedContent\` (faithfully condensed from the original submission) along with
+each commenter's \`detailedContent\` (a faithful transcription of the original submission) along with
 submitter name, type, and profile — this is the unadorned ground truth of what people actually said.
 Theme summaries, extracts, and entity indexes are useful for orientation and navigation, but they
 are pre-digested interpretations. Whenever a query seems to require or benefit from source-level
@@ -375,7 +375,7 @@ All comments with structured summaries, theme scores, and entity tags.
       "mainConcerns": "Removing certification criteria could allow...",
       "notableExperiences": "Describes implementing FHIR at a rural...",
       "keyQuotations": "- \\"The house won't fall if the bones are good\\"...",
-      "detailedContent": "Full condensed text of the comment..."
+      "detailedContent": "Full transcribed text of the comment..."
     },
     "themeScores": ["1.1", "5", "7.2"],
     "entities": [
@@ -404,6 +404,8 @@ All comments with structured summaries, theme scores, and entity tags.
 
 Together, the submitter metadata and \`detailedContent\` provide a full picture of who said what.
 The other \`structuredSections\` fields are useful shortcuts but are AI-distilled from the same source.
+Short comments judged to carry no substance beyond a stance are not distilled, so they have only
+\`detailedContent\`.
 
 \`themeScores\` is an array of theme codes (from themes.json) that this comment is relevant to.
 

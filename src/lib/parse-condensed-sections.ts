@@ -6,7 +6,7 @@ export interface CondensedSections {
   mainConcerns?: string;
   notableExperiences?: string;
   keyQuotations?: string;
-  detailedContent?: string;
+  detailedContent?: string;  // not produced by condense; website build fills it from the transcription
 }
 
 const SECTION_HEADERS = {
