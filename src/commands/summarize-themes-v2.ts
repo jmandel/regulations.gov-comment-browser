@@ -282,6 +282,8 @@ ${JSON.stringify(sections, null, 1)}`;
       prompt: THEME_GROUP_SUMMARY_PROMPT
         .replace('{THEME_CODE}', code)
         .replace('{THEME_DESCRIPTION}', () => fullDescription(theme))
+        .replace('{TOTAL_SUBMISSIONS}', String(all.submissions))
+        .replace('{TOTAL_UNITS}', String(all.units))
         .replace('{SUBTHEME_REPORTS}', () => childBlocks.join('\n\n---\n\n'))
         .replace('{DIRECT_EXTRACTS}', () => directBlocks.length ? directBlocks.join('\n\n---\n\n') : '(none)'),
     });

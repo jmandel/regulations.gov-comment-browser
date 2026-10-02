@@ -17,8 +17,11 @@ export const THEME_GROUP_SUMMARY_PROMPT = `You are a senior policy analyst writi
 ## Theme Being Analyzed
 {THEME_CODE}: {THEME_DESCRIPTION}
 
+## Size of This Theme
+This theme as a whole covers {TOTAL_SUBMISSIONS} submissions ({TOTAL_UNITS} distinct comments or form-letter groups). Use exactly this figure whenever you state the theme's total. Sub-theme counts overlap — the same commenter often appears under several sub-themes — so NEVER add sub-theme counts together or derive any other total from them.
+
 ## What You Are Given
-Reports already written for each of this theme's sub-themes, with how many submissions each covers, followed by any comments filed directly under the top-level theme. Submission counts include form-letter campaigns: a campaign of N identical letters counts as N submissions. The same commenter can appear under several sub-themes.
+Reports already written for each of this theme's sub-themes, with how many submissions each covers, followed by any comments filed directly under the top-level theme. Submission counts include form-letter campaigns: a campaign of N identical letters counts as N submissions.
 
 ## Your Task
 Write the report for the theme as a whole. Synthesize across sub-themes rather than summarizing them one by one:
