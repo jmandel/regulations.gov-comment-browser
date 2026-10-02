@@ -85,7 +85,7 @@ Re-running any load is safe: comments already in the DB are skipped by ID. Attac
 7. **extract-theme-content** - Extract theme-specific text from each comment, in two phases (see below)
 8. **summarize-themes** - Synthesize extracts into narrative theme analysis (includes post-processing to fix partial comment IDs)
 9. **discover-entities** - Identify organizations and named entities
-10. **build-website** - Export analysis to JSON for web dashboard (uses docket ID from DB metadata for output paths; `detailedContent` comes from the transcription)
+10. **build-website** - Export analysis for the web dashboard (uses docket ID from DB metadata for output paths). Writes a lean `comments-index.json` loaded at startup (form-letter members point to their representative plus a snippet of their own added text) and on-demand data: `comment-details/` and `comment-text/` shards (condensed sections; full text from the transcription), `theme-extracts/<code>.json`, and a `search/` word index. At PFS scale (43k comments) startup downloads ~3.4 MB gzipped
 11. **vacuum-db** - Optimize SQLite database
 
 ### Models and cost
