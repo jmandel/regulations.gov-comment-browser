@@ -20,7 +20,8 @@ async function buildWebsite(documentId: string, options: any) {
   await mkdir(join(outputDir, "indexes"), { recursive: true });
   
   // Look up docket ID from DB metadata (falls back to document ID)
-  const docMeta = db.prepare("SELECT docket_id, title FROM document_metadata LIMIT 1").get() as { docket_id?: string; title?: string } | null;
+  const docMeta = db.prepare("SELECT docket_id, title, document_type, agency_id, comment_start_date, comment_end_date FROM document_metadata LIMIT 1").get() as
+    { docket_id?: string; title?: string; document_type?: string; agency_id?: string; comment_start_date?: string; comment_end_date?: string } | null;
   const docketId = docMeta?.docket_id || documentId;
 
   // 1. Generate metadata
@@ -28,6 +29,10 @@ async function buildWebsite(documentId: string, options: any) {
     documentId: docketId,
     sourceDocumentId: documentId,
     title: docMeta?.title || documentId,
+    documentType: docMeta?.document_type || undefined,
+    agencyId: docMeta?.agency_id || undefined,
+    commentStartDate: docMeta?.comment_start_date || undefined,
+    commentEndDate: docMeta?.comment_end_date || undefined,
     generatedAt: new Date().toISOString(),
     stats: getStats(db),
   };
@@ -59,6 +64,9 @@ async function buildWebsite(documentId: string, options: any) {
 
   // 9. Export theme extracts (per-comment, per-theme analysis)
   await exportThemeExtracts(db, outputDir);
+
+  // 10. Small precomputed figures for the Overview page
+  await writeJson(join(outputDir, "overview.json"), getOverview(db, themes, themeSummaries));
 
   console.log(`✅ Website data built in ${outputDir}`);
   db.close();
@@ -141,6 +149,128 @@ function getCampaigns(db: any) {
     total: c.total_count, exact: c.exact_count, paraphrased: c.paraphrase_count, units: c.unit_count,
     example: reps.get(c.id),
   }));
+}
+
+// Figures for the Overview page that the up-front data can't give: how submissions split between
+// campaigns and independent comments, submitter categories, daily arrivals (by received date), and
+// a one-sentence gist per top-level theme. Every count is in submissions (form-letter copies included).
+function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>) {
+  const campaignOf = new Map<string, boolean>(); // comment -> reworded?
+  if (hasTable(db, "comment_campaigns")) {
+    for (const r of db.prepare(`SELECT comment_id, how FROM comment_campaigns`).all() as any[]) campaignOf.set(r.comment_id, r.how === "paraphrase");
+  }
+  const withAttachments = new Set<string>((db.prepare(`SELECT DISTINCT comment_id FROM attachments`).all() as any[]).map(r => r.comment_id));
+
+  type Part = "campaignCopies" | "campaignReworded" | "typed" | "attached";
+  const composition: Record<Part, number> = { campaignCopies: 0, campaignReworded: 0, typed: 0, attached: 0 };
+  const partOf = new Map<string, Part>();
+  const byCategory = new Map<string, { count: number; types: Map<string, number> }>();
+  const byDay = new Map<string, number>();
+  for (const r of db.prepare(`SELECT id, json_extract(attributes_json, '$.category') AS category, json_extract(attributes_json, '$.organization') AS org,
+      COALESCE(json_extract(attributes_json, '$.receiveDate'), json_extract(attributes_json, '$.postedDate')) AS received FROM comments`).all() as any[]) {
+    const reworded = campaignOf.get(r.id);
+    const part: Part = reworded === true ? "campaignReworded" : reworded === false ? "campaignCopies" : withAttachments.has(r.id) ? "attached" : "typed";
+    composition[part]++;
+    partOf.set(r.id, part);
+
+    // Same expression as comments-index.json's submitterType, so the browser filter matches
+    const raw = r.category || (r.org ? "Organization" : "Individual");
+    const label = submitterCategoryLabel(raw);
+    let c = byCategory.get(label); if (!c) byCategory.set(label, c = { count: 0, types: new Map() });
+    c.count++; c.types.set(raw, (c.types.get(raw) || 0) + 1);
+
+    if (typeof r.received === "string" && /^\d{4}-\d{2}-\d{2}/.test(r.received)) {
+      const day = r.received.slice(0, 10);
+      byDay.set(day, (byDay.get(day) || 0) + 1);
+    }
+  }
+
+  // Daily arrivals, with empty days filled in so the series is continuous
+  const days = [...byDay.keys()].sort();
+  const arrivals: { date: string; count: number }[] = [];
+  if (days.length) {
+    for (let d = new Date(days[0] + "T00:00:00Z"); d <= new Date(days[days.length - 1] + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+      const key = d.toISOString().slice(0, 10);
+      arrivals.push({ date: key, count: byDay.get(key) || 0 });
+    }
+  }
+
+  const submitters = [...byCategory.entries()]
+    .map(([label, c]) => ({ label, count: c.count, types: [...c.types.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t) }))
+    .sort((a, b) => b.count - a.count);
+
+  // The same split within each top-level theme: a unit's extracts speak for its form-letter copies
+  const membersOf = new Map<string, string[]>();
+  if (hasTable(db, "comment_cluster_membership")) {
+    for (const r of db.prepare(`SELECT ccm.comment_id, cc.representative_comment_id AS rep FROM comment_cluster_membership ccm
+        JOIN comment_clusters cc ON cc.cluster_id = ccm.cluster_id`).all() as any[]) {
+      let a = membersOf.get(r.rep); if (!a) membersOf.set(r.rep, a = []); a.push(r.comment_id);
+    }
+  }
+  const unitsByTheme = new Map<string, Set<string>>();
+  for (const r of db.prepare(`SELECT DISTINCT comment_id, theme_code FROM comment_theme_extracts`).all() as any[]) {
+    const top = String(r.theme_code).split(".")[0];
+    let set = unitsByTheme.get(top); if (!set) unitsByTheme.set(top, set = new Set()); set.add(r.comment_id);
+  }
+  const themeComposition: Record<string, Record<Part, number>> = {};
+  for (const [code, units] of unitsByTheme) {
+    const c: Record<Part, number> = { campaignCopies: 0, campaignReworded: 0, typed: 0, attached: 0 };
+    for (const u of units) for (const id of membersOf.get(u) || [u]) { const part = partOf.get(id); if (part) c[part]++; }
+    themeComposition[code] = c;
+  }
+
+  const themeGists: Record<string, string> = {};
+  for (const t of themes) {
+    if (t.parent_code) continue;
+    const gist = summaryGist(themeSummaries[t.code]?.sections?.executiveSummary);
+    if (gist) themeGists[t.code] = gist;
+  }
+
+  return { version: 1, composition, submitters, arrivals, themeGists, themeComposition };
+}
+
+// regulations.gov mixes two category vocabularies ("Physician - HC005" and "Health Care
+// Professional/Association - Physician"); fold them onto one plain name.
+function submitterCategoryLabel(raw: string): string {
+  let s = raw.trim().replace(/\s+-\s+[A-Z]{1,3}\d{3,4}$/, "");
+  s = s.replace(/^Health Care (Professional|Provider)(\/| or )Association\s+-\s+/, "");
+  const fixes: Record<string, string> = {
+    "Other Practitione": "Other Practitioner", "Occupational Therapis": "Occupational Therapist",
+    "Dietician/Nutritionist": "Dietitian/Nutritionist", "Federal Government": "Government - Federal",
+    "State Government": "Government - State", "Other Government": "Government - Other",
+    "Health Care Professional or Association": "Other Health Care Professional",
+    "Health Care Provider/Association": "Other Health Care Provider", "Other": "Other",
+  };
+  return fixes[s] || s;
+}
+
+// A short gist of a theme report: its first sentence without the "Across N submissions (M distinct
+// ...)," preamble (the Overview shows the count beside it), cut at a clause break when long.
+function summaryGist(text?: string | null): string | null {
+  if (!text) return null;
+  const sentences = text.replace(/\s+/g, " ").trim().match(/[^]+?[.!?](?=\s+["“(]?[A-Z]|$)|[^]+$/g) || [];
+  const clean = (sentence: string) => {
+    let s = sentence.trim()
+      .replace(/\s*\((?:representing\s+)?[\d,]+\s+distinct[^)]*\)/gi, "")
+      .replace(/^Across (?:Theme \d+(?:, which covers [\d,]+ submissions)?|[\d,]+ (?:submissions|comments))[^,]*?,\s*/i, "")
+      .replace(/^Public comment on Theme \d+.*?submissions\W*?(?:reflects|reveals|shows|demonstrates)\s+/i, "")
+      .replace(/^(\w+) across Theme \d+\s+/i, "$1 ");
+    return s ? s[0].toUpperCase() + s.slice(1) : s;
+  };
+  let gist = "";
+  for (const sentence of sentences.slice(0, 3)) {
+    gist = clean(sentence);
+    if (gist && !/\bTheme \d+\b|\b[\d,]+ submissions\b/.test(gist)) break;
+  }
+  if (!gist) return null;
+  if (gist.length > 170) {
+    const re = /,\s+(?=(?:with|warning|led|viewing|widely|including|citing|arguing|noting|urging|but|while|which|particularly|especially|reflecting|driven)\b)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(gist))) {
+      if (m.index >= 60) { gist = gist.slice(0, m.index).replace(/[,;:]$/, "") + "."; break; }
+    }
+  }
+  return gist;
 }
 
 function getThemeHierarchy(db: any) {

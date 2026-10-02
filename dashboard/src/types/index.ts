@@ -1,5 +1,10 @@
 export interface Meta {
   documentId: string
+  title?: string
+  documentType?: string
+  agencyId?: string
+  commentStartDate?: string
+  commentEndDate?: string
   generatedAt: string
   stats: {
     totalComments: number
@@ -13,6 +18,22 @@ export interface Meta {
     paraphrasedCampaignComments?: number
     paraphraseCampaigns?: number
   }
+}
+
+// overview.json: precomputed figures for the Overview page. Counts are submissions (copies included).
+export interface CompositionCounts {
+  campaignCopies: number   // exact copies of a campaign letter
+  campaignReworded: number // campaign letters reworded by the sender
+  typed: number            // not in a campaign, no attachment
+  attached: number         // not in a campaign, with an attached document
+}
+export interface OverviewData {
+  version: number
+  composition: CompositionCounts
+  submitters: Array<{ label: string; count: number; types: string[] }>
+  arrivals: Array<{ date: string; count: number }>
+  themeGists: Record<string, string>
+  themeComposition: Record<string, CompositionCounts>
 }
 
 // An organized comment campaign (campaigns.json, from tag-campaigns). method 'paraphrase': has

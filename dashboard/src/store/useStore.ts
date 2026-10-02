@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile, Campaign } from '../types'
+import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile, Campaign, OverviewData } from '../types'
 import { parseThemeDescription } from '../utils/helpers'
 import { parseSearchQuery, matchesSearchQuery } from '../utils/searchParser'
 import { loadSearchIndex, searchWithIndex, verifyCandidates } from '../utils/fullTextSearch'
@@ -37,6 +37,7 @@ interface StoreState {
   units: Comment[] // comments with their own content: representatives, or all without clustering
   campaigns: Campaign[]
   campaignsById: Map<number, Campaign>
+  overview: OverviewData | null
   hasClustering: boolean
   filters: FilterOptions
   searchQuery: string
@@ -148,6 +149,7 @@ const useStore = create<StoreState>((set, get) => {
     units: [],
     campaigns: [],
     campaignsById: new Map(),
+    overview: null,
     hasClustering: false,
     themeIndex: {},
     entityIndex: {},
@@ -208,7 +210,7 @@ const useStore = create<StoreState>((set, get) => {
           if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`)
           return r.json()
         })
-        const [meta, themes, themeSummaries, entities, index, campaigns] = await Promise.all([
+        const [meta, themes, themeSummaries, entities, index, campaigns, overview] = await Promise.all([
           getJson('./data/meta.json'),
           getJson('./data/themes.json'),
           getJson('./data/theme-summaries.json'),
@@ -216,6 +218,8 @@ const useStore = create<StoreState>((set, get) => {
           getJson('./data/comments-index.json') as Promise<CommentsIndexFile>,
           // Optional: only present when tag-campaigns ran
           (getJson('./data/campaigns.json') as Promise<Campaign[]>).catch(() => [] as Campaign[]),
+          // Optional: older builds lack it; the Overview falls back to the index
+          (getJson('./data/overview.json') as Promise<OverviewData>).catch(() => null),
         ])
         const t0 = performance.now()
 
@@ -256,6 +260,7 @@ const useStore = create<StoreState>((set, get) => {
           units,
           campaigns,
           campaignsById: new Map(campaigns.map(c => [c.id, c])),
+          overview,
           hasClustering: index.clustered,
           themeIndex,
           entityIndex,

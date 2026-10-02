@@ -83,11 +83,12 @@ function CommentBrowser() {
 
   // Apply URL query parameters on mount
   useEffect(() => {
-    const submitterType = searchParams.get('submitterType')
-    if (submitterType) {
+    // Repeatable: ?submitterType=A&submitterType=B (the Overview links a category's variants)
+    const submitterTypes = searchParams.getAll('submitterType')
+    if (submitterTypes.length) {
       setFilters((prev: FilterOptions) => ({
         ...prev,
-        submitterTypes: [submitterType]
+        submitterTypes
       }))
     }
     const campaign = searchParams.get('campaign')

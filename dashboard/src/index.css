@@ -28,3 +28,27 @@
     background: rgb(148 163 184);
   }
 } 
+/* Overview page tokens. Composition colors validated with the dataviz palette checker
+   (adjacent CVD ΔE ≥ 15.8, normal-vision ΔE ≥ 16.6 on #f9fafb); amber sits below 3:1,
+   so every segment carries a visible label and count in the legend. */
+.overview {
+  --ov-ink: #14233c;
+  --ov-ink-2: #46546b;
+  --ov-ink-3: #5f6c82;
+  --ov-rule: #dde2ea;
+  --ov-track: #e9edf2;
+  --ov-link: #1b4f9c;
+  --ov-mark: #6c7d99;
+  --ov-copies: #c2511d;
+  --ov-reworded: #dc9a2c;
+  --ov-typed: #3b82d0;
+  --ov-attached: #24508f;
+  color: var(--ov-ink);
+}
+.overview .tnum { font-variant-numeric: tabular-nums; }
+
+@keyframes ov-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.ov-grow { transform-origin: left center; animation: ov-grow 700ms cubic-bezier(.2, .7, .2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .ov-grow { animation: none; }
+}
