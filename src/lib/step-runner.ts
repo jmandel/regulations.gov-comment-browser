@@ -32,6 +32,7 @@ export interface RunOptions {
   mode?: "live" | "batch";
   concurrency?: number;              // live mode
   label?: string;                    // batch mode: identifies this submission so it can be resumed
+  pollIntervalMs?: number;           // batch mode: first poll delay
 }
 
 export interface RunSummary {
@@ -83,17 +84,19 @@ export async function runLlmRequests(
   );
 
   const finish = async (req: LlmRequest, res: LlmResponse) => {
+    let handled = true;
     try {
       await handle(req, res);
       summary.ok++;
     } catch (e) {
+      handled = false;
       summary.failed++;
       console.error(`\n❌ [${opts.task}] ${req.key}: handler failed: ${(e as Error).message}`);
-      return;
     }
-    if (res.cached) { summary.cached++; return; }
+    if (res.cached) { if (handled) summary.cached++; return; }
+    // Only cache responses the handler accepted (e.g. parsed), but count usage either way: it was paid for
     const key = cacheKey(req);
-    if (key) putCached.run(key, opts.task, JSON.stringify({ key: req.key }), res.text, req.model);
+    if (key && handled) putCached.run(key, opts.task, JSON.stringify({ key: req.key }), res.text, req.model);
     if (res.usage) {
       summary.usage.input += res.usage.promptTokenCount;
       summary.usage.cachedInput += res.usage.cachedContentTokenCount;
@@ -144,6 +147,7 @@ export async function runLlmRequests(
         db: opts.db,
         task: opts.task,
         label: `${opts.label || opts.task}:${model}`,
+        pollIntervalMs: opts.pollIntervalMs,
         onResult: async (res) => {
           const req = byKey.get(res.key);
           if (!req) return;
