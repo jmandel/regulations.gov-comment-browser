@@ -6,6 +6,7 @@ import remarkBreaks from 'remark-breaks'
 import { getRegulationsGovUrl, formatDate } from '../utils/helpers'
 import useStore from '../store/useStore'
 import type { Comment } from '../types'
+import { useCommentContent } from '../utils/commentData'
 
 interface CommentDetailViewProps {
   comment: Comment
@@ -20,8 +21,9 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
     ? getCommentById(comment.clusterRepresentativeId)
     : null
   
-  // Use representative's structured sections if available, otherwise use the comment's own
-  const displaySections = representativeComment?.structuredSections || comment.structuredSections
+  // Full sections and text (the representative's for form-letter members) load from shards
+  const { content, loading, error } = useCommentContent(comment, true)
+  const displaySections = content?.sections || comment.structuredSections
   
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -90,11 +92,32 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
           <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
             <p className="text-sm text-purple-800">
               <span className="font-semibold">Note:</span> This comment is part of a cluster of {comment.clusterSize || 'multiple'} aligned submissions. 
-              The summary below is from the representative comment{representativeComment ? ` (#${representativeComment.id})` : ''}.
+              The summary and text below are from the representative comment
+              {representativeComment ? <> (<Link to={`/comments/${representativeComment.id}`} className="underline">#{representativeComment.id}</Link>)</> : ''}.
+              {comment.addedWords ? ' This submitter added their own text, shown first.' : ''}
             </p>
           </div>
         )}
         
+        {(content?.addedText || comment.addedSnippet) && (
+          <div className="mb-6">
+            <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
+              <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs mr-2">ADDED TO THE FORM LETTER</span>
+              {comment.addedWords ? <span className="normal-case font-normal">{comment.addedWords} words</span> : null}
+            </h5>
+            <div className="text-sm pl-4 border-l-2 border-amber-200 whitespace-pre-wrap text-gray-800">
+              {content?.addedText || comment.addedSnippet}
+            </div>
+          </div>
+        )}
+
+        {loading && (
+          <p className="text-sm text-gray-400 italic mb-4">Loading comment content…</p>
+        )}
+        {error && (
+          <p className="text-sm text-red-600 mb-4">Could not load the full content: {error}</p>
+        )}
+
         {displaySections ? (
           <div className="space-y-6">
             {/* One-line Summary */}
@@ -271,7 +294,7 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
               </div>
             )}
           </div>
-        ) : (
+        ) : !loading && (
           <div className="mb-6">
             <p className="text-gray-500 italic">No condensed version available</p>
           </div>

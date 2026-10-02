@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { openDb } from "./lib/database";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, rm } from "fs/promises";
 import { join } from "path";
 
 export const buildWebsiteCommand = new Command("build-website")
@@ -307,136 +307,252 @@ function getEntityTaxonomy(db: any) {
   return taxonomy;
 }
 
-async function exportAllComments(db: any, outputDir: string, documentId: string) {
-  console.log("  📄 Exporting all comments...");
-  
-  // Check if clustering tables exist AND have data
-  const hasClusteringTables = db.prepare(`
-    SELECT name FROM sqlite_master 
-    WHERE type='table' AND name='comment_cluster_membership'
-  `).get();
-  
-  const hasClusteringData = hasClusteringTables ? db.prepare(`
-    SELECT COUNT(*) as count FROM comment_cluster_membership
-  `).get()?.count > 0 : false;
-  
-  let comments;
-  if (hasClusteringData) {
-    // Include clustering data if tables exist
-    comments = db.prepare(`
-      SELECT 
-        c.id,
-        c.attributes_json,
-        COALESCE(cc.structured_sections, cc_rep.structured_sections) as structured_sections,
-        COALESCE(t.markdown, t_rep.markdown) as transcription_markdown,
-        COALESCE(cc.word_count, cc_rep.word_count) as word_count,
-        GROUP_CONCAT(DISTINCT cte.theme_code) as theme_codes,
-        GROUP_CONCAT(DISTINCT ce.category || '|' || ce.entity_label) as entities,
-        COUNT(DISTINCT a.id) as attachment_count,
-        ccl.cluster_size,
-        ccm.is_representative,
-        ccl.representative_comment_id as cluster_representative_id,
-        CASE WHEN cc.structured_sections IS NULL AND cc_rep.structured_sections IS NOT NULL THEN 1 ELSE 0 END as uses_representative_summary
-      FROM comments c
-      LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
-      LEFT JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
-      LEFT JOIN comment_cluster_membership ccm ON c.id = ccm.comment_id
-      LEFT JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id
-      LEFT JOIN condensed_comments cc_rep ON ccl.representative_comment_id = cc_rep.comment_id
-      LEFT JOIN transcriptions t_rep ON ccl.representative_comment_id = t_rep.comment_id AND t_rep.status = 'completed'
-      LEFT JOIN comment_theme_extracts cte ON c.id = cte.comment_id
-      LEFT JOIN comment_entities ce ON c.id = ce.comment_id
-      LEFT JOIN attachments a ON c.id = a.comment_id
-      GROUP BY c.id
-      ORDER BY c.id
-    `).all();
-  } else {
-    // Fallback query without clustering tables
-    comments = db.prepare(`
-      SELECT 
-        c.id,
-        c.attributes_json,
-        cc.structured_sections,
-        t.markdown as transcription_markdown,
-        cc.word_count,
-        GROUP_CONCAT(DISTINCT cte.theme_code) as theme_codes,
-        GROUP_CONCAT(DISTINCT ce.category || '|' || ce.entity_label) as entities,
-        COUNT(DISTINCT a.id) as attachment_count,
-        NULL as cluster_size,
-        NULL as is_representative
-      FROM comments c
-      LEFT JOIN condensed_comments cc ON c.id = cc.comment_id
-      LEFT JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
-      LEFT JOIN comment_theme_extracts cte ON c.id = cte.comment_id
-      LEFT JOIN comment_entities ce ON c.id = ce.comment_id
-      LEFT JOIN attachments a ON c.id = a.comment_id
-      GROUP BY c.id
-      ORDER BY c.id
-    `).all();
-  }
-  
-  // Process comments
-  const processedComments = comments.map((c: any) => {
-    const attrs = JSON.parse(c.attributes_json);
-    
-    // Parse theme codes - all themes that have extracts for this comment
-    const themeScores: any = {};
-    if (c.theme_codes) {
-      for (const code of c.theme_codes.split(',')) {
-        themeScores[code] = 1;  // Use 1 to indicate presence
-      }
-    }
-    
-    // Parse entities
-    const entities: any[] = [];
-    if (c.entities) {
-      for (const entity of c.entities.split(',')) {
-        const [category, label] = entity.split('|');
-        if (category && label) {  // Only add if both category and label are defined
-          entities.push({ category, label });
-        }
-      }
-    }
-    
-    const wordCount = c.word_count ?? 0
+// Data layout (version 2), sized for dockets with tens of thousands of comments:
+//   comments-index.json        every comment's metadata + one-line summary; form-letter members
+//                              point at their representative instead of copying its content
+//   comment-details/NNNN.json  { [unitId]: { sections } , [memberId]: { addedText } } (condensed
+//                              sections minus oneLineSummary, plus members' full added text)
+//   comment-text/NNNN.json     { [unitId]: detailedContent } (full transcription)
+//   search/index.json + search/postings.bin   word -> unit inverted index for full-text search
+// A "unit" is a comment that carries its own content: a cluster representative, or every
+// comment when there is no clustering. Shards hold consecutive units (by ID) and are cut by size.
+const DETAIL_SHARD_BYTES = 256 * 1024;
+const TEXT_SHARD_BYTES = 512 * 1024;
+const ADDED_SNIPPET_CHARS = 160;
+const MAX_INDEXED_WORD = 60;
+const WORD_RE = /[\p{L}\p{N}]+/gu;
 
-    // Parse structured sections if available
-    let structuredSections = null;
-    if (c.structured_sections) {
-      try {
-        structuredSections = JSON.parse(c.structured_sections);
-      } catch (e) {
-        console.warn(`Failed to parse structured sections for comment ${c.id}:`, e);
-      }
+// Must match buildSearchText in dashboard/src/utils/searchParser.ts
+function buildSearchText(parts: {
+  sections?: any; detailedContent?: string | null; submitter?: string; id: string;
+}): string {
+  const out: string[] = [];
+  const s = parts.sections || {};
+  for (const v of [s.oneLineSummary, s.corePosition, parts.detailedContent, s.keyRecommendations, s.mainConcerns, s.commenterProfile]) {
+    if (v) out.push(v);
+  }
+  if (parts.submitter) out.push(parts.submitter);
+  out.push(parts.id);
+  return out.join(" ").toLowerCase();
+}
+
+function writeVarint(buf: number[], n: number) {
+  while (n >= 0x80) { buf.push((n & 0x7f) | 0x80); n >>>= 7; }
+  buf.push(n);
+}
+
+async function exportAllComments(db: any, outputDir: string, documentId: string) {
+  console.log("  📄 Exporting comments (index, detail shards, text shards, search index)...");
+
+  for (const stale of ["comments.json", "theme-extracts.json"]) await rm(join(outputDir, stale), { force: true });
+  for (const dir of ["comment-details", "comment-text", "search"]) {
+    await rm(join(outputDir, dir), { recursive: true, force: true });
+    await mkdir(join(outputDir, dir), { recursive: true });
+  }
+
+  const hasClusteringData = (db.prepare(`SELECT COUNT(*) as count FROM comment_cluster_membership`).get()?.count || 0) > 0;
+
+  const rows = db.prepare(`
+    SELECT
+      c.id,
+      c.attributes_json,
+      ${hasClusteringData ? "ccm.is_representative, ccl.cluster_size, ccl.representative_comment_id" : "NULL as is_representative, NULL as cluster_size, NULL as representative_comment_id"}
+    FROM comments c
+    ${hasClusteringData ? `LEFT JOIN comment_cluster_membership ccm ON c.id = ccm.comment_id
+    LEFT JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id` : ""}
+    ORDER BY c.id
+  `).all() as any[];
+
+  const condensed = new Map<string, { s: string; wc: number | null }>();
+  for (const r of db.prepare(`SELECT comment_id, structured_sections, word_count FROM condensed_comments WHERE structured_sections IS NOT NULL AND structured_sections != ''`).all() as any[]) {
+    condensed.set(r.comment_id, { s: r.structured_sections, wc: r.word_count });
+  }
+  const getTranscription = db.prepare(`SELECT markdown FROM transcriptions WHERE comment_id = ? AND status = 'completed'`);
+  const attachmentCounts = new Map<string, number>();
+  for (const r of db.prepare(`SELECT comment_id, COUNT(DISTINCT id) n FROM attachments GROUP BY comment_id`).all() as any[]) {
+    attachmentCounts.set(r.comment_id, r.n);
+  }
+  const themesBy = new Map<string, string[]>();
+  for (const r of db.prepare(`SELECT comment_id, theme_code FROM comment_theme_extracts ORDER BY theme_code`).all() as any[]) {
+    let a = themesBy.get(r.comment_id); if (!a) themesBy.set(r.comment_id, a = []); a.push(r.theme_code);
+  }
+  const entityKeys: string[] = [];
+  const entityKeyIndex = new Map<string, number>();
+  const entitiesBy = new Map<string, number[]>();
+  for (const r of db.prepare(`SELECT comment_id, category, entity_label FROM comment_entities ORDER BY category, entity_label`).all() as any[]) {
+    if (!r.category || !r.entity_label) continue;
+    const key = `${r.category}|${r.entity_label}`;
+    let idx = entityKeyIndex.get(key);
+    if (idx === undefined) { idx = entityKeys.length; entityKeys.push(key); entityKeyIndex.set(key, idx); }
+    let a = entitiesBy.get(r.comment_id); if (!a) entitiesBy.set(r.comment_id, a = []); a.push(idx);
+  }
+  // Form-letter members' own added text (non-promoted; promoted members are their own units)
+  const additions = new Map<string, { words: number; text: string }>();
+  const hasAdditions = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='form_letter_additions'`).get();
+  if (hasAdditions) {
+    for (const r of db.prepare(`SELECT comment_id, added_word_count, added_text FROM form_letter_additions WHERE promoted = 0 AND added_word_count > 0`).all() as any[]) {
+      additions.set(r.comment_id, { words: r.added_word_count, text: r.added_text });
     }
-    
-    // Use transcription as detailedContent
-    if (c.transcription_markdown) {
-      if (!structuredSections) structuredSections = {};
-      structuredSections.detailedContent = c.transcription_markdown;
+  }
+
+  const isMember = (r: any) => hasClusteringData && r.is_representative !== 1 && r.representative_comment_id && r.representative_comment_id !== r.id;
+
+  // Assign units to shards in ID order; members' added text goes in their representative's detail shard
+  const membersByRep = new Map<string, string[]>();
+  for (const r of rows) if (isMember(r) && additions.has(r.id)) {
+    let a = membersByRep.get(r.representative_comment_id); if (!a) membersByRep.set(r.representative_comment_id, a = []); a.push(r.id);
+  }
+
+  const index: any[] = [];
+  const unitIds: string[] = [];
+  const postings = new Map<string, number[]>();
+  const detailShardOf = new Map<string, number>();
+  const textShardOf = new Map<string, number>();
+  let detailShard: Record<string, any> = {}, detailBytes = 0, detailN = 0;
+  let textShard: Record<string, string> = {}, textBytes = 0, textN = 0;
+  const pad = (n: number) => String(n).padStart(4, "0");
+  const flushDetail = async () => {
+    if (!detailBytes) return;
+    await writeFile(join(outputDir, "comment-details", `${pad(detailN++)}.json`), JSON.stringify(detailShard));
+    detailShard = {}; detailBytes = 0;
+  };
+  const flushText = async () => {
+    if (!textBytes) return;
+    await writeFile(join(outputDir, "comment-text", `${pad(textN++)}.json`), JSON.stringify(textShard));
+    textShard = {}; textBytes = 0;
+  };
+  const wordCountOf = new Map<string, number>();
+  const summaryOf = new Map<string, string>();
+  let detailedTotal = 0;
+
+  for (const r of rows) {
+    if (isMember(r)) continue;
+    const attrs = JSON.parse(r.attributes_json);
+    const submitter = attrs.organization || `${attrs.firstName || ''} ${attrs.lastName || ''}`.trim() || 'Anonymous';
+    let sections: any = null;
+    const cc = condensed.get(r.id);
+    if (cc) {
+      try { sections = JSON.parse(cc.s); } catch { console.warn(`Failed to parse structured sections for comment ${r.id}`); }
+      if (cc.wc != null) wordCountOf.set(r.id, cc.wc);
     }
-    
-    return {
-      id: c.id,
-      documentId,
+    const detailedContent = (getTranscription.get(r.id) as any)?.markdown || null;
+    if (sections?.oneLineSummary) summaryOf.set(r.id, sections.oneLineSummary);
+
+    // Search index over this unit's text
+    const ordinal = unitIds.length;
+    unitIds.push(r.id);
+    const text = buildSearchText({ sections, detailedContent, submitter, id: r.id });
+    for (const w of new Set(text.match(WORD_RE) || [])) {
+      if (w.length > MAX_INDEXED_WORD) continue;
+      let p = postings.get(w); if (!p) postings.set(w, p = []); p.push(ordinal);
+    }
+
+    // Detail shard: condensed sections (minus the one-line summary, which is in the index) + members' added text
+    const detail: Record<string, any> = {};
+    if (sections) {
+      const { oneLineSummary: _omit, ...rest } = sections;
+      if (Object.keys(rest).length) detail[r.id] = { sections: rest };
+    }
+    for (const m of membersByRep.get(r.id) || []) detail[m] = { addedText: additions.get(m)!.text };
+    const detailJson = JSON.stringify(detail);
+    if (detailJson.length > 2) {
+      Object.assign(detailShard, detail);
+      detailBytes += detailJson.length;
+      detailShardOf.set(r.id, detailN);
+      if (detailBytes >= DETAIL_SHARD_BYTES) await flushDetail();
+    }
+    if (detailedContent) {
+      textShard[r.id] = detailedContent;
+      textBytes += detailedContent.length;
+      detailedTotal++;
+      textShardOf.set(r.id, textN);
+      if (textBytes >= TEXT_SHARD_BYTES) await flushText();
+    }
+  }
+  await flushDetail();
+  await flushText();
+
+  const submitterTypes: string[] = [];
+  const typeIdx = new Map<string, number>();
+  const typeIndex = (t: string) => {
+    let i = typeIdx.get(t);
+    if (i === undefined) { i = submitterTypes.length; submitterTypes.push(t); typeIdx.set(t, i); }
+    return i;
+  };
+  for (const r of rows) {
+    const attrs = JSON.parse(r.attributes_json);
+    const member = isMember(r);
+    const repId = member ? r.representative_comment_id : r.id;
+    const entry: any = {
+      id: r.id,
       submitter: attrs.organization || `${attrs.firstName || ''} ${attrs.lastName || ''}`.trim() || 'Anonymous',
-      submitterType: attrs.category || (attrs.organization ? 'Organization' : 'Individual'),
+      submitterType: typeIndex(attrs.category || (attrs.organization ? 'Organization' : 'Individual')),
       date: attrs.postedDate || attrs.receiveDate,
-      location: [attrs.city, attrs.stateProvinceRegion, attrs.country].filter(Boolean).join(', '),
-      structuredSections,
-      themeScores,
-      entities,
-      hasAttachments: c.attachment_count > 0,
-      wordCount,
-      clusterSize: c.cluster_size || 1,
-      isClusterRepresentative: c.is_representative == null ? undefined : c.is_representative === 1,
-      clusterRepresentativeId: c.cluster_representative_id || null,
-      isAlignedSummary: c.uses_representative_summary === 1,
     };
-  });
-  
-  await writeJson(join(outputDir, "comments.json"), processedComments);
-  console.log(`  ✅ Exported ${processedComments.length} comments`);
+    const location = [attrs.city, attrs.stateProvinceRegion, attrs.country].filter(Boolean).join(', ');
+    if (location) entry.location = location;
+    if ((attachmentCounts.get(r.id) || 0) > 0) entry.hasAttachments = true;
+    if (member) {
+      entry.rep = repId;
+      const add = additions.get(r.id);
+      if (add) {
+        entry.addedWords = add.words;
+        entry.addedSnippet = add.text.length > ADDED_SNIPPET_CHARS ? add.text.slice(0, ADDED_SNIPPET_CHARS).trimEnd() + '…' : add.text;
+        entry.detailShard = detailShardOf.get(repId);
+      }
+    } else {
+      if (hasClusteringData) {
+        entry.isRep = true;
+        if ((r.cluster_size || 1) > 1) entry.clusterSize = r.cluster_size;
+      }
+      const wc = wordCountOf.get(r.id);
+      if (wc != null) entry.wordCount = wc;
+      const summary = summaryOf.get(r.id);
+      if (summary) entry.summary = summary;
+      if (detailShardOf.has(r.id)) entry.detailShard = detailShardOf.get(r.id);
+      if (textShardOf.has(r.id)) entry.textShard = textShardOf.get(r.id);
+      const themes = themesBy.get(r.id);
+      if (themes) entry.themes = themes;
+      const ents = entitiesBy.get(r.id);
+      if (ents) entry.entities = ents;
+    }
+    index.push(entry);
+  }
+
+  await writeFile(join(outputDir, "comments-index.json"), JSON.stringify({
+    version: 2,
+    documentId,
+    clustered: hasClusteringData,
+    submitterTypes,
+    entityKeys,
+    comments: index,
+  }));
+
+  // Inverted index: sorted vocabulary, per-word byte length of its posting list, and the
+  // concatenated posting lists in one binary file. A list is unit ordinals, delta + varint
+  // encoded; for words in more than 1/8 of units it is a bitmap instead, marked by a negative length.
+  const words = [...postings.keys()].sort();
+  const bytes: number[] = [];
+  const lens: number[] = [];
+  const bitmapBytes = Math.ceil(unitIds.length / 8);
+  for (const w of words) {
+    const list = postings.get(w)!;
+    const start = bytes.length;
+    if (list.length > unitIds.length / 8) {
+      const bm = new Uint8Array(bitmapBytes);
+      for (const o of list) bm[o >> 3] |= 1 << (o & 7);
+      for (const b of bm) bytes.push(b);
+      lens.push(-bitmapBytes);
+      continue;
+    }
+    let prev = -1;
+    for (const o of list) { writeVarint(bytes, o - prev); prev = o; }
+    lens.push(bytes.length - start);
+  }
+  await writeFile(join(outputDir, "search", "postings.bin"), new Uint8Array(bytes));
+  await writeFile(join(outputDir, "search", "index.json"), JSON.stringify({ version: 1, maxWord: MAX_INDEXED_WORD, units: unitIds, words, lens }));
+
+  console.log(`  ✅ Exported ${index.length} comments (${unitIds.length} units, ${detailedTotal} with full text) in ${detailN} detail + ${textN} text shards; search index ${words.length} words, ${(bytes.length / 1e6).toFixed(1)} MB postings`);
 }
 
 async function generateClusterReport(db: any, outputDir: string) {
@@ -581,7 +697,13 @@ async function exportThemeExtracts(db: any, outputDir: string) {
     }
   }
 
-  await writeJson(join(outputDir, "theme-extracts.json"), extractsMap);
+  // One file per theme, loaded when that theme's page opens (a single file is ~100 MB at 40k comments)
+  const dir = join(outputDir, "theme-extracts");
+  await rm(dir, { recursive: true, force: true });
+  await mkdir(dir, { recursive: true });
+  for (const [code, map] of Object.entries(extractsMap)) {
+    await writeFile(join(dir, `${code}.json`), JSON.stringify(map));
+  }
   console.log(`  ✅ Exported theme extracts for ${Object.keys(extractsMap).length} themes (${rows.length} total extracts)`);
 }
 

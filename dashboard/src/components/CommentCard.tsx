@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { ExternalLink, Paperclip, Calendar, MapPin, User, Building2, Quote, FileText, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
@@ -8,6 +8,23 @@ import clsx from 'clsx'
 import { useState } from 'react'
 import type { Comment, ThemeExtract } from '../types'
 import CopyCommentsModal from './CopyCommentsModal'
+import { useCommentContent } from '../utils/commentData'
+
+// True once the element has come within ~1 screen of the viewport
+function useNearViewport<T extends Element>(enabled: boolean) {
+  const ref = useRef<T>(null)
+  const [near, setNear] = useState(false)
+  useEffect(() => {
+    if (!enabled || near || !ref.current) return
+    if (typeof IntersectionObserver === 'undefined') { setNear(true); return }
+    const obs = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) setNear(true)
+    }, { rootMargin: '800px 0px' })
+    obs.observe(ref.current)
+    return () => obs.disconnect()
+  }, [enabled, near])
+  return { ref, near }
+}
 
 interface CommentCardProps {
   comment: Comment
@@ -46,9 +63,16 @@ function CommentCard({
 }: CommentCardProps) {
   const [showCopyModal, setShowCopyModal] = useState(false)
   const regulationsUrl = getRegulationsGovUrl(comment.documentId || '', comment.id)
+
+  // Sections beyond the one-line summary live in detail shards; fetch them once the card is
+  // near the viewport
+  const wantsDetail = !themeExtract && Object.entries(sections).some(([k, v]) => v && k !== 'oneLineSummary')
+  const { ref, near } = useNearViewport<HTMLDivElement>(wantsDetail && comment.detailShard !== undefined)
+  const { content, loading: detailLoading } = useCommentContent(comment, false, wantsDetail && near)
+  const structuredSections = content?.sections || comment.structuredSections
   
   const cardContent = (
-    <div className={clsx(
+    <div ref={ref} className={clsx(
       "bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition-all",
       clickable && "hover:shadow-lg hover:border-blue-300"
     )}>
@@ -149,6 +173,12 @@ function CommentCard({
           </div>
         )}
         
+        {comment.addedSnippet && (
+          <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
+            <span className="font-semibold">Added to the form letter ({comment.addedWords} words):</span> {comment.addedSnippet}
+          </div>
+        )}
+
         {/* Theme-Specific Extract (shown when viewing from a theme page) */}
         {themeExtract ? (
           <>
@@ -239,7 +269,7 @@ function CommentCard({
               </div>
             )}
           </>
-        ) : comment.structuredSections ? (
+        ) : structuredSections ? (
           <>
             {/* Generic structured sections (default view) */}
             {(() => {
@@ -250,7 +280,7 @@ function CommentCard({
                 mainConcerns,
                 notableExperiences,
                 keyQuotations
-              } = comment.structuredSections;
+              } = structuredSections;
 
               return (
                 <>
@@ -259,6 +289,10 @@ function CommentCard({
                     <div className="mb-4">
                       <p className="text-base font-medium text-gray-900 italic">{oneLineSummary}</p>
                     </div>
+                  )}
+
+                  {detailLoading && (
+                    <p className="text-xs text-gray-400 italic mb-4">Loading summary…</p>
                   )}
 
                   {/* Core Position */}

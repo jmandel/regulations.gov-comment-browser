@@ -106,22 +106,28 @@ export interface EntityTaxonomy {
   [category: string]: Entity[]
 }
 
+export interface StructuredSections {
+  oneLineSummary?: string
+  commenterProfile?: string
+  corePosition?: string
+  keyRecommendations?: string
+  mainConcerns?: string
+  notableExperiences?: string
+  keyQuotations?: string
+  detailedContent?: string
+}
+
+// A comment as held in memory. Only lean fields are loaded up front (from comments-index.json);
+// the full condensed sections, full text and a form-letter member's added text are fetched on
+// demand from shards (see utils/commentData.ts).
 export interface Comment {
   id: string
   submitter: string
   submitterType: string
   date: string
   location?: string
-  structuredSections?: {
-    oneLineSummary?: string
-    commenterProfile?: string
-    corePosition?: string
-    keyRecommendations?: string
-    mainConcerns?: string
-    notableExperiences?: string
-    keyQuotations?: string
-    detailedContent?: string
-  }
+  // Up front this holds only oneLineSummary (the representative's, for form-letter members)
+  structuredSections?: StructuredSections
   themeScores?: Record<string, number>
   entities?: Array<{
     category: string
@@ -130,10 +136,45 @@ export interface Comment {
   hasAttachments: boolean
   documentId?: string
   wordCount?: number
+  percentile?: number
   clusterSize?: number
   isClusterRepresentative?: boolean
   clusterRepresentativeId?: string | null
   isAlignedSummary?: boolean
+  // Form-letter members: words this member added to the template, and the start of that text
+  addedWords?: number
+  addedSnippet?: string
+  // Shards holding this comment's content (for members: the representative's)
+  detailShard?: number
+  textShard?: number
+}
+
+// Shape of comments-index.json
+export interface CommentsIndexFile {
+  version: number
+  documentId: string
+  clustered: boolean
+  submitterTypes: string[]
+  entityKeys: string[]
+  comments: Array<{
+    id: string
+    submitter: string
+    submitterType: number
+    date: string
+    location?: string
+    hasAttachments?: boolean
+    isRep?: boolean
+    clusterSize?: number
+    rep?: string
+    addedWords?: number
+    addedSnippet?: string
+    wordCount?: number
+    summary?: string
+    detailShard?: number
+    textShard?: number
+    themes?: string[]
+    entities?: number[]
+  }>
 }
 
 export interface ThemeExtract {

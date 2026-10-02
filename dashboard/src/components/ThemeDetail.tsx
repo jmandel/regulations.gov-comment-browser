@@ -1,27 +1,36 @@
 import { Link, useParams } from 'react-router-dom'
 import { Copy, ChevronRight, FileText } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import useStore from '../store/useStore'
 import CommentCard from './CommentCard'
 import Breadcrumbs from './Breadcrumbs'
 import ThemeSummaryView from './ThemeSummaryView'
 import CopyCommentsModal from './CopyCommentsModal'
 
+const PAGE_SIZE = 50
+
 function ThemeDetail() {
   const { themeCode } = useParams<{ themeCode: string }>()
-  const { themes, themeSummaries, getCommentsForTheme, themeExtracts } = useStore()
+  const { themes, themeSummaries, getCommentsForTheme, themeExtracts, loadThemeExtracts } = useStore()
   const [showCopyModal, setShowCopyModal] = useState(false)
-  
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+
   const theme = themes.find(t => t.code === themeCode)
   const themeSummary = themeCode ? themeSummaries[themeCode] : undefined
-  const { direct } = themeCode ? getCommentsForTheme(themeCode) : { direct: [] }
-  const extracts = themeCode ? themeExtracts[themeCode] || {} : {}
-  
+  const direct = useMemo(() => (themeCode ? getCommentsForTheme(themeCode).direct : []), [themeCode, getCommentsForTheme])
+  // Per-theme extracts are fetched when the page opens
+  const loadedExtracts = themeCode ? themeExtracts[themeCode] : undefined
+  const extracts = loadedExtracts || {}
+  useEffect(() => {
+    if (themeCode) loadThemeExtracts(themeCode)
+    setVisibleCount(PAGE_SIZE)
+  }, [themeCode, loadThemeExtracts])
+
   // Filter to only show representative comments (or all if no clustering)
-  const displayedComments = direct.filter(c => 
-    c.isClusterRepresentative === true || 
+  const displayedComments = useMemo(() => direct.filter(c =>
+    c.isClusterRepresentative === true ||
     c.isClusterRepresentative === undefined // For databases without clustering
-  )
+  ), [direct])
   
   // Build theme hierarchy
   const themeHierarchy = useMemo(() => {
@@ -213,7 +222,10 @@ function ThemeDetail() {
         
         {displayedComments.length > 0 ? (
           <div className="space-y-4">
-            {displayedComments.map(comment => (
+            {!loadedExtracts && (
+              <p className="text-sm text-gray-400 italic">Loading theme-specific extracts…</p>
+            )}
+            {displayedComments.slice(0, visibleCount).map(comment => (
               <CommentCard
                 key={comment.id}
                 comment={comment}
@@ -223,6 +235,14 @@ function ThemeDetail() {
                 themeCode={themeCode}
               />
             ))}
+            {displayedComments.length > visibleCount && (
+              <button
+                onClick={() => setVisibleCount(n => n + PAGE_SIZE * 2)}
+                className="w-full py-3 bg-white border border-gray-200 rounded-lg text-sm text-blue-600 hover:bg-gray-50"
+              >
+                Show more ({(displayedComments.length - visibleCount).toLocaleString()} remaining)
+              </button>
+            )}
           </div>
         ) : (
           <p className="text-gray-500 italic">No comments found addressing this theme</p>

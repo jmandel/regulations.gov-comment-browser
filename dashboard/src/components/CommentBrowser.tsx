@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useTransition } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { MessageSquare, Copy, Search, X, HelpCircle } from 'lucide-react'
+import { MessageSquare, Copy, Search, X, HelpCircle, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
 import CommentCard from './CommentCard'
 import CopyCommentsModal from './CopyCommentsModal'
@@ -43,7 +43,7 @@ function detectPrefix(query: string, cursorPos: number): PrefixDetection | null 
 }
 
 function CommentBrowser() {
-  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {} } = useStore()
+  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering } = useStore()
   const [searchParams] = useSearchParams()
   const [page, setPage] = useState(0)
   const [showCopyModal, setShowCopyModal] = useState(false)
@@ -127,7 +127,7 @@ function CommentBrowser() {
   const filteredComments = useMemo(() => {
     if (!getFilteredComments) return []
     return getFilteredComments()
-  }, [getFilteredComments, filters])
+  }, [getFilteredComments, filters, search])
 
   // Available submitter types (with 5+ comments)
   const availableSubmitterTypes = useMemo(() => {
@@ -375,7 +375,7 @@ function CommentBrowser() {
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Browse Comments</h1>
               <p className="text-sm text-gray-500 mt-1 truncate sm:whitespace-normal">
-                {comments.some(c => c.isClusterRepresentative !== undefined) ? (
+                {hasClustering ? (
                   <>Showing {filteredComments.length} clusters representing {comments.length} comments</>
                 ) : (
                   <>Showing {filteredComments.length} of {comments.length} comments</>
@@ -445,6 +445,21 @@ function CommentBrowser() {
             <HelpCircle className="h-4 w-4" />
           </button>
         </div>
+
+        {/* Full-text search progress */}
+        {filters.searchQuery && search.query === filters.searchQuery && search.phase !== 'done' && search.phase !== 'idle' && (
+          <div className={`mt-2 flex items-center gap-2 text-xs ${search.phase === 'error' ? 'text-red-600' : 'text-gray-500'}`}>
+            {search.phase !== 'error' && <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />}
+            {search.phase === 'index' && <span>Showing matches in names and summaries; loading the full-text index…</span>}
+            {search.phase === 'verify' && (
+              <span>
+                Checking exact phrase in {(search.pending ?? 0).toLocaleString()} candidate comments
+                {search.progress && search.progress.total > 1 ? ` (${Math.round((search.progress.done / search.progress.total) * 100)}% of text loaded)` : ''}…
+              </span>
+            )}
+            {search.phase === 'error' && <span>{search.error}</span>}
+          </div>
+        )}
 
         {/* Active Filter Chips */}
         <ActiveFilterChips

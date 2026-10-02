@@ -29,8 +29,9 @@ export function parseSearchQuery(query: string): SearchToken[] {
       (i + 2 >= query.length || query[i + 2] === ' ') &&
       tokens.length > 0
     ) {
-      // OR joins next token into same orGroup as previous — don't increment
+      // OR joins the next token into the previous token's orGroup
       i += 2
+      orGroup = tokens[tokens.length - 1].orGroup
       continue
     }
 
@@ -136,7 +137,9 @@ interface Searchable {
   id?: string
 }
 
-function buildSearchText(comment: Searchable): string {
+// The text a comment is searched in. build-website builds the same string (buildSearchText in
+// src/website-build-script.ts) to make the full-text index; keep the two in step.
+export function buildSearchText(comment: Searchable): string {
   const parts: string[] = []
   if (comment.structuredSections) {
     const s = comment.structuredSections
@@ -154,8 +157,12 @@ function buildSearchText(comment: Searchable): string {
 
 export function matchesSearchQuery(comment: Searchable, tokens: SearchToken[]): boolean {
   if (tokens.length === 0) return true
+  return matchesSearchText(buildSearchText(comment), tokens)
+}
 
-  const text = buildSearchText(comment)
+// `text` must already be lowercased
+export function matchesSearchText(text: string, tokens: SearchToken[]): boolean {
+  if (tokens.length === 0) return true
 
   // Group tokens by orGroup
   const groups = new Map<number, SearchToken[]>()

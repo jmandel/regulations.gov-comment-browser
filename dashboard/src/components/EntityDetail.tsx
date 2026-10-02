@@ -12,7 +12,8 @@ function EntityDetail() {
   const [showCopyModal, setShowCopyModal] = useState(false)
   
   const entity = category && label && entities[category]?.find(e => e.label === label)
-  const comments = category && label ? getCommentsForEntity(category, label) : []
+  const comments = useMemo(() => (category && label ? getCommentsForEntity(category, label) : []), [category, label, getCommentsForEntity])
+  const [visibleCount, setVisibleCount] = useState(50)
   
   // Calculate theme distribution for these comments
   const themeDistribution = useMemo(() => {
@@ -136,7 +137,7 @@ function EntityDetail() {
             Comments Mentioning This Topic ({comments.length})
           </h2>
           <div className="space-y-4">
-            {comments.map(comment => (
+            {comments.slice(0, visibleCount).map(comment => (
               <CommentCard 
                 key={comment.id} 
                 comment={comment} 
@@ -144,6 +145,14 @@ function EntityDetail() {
                 showEntities={false}
               />
             ))}
+            {comments.length > visibleCount && (
+              <button
+                onClick={() => setVisibleCount(n => n + 100)}
+                className="w-full py-3 bg-white border border-gray-200 rounded-lg text-sm text-blue-600 hover:bg-gray-50"
+              >
+                Show more ({(comments.length - visibleCount).toLocaleString()} remaining)
+              </button>
+            )}
           </div>
         </div>
       ) : (

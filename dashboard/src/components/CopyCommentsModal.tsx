@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
-import { X, Copy, Check, Download, Share2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Copy, Check, Download, Share2, Loader2 } from 'lucide-react'
 import { Comment, ThemeSummary, ThemeExtract } from '../types'
+import { forEachCommentContent, type CommentContent } from '../utils/commentData'
 
 interface CopyCommentsModalProps {
   isOpen: boolean
@@ -98,11 +99,49 @@ function CopyCommentsModal({
     () => themeStorageKey ? loadSavedSections(themeStorageKey, defaultThemeSections) : defaultThemeSections
   )
 
+  // Sections other than the one-line summary are fetched from shards when copying
+  const needsDetail = commentSections.corePosition || commentSections.keyRecommendations ||
+    commentSections.mainConcerns || commentSections.notableExperiences || commentSections.keyQuotations ||
+    commentSections.detailedContent
+  const withText = commentSections.detailedContent
+  const contentRef = useRef<{ key: string; byId: Map<string, CommentContent> }>({ key: '', byId: new Map() })
+  const [prep, setPrep] = useState<{ phase: 'idle' | 'loading' | 'ready' | 'error'; done: number; total: number; error?: string }>({ phase: 'idle', done: 0, total: 0 })
+  const loadKey = `${withText}|${comments.length}|${comments[0]?.id}|${comments[comments.length - 1]?.id}`
+
   useEffect(() => {
     if (!isOpen) {
       setCopied(false)
+      setPrep({ phase: 'idle', done: 0, total: 0 })
     }
   }, [isOpen])
+
+  useEffect(() => {
+    setPrep(p => (p.phase === 'loading' ? p : { phase: 'idle', done: 0, total: 0 }))
+  }, [loadKey])
+
+  // Returns true if content was already loaded (so the copy can happen within the click)
+  const ensureContent = async (): Promise<boolean> => {
+    if (!needsDetail) return true
+    const cache = contentRef.current
+    if (cache.key === loadKey && cache.byId.size >= comments.length) return true
+    const byId = new Map<string, CommentContent>()
+    contentRef.current = { key: loadKey, byId }
+    setPrep({ phase: 'loading', done: 0, total: 1 })
+    try {
+      await forEachCommentContent(
+        comments,
+        withText,
+        items => { for (const { comment, content } of items) byId.set(comment.id, content) },
+        ({ done, total }) => setPrep({ phase: 'loading', done, total }),
+      )
+      setPrep({ phase: 'idle', done: 0, total: 0 })
+    } catch (err) {
+      contentRef.current = { key: '', byId: new Map() }
+      setPrep({ phase: 'error', done: 0, total: 0, error: String(err) })
+      throw err
+    }
+    return false
+  }
 
   // Persist comment section choices
   useEffect(() => {
@@ -175,11 +214,17 @@ function CopyCommentsModal({
       parts.push(`<comment id="${comment.id}">`)
     }
 
-    const sections = comment.structuredSections || {}
+    const loaded = contentRef.current.byId.get(comment.id)
+    const sections = loaded?.sections || comment.structuredSections || {}
     const contentParts: string[] = []
     
     if (commentSections.oneLineSummary && sections.oneLineSummary) {
       contentParts.push(`**Summary:** ${sections.oneLineSummary}`)
+    }
+
+    // A form-letter member's own additions to the letter
+    if (needsDetail && (loaded?.addedText || comment.addedSnippet)) {
+      contentParts.push(`**Added to the form letter:**\n${loaded?.addedText || comment.addedSnippet}`)
     }
     
     if (commentSections.corePosition && sections.corePosition) {
@@ -375,13 +420,26 @@ function CopyCommentsModal({
   }
 
   const handleCopy = async () => {
+    let immediate
+    try {
+      immediate = await ensureContent()
+    } catch {
+      return
+    }
     const content = buildContent()
     try {
       await navigator.clipboard.writeText(content)
       setCopied(true)
+      setPrep({ phase: 'idle', done: 0, total: 0 })
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
+      // After a long load the browser may no longer treat this as a user action; the content is
+      // now cached, so a second click copies immediately
+      if (!immediate) {
+        setPrep({ phase: 'ready', done: 1, total: 1 })
+        return
+      }
       // Fallback: trigger share/download if clipboard fails
       handleExport()
     }
@@ -390,6 +448,11 @@ function CopyCommentsModal({
   const hasShareApi = typeof navigator.share === 'function'
 
   const handleExport = async () => {
+    try {
+      await ensureContent()
+    } catch {
+      return
+    }
     const content = buildContent()
     const filename = `comments-${comments.length}-export.md`
 
@@ -741,6 +804,18 @@ function CopyCommentsModal({
           
           {/* Footer */}
           <div className="flex items-center justify-end space-x-2 sm:space-x-3 p-3 sm:p-4 border-t border-gray-200 flex-shrink-0 bg-white">
+            {prep.phase === 'loading' && (
+              <span className="flex items-center gap-1 text-xs text-gray-500 mr-auto">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading comment content… {prep.total > 1 ? `${Math.round((prep.done / prep.total) * 100)}%` : ''}
+              </span>
+            )}
+            {prep.phase === 'ready' && !copied && (
+              <span className="text-xs text-green-700 mr-auto">Content loaded — click Copy again to copy it</span>
+            )}
+            {prep.phase === 'error' && (
+              <span className="text-xs text-red-600 mr-auto">Could not load content: {prep.error}</span>
+            )}
             <button
               onClick={onClose}
               className="px-3 sm:px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm"
@@ -749,7 +824,8 @@ function CopyCommentsModal({
             </button>
             <button
               onClick={handleExport}
-              className="flex items-center space-x-1.5 px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg transition-colors text-sm"
+              disabled={prep.phase === 'loading'}
+              className="disabled:opacity-50 flex items-center space-x-1.5 px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg transition-colors text-sm"
               title={hasShareApi ? 'Share as file' : 'Download as file'}
             >
               {hasShareApi ? <Share2 className="h-4 w-4" /> : <Download className="h-4 w-4" />}
@@ -758,7 +834,8 @@ function CopyCommentsModal({
             </button>
             <button
               onClick={handleCopy}
-              className="flex items-center space-x-1.5 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+              disabled={prep.phase === 'loading'}
+              className="disabled:opacity-50 flex items-center space-x-1.5 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
               title="Copy to clipboard"
             >
               {copied ? (
