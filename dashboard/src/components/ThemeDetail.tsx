@@ -93,7 +93,10 @@ function ThemeDetail() {
                   )}
                 </h2>
                 <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium whitespace-nowrap">
-                  {theme.direct_count.toLocaleString()} {theme.direct_count === 1 ? 'comment' : 'comments'}
+                  {theme.comment_count.toLocaleString()} {theme.comment_count === 1 ? 'comment' : 'comments'}
+                  {theme.comment_count > theme.direct_count && (
+                    <> ({theme.direct_count.toLocaleString()} on this theme directly, the rest in sub-themes)</>
+                  )}
                   {theme.direct_count > displayedComments.length && (
                     <> ({displayedComments.length} {displayedComments.length === 1 ? 'cluster' : 'clusters'})</>
                   )}
@@ -154,14 +157,14 @@ function ThemeDetail() {
               No Detailed Analysis Available
             </h2>
             <p className="text-gray-700 mb-4">
-              This sub-theme hasn't been analyzed in detail yet. 
-              {theme.parent_code && (
+              Too few comments discussed this theme for a synthesized analysis (theme summaries need at least 5); the comments that did are listed below.
+              {theme.parent_code && themeSummaries[theme.parent_code] && (
                 <>
-                  {' '}View the parent theme for a broader analysis that may include this topic.
+                  {' '}The parent theme's analysis may cover this topic more broadly.
                 </>
               )}
             </p>
-            {theme.parent_code && (
+            {theme.parent_code && themeSummaries[theme.parent_code] && (
               <Link
                 to={`/themes/${theme.parent_code}`}
                 className="inline-flex items-center space-x-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
@@ -199,7 +202,7 @@ function ThemeDetail() {
                   )}
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-blue-600 font-medium">
-                      {child.direct_count} {child.direct_count === 1 ? 'comment' : 'comments'}
+                      {child.comment_count} {child.comment_count === 1 ? 'comment' : 'comments'}
                     </span>
                     <ChevronRight className="h-4 w-4 text-gray-400" />
                   </div>

@@ -163,6 +163,25 @@ function getThemeHierarchy(db: any) {
     `).all();
   }
   
+  // comment_count rolls up sub-themes: extraction files each point under the most specific theme,
+  // so a top-level theme's direct extracts are only a small part of what it covers. Count each
+  // comment once per theme (weighted by form-letter cluster size) across the theme and descendants.
+  const rollup = new Map<string, Map<string, number>>();
+  const extractRows = db.prepare(`SELECT DISTINCT comment_id, theme_code, ${hasClusteringData ? 'COALESCE(cluster_size, 1)' : '1'} AS size FROM comment_theme_extracts`).all() as { comment_id: string; theme_code: string; size: number }[];
+  for (const r of extractRows) {
+    const parts = r.theme_code.split('.');
+    for (let i = 1; i <= parts.length; i++) {
+      const code = parts.slice(0, i).join('.');
+      if (!rollup.has(code)) rollup.set(code, new Map());
+      rollup.get(code)!.set(r.comment_id, r.size);
+    }
+  }
+  for (const t of themes as any[]) {
+    let total = 0;
+    for (const size of rollup.get(t.code)?.values() ?? []) total += size;
+    t.comment_count = total;
+  }
+
   // Build hierarchy without quotes
   return themes.map((t: any) => {
     // Fix truncated descriptions by using the first sentence of detailed_guidelines

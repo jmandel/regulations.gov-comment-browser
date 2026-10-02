@@ -165,8 +165,8 @@ function ThemeExplorer({ hideTopLevelMetrics = false }: ThemeExplorerProps = {})
                 {/* Desktop: comment count + chevron on the right */}
                 <div className="hidden sm:flex items-center space-x-2 flex-shrink-0 mt-0.5">
                   {!shouldHideMetrics && (
-                    <span className="text-sm text-blue-600 font-medium whitespace-nowrap" title="Direct mentions">
-                      {theme.direct_count}
+                    <span className="text-sm text-blue-600 font-medium whitespace-nowrap" title="Comments on this theme or its sub-themes">
+                      {theme.comment_count}
                     </span>
                   )}
                   {!shouldHideMetrics && hasSummary && (
@@ -192,7 +192,7 @@ function ThemeExplorer({ hideTopLevelMetrics = false }: ThemeExplorerProps = {})
               {/* Mobile: comment count on its own line */}
               {!shouldHideMetrics && (
                 <span className="sm:hidden text-xs text-blue-600 font-medium leading-tight">
-                  {theme.direct_count} {theme.direct_count === 1 ? 'comment' : 'comments'}
+                  {theme.comment_count} {theme.comment_count === 1 ? 'comment' : 'comments'}
                 </span>
               )}
             </div>
