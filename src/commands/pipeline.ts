@@ -26,7 +26,7 @@ export const pipelineCommand = new Command("pipeline")
   .option("-l, --limit-total-comment-load <N>", "Limit initial number of comments loaded")
   .option("--start-at <step>", "Start at a specific step (1-11): 1=load, 2=cluster, 3=triage, 4=transcribe, 5=condense, 6=discover-themes, 7=extract-theme-content, 8=summarize-themes, 9=discover-entities, 10=build-website, 11=vacuum-db")
   .option("-c, --concurrency <N>", "Number of concurrent operations")
-  .option("--batch", "Run per-comment LLM steps (triage, transcribe, condense, theme extraction) through the Gemini Batch API: half price, minutes-to-hours per step")
+  .option("--batch", "Run LLM steps (triage, transcribe, condense, theme discovery/extraction/summaries) through the Gemini Batch API: half price, minutes-to-hours per step")
   .option("--max-crashes <N>", "Maximum number of crashes before giving up (default: 10)", parseInt)
   .option("-m, --model <model>", "Override the per-step models in batch-config.json for every step (e.g. gemini-3.8-flash, gemini-3.5-flash-lite)")
   .option("--no-clustering", "Skip clustering entirely (process all comments)")
@@ -157,6 +157,7 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
             ...(!!options.clustering ? ['--use-clustering'] : []),
+            ...(options.batch ? ['--batch'] : []),
           ]);
         }
       },
@@ -188,6 +189,7 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
             ...(!!options.clustering ? ['--use-clustering'] : []),
+            ...(options.batch ? ['--batch'] : []),
           ]);
         }
       },

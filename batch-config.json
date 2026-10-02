@@ -45,6 +45,15 @@
       "concurrency": 5,
       "mergeWidth": 10,
       "model": "gemini-3.8-flash",
+      "description": "Input: every form-letter representative, promoted member and attachment letter, plus a seeded sample of typedSample typed-only comments (0 = none); no_substance/stance_only triaged comments excluded. Batches are sized by the condensed text actually sent",
+      "models": {
+        "batch": "gemini-3.8-flash",
+        "merge": "gemini-3.8-flash"
+      },
+      "thresholds": {
+        "typedSample": 1000,
+        "sampleSeed": 1
+      },
       "batching": {
         "triggerWordLimit": 250000,
         "batchWordLimit": 150000,
@@ -69,9 +78,15 @@
       }
     },
     "summarizeThemes": {
-      "concurrency": 4,
+      "concurrency": 10,
       "mergeWidth": 4,
       "model": "gemini-3.8-flash",
+      "description": "Phases across all themes: per-batch summaries, then mergeWidth-way merges level by level for large themes, then JSON structuring. All calls go through runLlmRequests (--batch, llm_cache)",
+      "models": {
+        "summary": "gemini-3.8-flash",
+        "merge": "gemini-3.8-flash",
+        "structure": "gemini-3.8-flash"
+      },
       "batching": {
         "triggerWordLimit": 50000,
         "batchWordLimit": 40000,
@@ -83,31 +98,10 @@
       }
     },
     "discoverEntities": {
-      "concurrency": 3,
-      "model": "gemini-3.8-flash",
-      "stages": {
-        "categoryDiscovery": {
-          "mergeWidth": 10,
-          "model": "gemini-3.8-flash",
-          "batching": {
-            "triggerWordLimit": 50000,
-            "batchWordLimit": 50000,
-            "description": "Medium batches for category identification"
-          },
-          "description": "Uses hierarchical merging to combine category lists from multiple batches"
-        },
-        "entityExtraction": {
-          "model": "gemini-3.8-flash",
-          "concurrency": 20,
-          "batching": {
-            "triggerWordLimit": 1000,
-            "batchWordLimit": 1000,
-            "description": "Small batches for precise entity extraction"
-          },
-          "timeoutPerBatch": 60000,
-          "maxFailures": 3,
-          "description": "No merging - entities are automatically deduplicated across batches. Each batch extraction has a 60s timeout."
-        }
+      "model": "gemini-3.8-flash-nothink",
+      "description": "One LLM call builds an entity taxonomy (with match terms) from a seeded ~150k-word sample of units; every unit is then scanned locally. Entities are kept if found in at least min(1% of units, minUnitsCap) units and at most 50%",
+      "thresholds": {
+        "minUnitsCap": 10
       }
     },
     "loadComments": {
@@ -138,10 +132,6 @@
     "gemini-flash-lite": {
       "concurrency": 10,
       "description": "Can handle 2x concurrent requests"
-    },
-    "claude": {
-      "concurrency": 2,
-      "description": "Reduce concurrency for Claude"
     }
   }
 }

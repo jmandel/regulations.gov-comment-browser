@@ -108,12 +108,12 @@ export function createEvenBatches<T extends { wordCount: number }>(
   }
   
   // Filter out empty batches and restore original order within batches
+  // (index map: items.indexOf inside the comparator was quadratic, minutes for themes with thousands of extracts)
+  const position = new Map<T, number>(items.map((item, i) => [item, i]));
   return batches
     .filter(b => b.items.length > 0)
     .map(batch => ({
       ...batch,
-      items: batch.items.sort((a, b) => 
-        items.indexOf(a) - items.indexOf(b)
-      )
+      items: batch.items.sort((a, b) => position.get(a)! - position.get(b)!)
     }));
 }

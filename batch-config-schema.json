@@ -129,6 +129,11 @@
         "thresholds": {
           "type": "object"
         },
+        "models": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Per-role models within the task (getTaskRoleModel), e.g. discoverThemes: batch/merge; summarizeThemes: summary/merge/structure"
+        },
         "description": {
           "type": "string"
         }
@@ -143,6 +148,15 @@
         "model": {
           "type": "string",
           "description": "AI model to use for this task"
+        },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "minUnitsCap": { "type": "integer", "description": "Keep an entity found in at least min(1% of units, minUnitsCap) units" }
+          }
+        },
+        "description": {
+          "type": "string"
         },
         "stages": {
           "type": "object",

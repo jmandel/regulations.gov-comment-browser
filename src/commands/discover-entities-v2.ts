@@ -2,17 +2,29 @@ import { Command } from "commander";
 import { openDb, withTransaction } from "../lib/database";
 import type { Database } from "bun:sqlite";
 import { initDebug, debugSave } from "../lib/debug";
-import { AIClient } from "../lib/ai-client";
-import { loadCondensedCommentsForEntities } from "../lib/comment-processing";
+import { UsageTally } from "../lib/ai-client";
+import { loadUnitsForEntities, seededOrder } from "../lib/comment-processing";
 import type { EntityTaxonomy, EnrichedComment } from "../types";
 import { parseJsonResponse } from "../lib/json-parser";
-import { getTaskModel } from "../lib/batch-config";
+import { getTaskModel, getTaskConfig } from "../lib/batch-config";
+import { runLlmRequests } from "../lib/step-runner";
+
+// Entity discovery: one LLM call designs a taxonomy (with exact match terms) from a seeded random
+// sample of units, then every unit is scanned for the terms locally. Only the single call costs
+// money, so this step doesn't grow with docket size beyond the local scan.
+// Keep an entity if it appears in at least min(1% of units, minUnitsCap) units (and at least 1) and in at
+// most 50% of units. A flat 1% floor would need 200 mentions on a 20k-unit docket, dropping most
+// organizations and codes that only serious letters mention.
+const DEFAULT_MIN_UNITS_CAP = 10;
+// Long letters are truncated in the discovery sample so one 50-page letter can't fill it
+const SAMPLE_MAX_WORDS_PER_UNIT = 4000;
 
 export const discoverEntitiesV2Command = new Command("discover-entities-v2")
   .description("Discover named entities using single large prompt (v2)")
   .argument("<document-id>", "Document ID (e.g., CMS-2025-0050-0031)")
   .option("-l, --limit <n>", "Process only N comments", parseInt)
   .option("--word-limit <n>", "Target word count for prompt (default: 150000)", parseInt)
+  .option("--seed <s>", "Seed for the discovery sample (default: 1)")
   .option("-d, --debug", "Enable debug output")
   .option("-m, --model <model>", "AI model to use (overrides batch-config)")
   .option("--discover-only", "Only discover entities, skip annotation")
@@ -25,8 +37,6 @@ async function discoverEntitiesV2(documentId: string, options: any) {
   const db = openDb(documentId);
   const targetWords = options.wordLimit || 150000;
   const model = getTaskModel('discoverEntities', options.model);
-  
-  const ai = new AIClient(model, db);
   
   // Determine what operations to perform
   const shouldDiscover = !options.annotateOnly;
@@ -68,20 +78,20 @@ async function discoverEntitiesV2(documentId: string, options: any) {
     }
     
     // Load all comments (needed for both discovery and annotation)
-    const allComments = loadCondensedCommentsForEntities(db, options.limit);
+    const allComments = loadUnitsForEntities(db, options.limit);
     if (allComments.length === 0) {
-      console.log("❌ No condensed comments found. Run 'condense' command first.");
+      console.log("❌ No transcribed comments found. Run 'transcribe' command first.");
       db.close();
       return;
     }
     
-    console.log(`📊 Found ${allComments.length} condensed comments`);
+    console.log(`📊 Found ${allComments.length} units (transcribed; representatives only if clustered; no_substance excluded)`);
     
     let taxonomy: EntityTaxonomy = {};
     
     // Discovery phase
     if (shouldDiscover && existingEntities.count === 0) {
-      taxonomy = await discoverEntities(db, ai, allComments, targetWords, options.debug);
+      taxonomy = await discoverEntities(db, model, allComments, targetWords, options.seed ?? 1, options.debug);
     }
     
     // Annotation phase
@@ -108,26 +118,28 @@ async function discoverEntitiesV2(documentId: string, options: any) {
 // Discover entities from comments
 async function discoverEntities(
   db: Database,
-  ai: AIClient,
+  model: string,
   allComments: EnrichedComment[],
   targetWords: number,
+  seed: string | number,
   debug: boolean
 ): Promise<EntityTaxonomy> {
   console.log("\n🔍 Starting entity discovery...");
   
-  // Randomly select comments to reach target word count
-  const shuffled = [...allComments].sort(() => Math.random() - 0.5);
-  const selectedComments: EnrichedComment[] = [];
+  // Seeded random sample up to the target word count (reruns pick the same sample)
+  const selectedComments: { id: string; content: string }[] = [];
   let totalWords = 0;
-  
-  for (const comment of shuffled) {
-    const wordCount = comment.content.split(/\s+/).length;
-    
+  for (const comment of seededOrder(allComments, seed)) {
+    const words = comment.content.split(/\s+/);
+    const content = words.length > SAMPLE_MAX_WORDS_PER_UNIT
+      ? words.slice(0, SAMPLE_MAX_WORDS_PER_UNIT).join(' ') + ' [...]'
+      : comment.content;
+    const wordCount = Math.min(words.length, SAMPLE_MAX_WORDS_PER_UNIT);
     if (totalWords + wordCount > targetWords && totalWords > targetWords * 0.9) {
       break; // Close enough to target
     }
-    
-    selectedComments.push(comment);
+    if (totalWords + wordCount > targetWords) continue;
+    selectedComments.push({ id: comment.id, content });
     totalWords += wordCount;
   }
   
@@ -193,24 +205,30 @@ Generate the JSON taxonomy:`;
   // Generate taxonomy
   console.log("\n🤖 Generating taxonomy with LLM...");
   const startTime = Date.now();
-  
-  const taxonomy = await ai.generateContent<EntityTaxonomy>(
-    prompt,
-    debug ? 'entities_v2_full' : undefined,
-    'entities_v2_full_taxonomy',
-    {
-      taskType: 'discover-entities-v2-full',
-      taskLevel: 0,
-      params: { 
-        commentCount: selectedComments.length,
-        wordCount: totalWords
-      }
-    },
-    parseJsonResponse
-  );
+  let taxonomy: EntityTaxonomy | undefined;
+  const tally = new UsageTally();
+  // Two attempts; the retry asks for JSON output, which also keeps it from hitting a stale cache entry
+  for (let attempt = 1; attempt <= 2 && !taxonomy; attempt++) {
+    const summary = await runLlmRequests(
+      [{ key: 'entity-taxonomy', model, parts: [{ text: prompt }], config: attempt > 1 ? { responseMimeType: "application/json" } : undefined }],
+      (_req, res) => {
+        const parsed = parseJsonResponse(res.text);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('taxonomy is not a JSON object');
+        // Keep only well-formed entities
+        for (const [cat, list] of Object.entries(parsed)) {
+          parsed[cat] = Array.isArray(list) ? (list as any[]).filter(e => e && typeof e.label === 'string' && Array.isArray(e.terms)) : [];
+        }
+        taxonomy = parsed as EntityTaxonomy;
+      },
+      { db, task: 'discover-entities', mode: 'live', concurrency: 1 }
+    );
+    tally.addSummary('entity-taxonomy', summary);
+  }
+  if (!taxonomy) throw new Error('Entity taxonomy generation failed');
   
   const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`✅ Taxonomy generated in ${elapsedTime}s`);
+  tally.print('discover-entities-v2');
   
   if (debug) {
     await debugSave('entities_v2_taxonomy.json', taxonomy);
@@ -235,112 +253,63 @@ async function saveEntitiesWithFiltering(
   taxonomy: EntityTaxonomy,
   comments: EnrichedComment[]
 ) {
-  // ──────────────────── preparation ────────────────────
   const insertEntity = db.prepare(
     `INSERT INTO entity_taxonomy (category, label, definition, terms)
      VALUES (?, ?, ?, ?)`
   );
 
-  const insertAnnotation = db.prepare(
-    `INSERT OR IGNORE INTO comment_entities (comment_id, category, entity_label)
-     VALUES (?, ?, ?)`
-  );
-
-  // Build regex index per term so we can scan comments efficiently
-  type SearchEntry = {
-    entityKey: string;        // "{category}|{label}"
-    category: string;
-    label: string;
-    regex: RegExp;
-  };
-
-  const searchEntries: SearchEntry[] = [];
-
-  // Track occurrences per entity (unique comments mentioning it)
-  const entityHits: Map<string, Set<string>> = new Map();
-
+  const matcher = new TermMatcher();
+  const entityHits: Map<string, number> = new Map();
   for (const [category, entities] of Object.entries(taxonomy)) {
     for (const { label, terms } of entities) {
       const entityKey = `${category}|${label}`;
-      entityHits.set(entityKey, new Set());
-      for (const term of terms) {
-        // Word-boundary, case-sensitive match
-        const regex = new RegExp(`\\b${escapeRegex(term)}\\b`, "g");
-        searchEntries.push({ entityKey, category, label, regex });
-      }
+      entityHits.set(entityKey, 0);
+      for (const term of terms) matcher.add(term, entityKey);
     }
   }
 
-  // ───────────────────── scan comments ─────────────────────
-  console.log("\n📚 Scanning all comments for entity matches...");
-  const upperThreshold = Math.floor(comments.length * 0.5);
-  const lowerThreshold = Math.max(1, Math.floor(comments.length * 0.01));
-
-  let processedCount = 0;
+  console.log("\n📚 Scanning all units for entity matches...");
+  const t0 = Date.now();
   for (const comment of comments) {
-    // Search against the full comment content (transcription + metadata)
-    const searchText = comment.content;
-    if (!searchText) continue;
-
-    for (const entry of searchEntries) {
-      if (entry.regex.test(searchText)) {
-        entityHits.get(entry.entityKey)!.add(comment.id);
-      }
-    }
-    
-    processedCount++;
-    if (processedCount % 100 === 0) {
-      console.log(`   Processed ${processedCount}/${comments.length} comments...`);
-    }
+    for (const key of matcher.match(comment.content)) entityHits.set(key, entityHits.get(key)! + 1);
   }
+  console.log(`   Scanned ${comments.length} units in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
-  // ─────────────── decide which entities to keep ───────────────
+  const thresholds = (getTaskConfig('discoverEntities') as any).thresholds || {};
+  const minUnitsCap: number = thresholds.minUnitsCap ?? DEFAULT_MIN_UNITS_CAP;
+  const upperThreshold = Math.floor(comments.length * 0.5);
+  const lowerThreshold = Math.max(1, Math.min(Math.floor(comments.length * 0.01), minUnitsCap));
   const entitiesToRemove = new Set<string>();
-  for (const [entityKey, hits] of entityHits.entries()) {
-    const count = hits.size;
-    if (count < lowerThreshold || count > upperThreshold) {
-      entitiesToRemove.add(entityKey);
-    }
+  for (const [entityKey, count] of entityHits.entries()) {
+    if (count < lowerThreshold || count > upperThreshold) entitiesToRemove.add(entityKey);
   }
 
-  console.log(
-    `\n⚖️  Filtering entities outside [1%, 50%] occurrence thresholds.`
-  );
+  console.log(`\n⚖️  Keeping entities found in ${lowerThreshold}–${upperThreshold} units.`);
   console.log(`   Total entities: ${entityHits.size}`);
   console.log(`   To remove:      ${entitiesToRemove.size}`);
 
-  // ─────────────────── insert kept entities ───────────────────
   withTransaction(db, () => {
     let saved = 0;
     for (const [category, entities] of Object.entries(taxonomy)) {
       for (const entity of entities) {
         const key = `${category}|${entity.label}`;
-        if (entitiesToRemove.has(key)) continue; // skip
-        
-        // Final safeguard: ensure definition is not null/empty
-        const definition = entity.definition && entity.definition.trim() 
-          ? entity.definition 
+        if (entitiesToRemove.has(key)) continue;
+        const definition = entity.definition && entity.definition.trim()
+          ? entity.definition
           : `A ${category.toLowerCase()} entity mentioned in comments`;
-          
-        insertEntity.run(
-          category,
-          entity.label,
-          definition,
-          JSON.stringify(entity.terms)
-        );
+        insertEntity.run(category, entity.label, definition, JSON.stringify(entity.terms));
         saved++;
       }
     }
     console.log(`   ✅ Saved ${saved} entities to database`);
   });
 
-  // ─────────────────── summary ───────────────────
   if (entitiesToRemove.size > 0) {
     console.log("\n⚠️  Entities removed due to frequency thresholds (showing up to 10):");
     [...entitiesToRemove].slice(0, 10).forEach(key => {
-      const hits = entityHits.get(key)?.size ?? 0;
+      const hits = entityHits.get(key) ?? 0;
       const percent = ((hits / comments.length) * 100).toFixed(2);
-      console.log(`      - ${key} (${hits} comments, ${percent}%)`);
+      console.log(`      - ${key} (${hits} units, ${percent}%)`);
     });
     if (entitiesToRemove.size > 10) {
       console.log(`      ... and ${entitiesToRemove.size - 10} more`);
@@ -355,82 +324,87 @@ async function annotateComments(
 ) {
   console.log("\n📝 Annotating comments with entities...");
   
-  // Load existing taxonomy from database
   const entityRows = db.prepare(
     "SELECT category, label, terms FROM entity_taxonomy"
-  ).all() as Array<{
-    category: string;
-    label: string;
-    terms: string;
-  }>;
+  ).all() as Array<{ category: string; label: string; terms: string }>;
   
   if (entityRows.length === 0) {
     console.log("❌ No entities found in database");
     return;
   }
-  
   console.log(`   Found ${entityRows.length} entities to match`);
   
-  // Build search index
-  type SearchEntry = {
-    entityKey: string;
-    category: string;
-    label: string;
-    regex: RegExp;
-  };
-  
-  const searchEntries: SearchEntry[] = [];
-  
+  const matcher = new TermMatcher();
+  const byKey = new Map<string, { category: string; label: string }>();
   for (const row of entityRows) {
-    const terms = JSON.parse(row.terms) as string[];
     const entityKey = `${row.category}|${row.label}`;
-    
-    for (const term of terms) {
-      const regex = new RegExp(`\\b${escapeRegex(term)}\\b`, "g");
-      searchEntries.push({ 
-        entityKey, 
-        category: row.category, 
-        label: row.label, 
-        regex 
-      });
-    }
+    byKey.set(entityKey, { category: row.category, label: row.label });
+    for (const term of JSON.parse(row.terms) as string[]) matcher.add(term, entityKey);
   }
   
-  // Clear existing annotations
   db.prepare("DELETE FROM comment_entities").run();
-  
-  // Annotate comments
   const insertAnnotation = db.prepare(
     `INSERT OR IGNORE INTO comment_entities (comment_id, category, entity_label)
      VALUES (?, ?, ?)`
   );
   
   let annotationCount = 0;
-  let processedCount = 0;
-  
   withTransaction(db, () => {
     for (const comment of comments) {
-      const searchText = comment.content;
-      if (!searchText) continue;
-      
-      const alreadyAdded = new Set<string>();
-      for (const entry of searchEntries) {
-        if (alreadyAdded.has(entry.entityKey)) continue;
-        if (entry.regex.test(searchText)) {
-          insertAnnotation.run(comment.id, entry.category, entry.label);
-          alreadyAdded.add(entry.entityKey);
-          annotationCount++;
-        }
-      }
-      
-      processedCount++;
-      if (processedCount % 100 === 0) {
-        console.log(`   Processed ${processedCount}/${comments.length} comments...`);
+      for (const key of matcher.match(comment.content)) {
+        const e = byKey.get(key)!;
+        insertAnnotation.run(comment.id, e.category, e.label);
+        annotationCount++;
       }
     }
   });
   
-  console.log(`   💡 Created ${annotationCount} entity annotations`);
+  console.log(`   💡 Created ${annotationCount} entity annotations over ${comments.length} units`);
+}
+
+// Case-sensitive, whole-word term matching (same semantics as /\bTERM\b/) in one pass per text.
+// Terms are indexed by their leading word (\w+ run); each word in the text is looked up and the
+// candidates verified in place, so the cost is linear in text length rather than texts × terms
+// regex scans (which also had a bug: /g regexes reused across texts carried lastIndex over and
+// missed matches).
+export class TermMatcher {
+  private byFirstWord = new Map<string, { term: string; key: string }[]>();
+  private fallback: { regex: RegExp; key: string }[] = [];
+
+  add(term: string, key: string) {
+    if (!term) return;
+    const first = term.match(/^\w+/);
+    if (!first) {
+      this.fallback.push({ regex: new RegExp(`\\b${escapeRegex(term)}\\b`), key });
+      return;
+    }
+    const list = this.byFirstWord.get(first[0]) || [];
+    list.push({ term, key });
+    this.byFirstWord.set(first[0], list);
+  }
+
+  match(text: string): Set<string> {
+    const found = new Set<string>();
+    if (!text) return found;
+    const word = /\w+/g;
+    let m: RegExpExecArray | null;
+    while ((m = word.exec(text))) {
+      const candidates = this.byFirstWord.get(m[0]);
+      if (!candidates) continue;
+      for (const c of candidates) {
+        if (found.has(c.key) || !text.startsWith(c.term, m.index)) continue;
+        // \b after the term: word-ness of its last char differs from the next char's
+        const next = text[m.index + c.term.length];
+        if (isWordChar(c.term[c.term.length - 1]) !== isWordChar(next)) found.add(c.key);
+      }
+    }
+    for (const f of this.fallback) if (!found.has(f.key) && f.regex.test(text)) found.add(f.key);
+    return found;
+  }
+}
+
+function isWordChar(ch: string | undefined): boolean {
+  return ch !== undefined && /\w/.test(ch);
 }
 
 // Escape regex special characters

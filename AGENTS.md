@@ -81,10 +81,10 @@ Re-running any load is safe: comments already in the DB are skipped by ID. Attac
 3. **triage** - Label short ungrouped typed comments (<80 words) `no_substance` / `stance_only` / `substantive`, batched ~100 per Flash-Lite call. Condense skips the first two; theme extraction skips `no_substance` and reads `stance_only` comments' raw text so they still count toward themes
 4. **transcribe** - Convert attachments/PDFs to clean markdown. Comments without attachments are stored as-is with no LLM call
 5. **condense** - Structurally summarize each comment
-6. **discover-themes** - Build hierarchical taxonomy of policy themes
+6. **discover-themes** - Build hierarchical taxonomy of policy themes from a sample: every form-letter template, promoted member and attachment letter, plus `thresholds.typedSample` (1,000) seeded-random typed comments (`--typed-sample`, `--seed`; triaged-out comments excluded). On PFS: ~4,870 units, 15 batches, 3 merges
 7. **extract-theme-content** - Extract theme-specific text from each comment, in two phases (see below)
-8. **summarize-themes** - Synthesize extracts into narrative theme analysis (includes post-processing to fix partial comment IDs)
-9. **discover-entities** - Identify organizations and named entities
+8. **summarize-themes** - Synthesize extracts into narrative theme analysis, in phases across all themes: per-batch summaries, level-by-level 4-way merges, then JSON structuring (includes post-processing to fix partial comment IDs)
+9. **discover-entities** - Build an entity taxonomy from a seeded sample in one call, then tag every unit's text by term matching (local, no LLM). Entities need mentions in min(1%, 10) units
 10. **build-website** - Export analysis for the web dashboard (uses docket ID from DB metadata for output paths). Writes a lean `comments-index.json` loaded at startup (form-letter members point to their representative plus a snippet of their own added text) and on-demand data: `comment-details/` and `comment-text/` shards (condensed sections; full text from the transcription), `theme-extracts/<code>.json`, and a `search/` word index. At PFS scale (43k comments) startup downloads ~3.4 MB gzipped
 11. **vacuum-db** - Optimize SQLite database
 
@@ -98,7 +98,9 @@ Per-step models live in `batch-config.json` (`tasks.<step>.model`, or `tasks.<st
 | transcribe | `gemini-3.5-flash-lite`; failures retried once on `gemini-3.8-flash` (`models.fallback`) | Thinking budget and 3.8 Flash changed nothing in a trial (same length and source overlap, 2–5× cost). Flash-Lite occasionally returns an empty response for an ordinary letter |
 | condense | typed → `gemini-3.5-flash-lite`, attachment letters and promoted members → `gemini-3.8-flash-nothink` | Flash-Lite matched 3.8 on typed comments but omitted recommendations in long multi-issue letters |
 | extract-theme-content | gate → `gemini-3.5-flash-lite`; extraction → `gemini-3.8-flash-nothink` | Flash-Lite as extractor over-split themes in a blind comparison |
-| everything else | `gemini-3.8-flash` | |
+| discover-themes | `gemini-3.8-flash` (minimal thinking) | Without thinking it found fewer themes and missed issues (won 3 of 4 blind comparisons with thinking) |
+| summarize-themes | `gemini-3.8-flash` (minimal thinking) | Slightly better summaries and JSON structuring with thinking (7.69 vs 7.31); ~$3.6 difference at PFS scale |
+| discover-entities | `gemini-3.8-flash-nothink` | Won both blind comparisons and kept more entities |
 
 Thinking: 3.5 Flash-Lite doesn't think unless given a budget. `gemini-3.8-flash` defaults to `thinkingLevel: minimal`, which still spends ~1–2k thought tokens per call, often more than the visible output. `gemini-3.8-flash-nothink` (same model, `thinkingBudget: 0`, both in `GEMINI_MODELS` in `src/lib/llm-providers.ts`) produces no thought tokens; on attachment-letter condensing and theme extraction it cut cost 41–61% with equal or better blind-judged quality (extraction completeness 4.74 vs 4.35/5, half the omissions). Theme discovery, summaries and entities still use minimal thinking (untested without it).
 

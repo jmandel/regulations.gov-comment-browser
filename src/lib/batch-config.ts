@@ -21,6 +21,8 @@ export interface TaskConfig {
 export interface EntityTaskConfig {
   concurrency?: number;
   model?: string;
+  models?: Record<string, string>;
+  thresholds?: Record<string, any>;
   stages?: {
     categoryDiscovery?: {
       mergeWidth?: number;

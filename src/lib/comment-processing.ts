@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import type { RawComment, CommentAttributes, Attachment, EnrichedComment, ParsedTheme } from "../types";
 import { countWords } from "./batch-processor";
+import { createHash } from "crypto";
 
 // Load comments and attachments from database
 export function loadComments(db: Database, limit?: number): {
@@ -223,58 +224,98 @@ export function loadCondensedComments(db: Database, limit?: number, filterIds?: 
   });
 }
 
-// Load condensed comments for entity extraction (metadata + transcription)
-export function loadCondensedCommentsForEntities(db: Database, limit?: number): EnrichedComment[] {
-  const query = limit
-    ? `SELECT c.id, cc.structured_sections, c.attributes_json, t.markdown
-       FROM comments c 
-       JOIN condensed_comments cc ON c.id = cc.comment_id 
-       LEFT JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
-       WHERE cc.status = 'completed' 
-       LIMIT ?`
-    : `SELECT c.id, cc.structured_sections, c.attributes_json, t.markdown
-       FROM comments c 
-       JOIN condensed_comments cc ON c.id = cc.comment_id 
-       LEFT JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
-       WHERE cc.status = 'completed'`;
-  
-  const rows = limit
-    ? db.prepare(query).all(limit)
-    : db.prepare(query).all();
-  
-  return rows.map((row: any) => {
+// Load the units entity discovery/annotation should cover: every comment with a completed
+// transcription (cluster representatives only when form-letter clustering ran), except comments
+// triaged no_substance. Uses transcriptions rather than condensed_comments: stance_only comments
+// have no condensed row but still count as units and can mention entities.
+export function loadUnitsForEntities(db: Database, limit?: number): EnrichedComment[] {
+  const repsOnly = checkClusteringStatus(db);
+  let query = `SELECT c.id, c.attributes_json, t.markdown, cc.structured_sections
+       FROM comments c
+       JOIN transcriptions t ON c.id = t.comment_id AND t.status = 'completed'
+       LEFT JOIN condensed_comments cc ON c.id = cc.comment_id AND cc.status = 'completed'
+       WHERE c.id NOT IN (SELECT comment_id FROM comment_triage WHERE label = 'no_substance')`;
+  if (repsOnly) query += ` AND c.id IN (SELECT comment_id FROM comment_cluster_membership WHERE is_representative = 1)`;
+  query += ` ORDER BY c.id`;
+  if (limit) query += ` LIMIT ${Number(limit)}`;
+  const rows = db.prepare(query).all() as any[];
+
+  return rows.map((row) => {
     const attrs = JSON.parse(row.attributes_json) as CommentAttributes;
-    const sections = JSON.parse(row.structured_sections || '{}');
     const metadata = extractMetadata(attrs);
-    
-    // Build representation with metadata and transcription
-    const parts: string[] = [];
-    
-    // Add metadata
-    parts.push(`[${metadata.submitterType}] ${metadata.submitter}`);
-    if (metadata.organization) {
-      parts.push(`Organization: ${metadata.organization}`);
-    }
-    if (metadata.location) {
-      parts.push(`Location: ${metadata.location}`);
-    }
+    const parts: string[] = [`[${metadata.submitterType}] ${metadata.submitter}`];
+    if (metadata.organization) parts.push(`Organization: ${metadata.organization}`);
+    if (metadata.location) parts.push(`Location: ${metadata.location}`);
     parts.push('');
-    
-    // Add transcription
-    if (row.markdown) {
-      parts.push(row.markdown);
-    }
-    
+    if (row.markdown) parts.push(row.markdown);
     const content = parts.join('\n');
-    
     return {
       id: row.id,
       content,
       wordCount: countWords(content),
       metadata,
-      structuredSections: sections
+      structuredSections: row.structured_sections ? JSON.parse(row.structured_sections) : undefined,
     };
   });
+}
+
+// Deterministic pseudo-random order: sort by hash(seed:id). Stable across runs and unaffected by
+// row order, so a rerun with the same seed picks the same sample.
+export function seededOrder<T extends { id: string }>(items: T[], seed: string | number): T[] {
+  const key = (id: string) => createHash("sha1").update(`${seed}:${id}`).digest("hex");
+  return items.map(it => [key(it.id), it] as const).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).map(p => p[1]);
+}
+
+export type DiscoveryStratum = "form_letter" | "promoted" | "attachment" | "typed";
+
+export interface DiscoveryUnit extends EnrichedComment {
+  stratum: DiscoveryStratum;
+  groupSize: number;
+}
+
+// Units for theme discovery. Always included: form-letter group representatives (cluster_size >= 4),
+// promoted members (form_letter_additions.promoted = 1) and units with attachments; plus a seeded
+// random sample of `typedSample` other (typed-only) units (0 = none, undefined = all). Comments
+// triaged no_substance / stance_only are excluded (they have no condensed row anyway).
+// With repsOnly, only cluster representatives are considered.
+export function selectThemeDiscoveryUnits(
+  db: Database,
+  opts: { typedSample?: number; seed?: string | number; repsOnly?: boolean }
+): { units: DiscoveryUnit[]; composition: Record<string, { available: number; used: number }> } {
+  let query = `SELECT c.id, c.attributes_json, cc.structured_sections,
+      COALESCE((SELECT k.cluster_size FROM comment_clusters k WHERE k.representative_comment_id = c.id), 1) AS group_size,
+      EXISTS(SELECT 1 FROM attachments a WHERE a.comment_id = c.id) AS has_att,
+      EXISTS(SELECT 1 FROM form_letter_additions f WHERE f.comment_id = c.id AND f.promoted = 1) AS promoted
+    FROM comments c
+    JOIN condensed_comments cc ON c.id = cc.comment_id AND cc.status = 'completed'
+    WHERE c.id NOT IN (SELECT comment_id FROM comment_triage WHERE label IN ('no_substance', 'stance_only'))`;
+  if (opts.repsOnly) query += ` AND c.id IN (SELECT comment_id FROM comment_cluster_membership WHERE is_representative = 1)`;
+  const rows = db.prepare(query).all() as any[];
+
+  const all: DiscoveryUnit[] = rows.map(row => {
+    const stratum: DiscoveryStratum = row.group_size >= 4 ? "form_letter" : row.promoted ? "promoted" : row.has_att ? "attachment" : "typed";
+    return {
+      id: row.id,
+      content: "",
+      wordCount: 0,
+      metadata: extractMetadata(JSON.parse(row.attributes_json) as CommentAttributes),
+      structuredSections: JSON.parse(row.structured_sections || "{}"),
+      stratum,
+      groupSize: row.group_size,
+    };
+  });
+
+  const strata: DiscoveryStratum[] = ["form_letter", "promoted", "attachment", "typed"];
+  const composition: Record<string, { available: number; used: number }> = {};
+  const units: DiscoveryUnit[] = [];
+  for (const st of strata) {
+    let members = seededOrder(all.filter(u => u.stratum === st), opts.seed ?? 1);
+    const available = members.length;
+    if (st === "typed" && opts.typedSample !== undefined && opts.typedSample >= 0) members = members.slice(0, opts.typedSample);
+    composition[st] = { available, used: members.length };
+    units.push(...members);
+  }
+  return { units, composition };
 }
 
 // Enrich a comment with its full content including PDFs
@@ -372,7 +413,7 @@ export async function enrichComment(
 }
 
 // Extract metadata from comment attributes
-function extractMetadata(attrs: CommentAttributes) {
+export function extractMetadata(attrs: CommentAttributes) {
   // Determine submitter name
   let submitter = "Anonymous";
   if (attrs.organization) {
