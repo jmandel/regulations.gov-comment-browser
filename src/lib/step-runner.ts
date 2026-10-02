@@ -141,7 +141,8 @@ export async function runLlmRequests(
       if (!byModel.has(req.model)) byModel.set(req.model, []);
       byModel.get(req.model)!.push(req);
     }
-    for (const [model, reqs] of byModel) {
+    // One batch job per model, submitted and polled concurrently
+    await Promise.all([...byModel].map(async ([model, reqs]) => {
       const byKey = new Map(reqs.map(r => [r.key, r]));
       await runGeminiBatch(reqs, {
         db: opts.db,
@@ -159,7 +160,7 @@ export async function runLlmRequests(
           await finish(req, { key: res.key, text: res.text || "", usage: res.usage });
         },
       });
-    }
+    }));
   }
 
   const u = summary.usage;

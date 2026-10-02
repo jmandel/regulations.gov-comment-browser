@@ -210,6 +210,10 @@ export async function runGeminiBatch(requests: LlmRequest[], opts: BatchOptions)
     jobs.push({ name: job.name, keys, state, done: false });
   }
 
+  // The request lines (with base64 attachments) aren't needed once uploaded; free them so several
+  // large submissions can poll at once
+  lineByKey.clear();
+
   // Poll all jobs until each reaches a terminal state, delivering results as each finishes
   const start = Date.now();
   let delay = opts.pollIntervalMs ?? 30_000;

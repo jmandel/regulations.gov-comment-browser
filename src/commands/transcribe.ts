@@ -24,6 +24,7 @@ export const transcribeCommand = new Command("transcribe")
   .option("-m, --model <model>", "AI model to use (overrides config)")
   .option("--use-clustering", "Only transcribe representative comments from clusters")
   .option("--batch", "Use the Gemini Batch API (half price, slower)")
+  .option("--chunk-size <n>", "Comments per chunk of attachment comments (default: 500)", parseInt)
   .action(transcribeComments);
 
 // MIME types that Gemini can ingest natively as inline data
@@ -314,7 +315,7 @@ async function transcribeComments(documentId: string, options: any) {
   let curBytes = 0;
   for (const c of withAttachments) {
     const bytes = readableBytes.get(c.id)!;
-    if (cur.length > 0 && (cur.length >= CHUNK_MAX_COMMENTS || curBytes + bytes > CHUNK_MAX_BYTES)) {
+    if (cur.length > 0 && (cur.length >= (options.chunkSize || CHUNK_MAX_COMMENTS) || curBytes + bytes > CHUNK_MAX_BYTES)) {
       chunks.push(cur);
       cur = [];
       curBytes = 0;
@@ -324,7 +325,7 @@ async function transcribeComments(documentId: string, options: any) {
   }
   if (cur.length > 0) chunks.push(cur);
 
-  for (const [i, chunk] of chunks.entries()) {
+  const processChunk = async (chunk: RawComment[], i: number) => {
     if (chunks.length > 1) console.log(`\n📦 Chunk ${i + 1}/${chunks.length}: ${chunk.length} comments`);
     const attachments = new Map<string, Attachment[]>();
     const requests: LlmRequest[] = [];
@@ -386,7 +387,11 @@ async function transcribeComments(documentId: string, options: any) {
       updateFailed.run(req.key, "LLM transcription failed (see run log)");
       failed++;
     }
-  }
+  };
+  // Batch jobs mostly wait in Google's queue, so submit every chunk at once; live mode keeps one
+  // chunk at a time so it doesn't multiply the concurrency limit
+  if (mode === "batch") await Promise.all(chunks.map((chunk, i) => processChunk(chunk, i)));
+  else for (const [i, chunk] of chunks.entries()) await processChunk(chunk, i);
 
   // Final summary
   console.log("\n📊 Transcription complete:");

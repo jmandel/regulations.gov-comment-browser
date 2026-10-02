@@ -414,7 +414,8 @@ async function extractThemeContent(documentId: string, options: any) {
   // Long units in "full" mode: one call each with the whole taxonomy; done-marker group_code '*'
   const FULL = '*';
   const fullUnits = longMode === 'full' ? units.filter(u => !isShort(u) && !extracted.has(`${u.id}|${FULL}`)) : [];
-  if (fullUnits.length > 0) {
+  const fullStage = async () => {
+    if (fullUnits.length === 0) return;
     console.log(`📚 Full-taxonomy extraction for ${fullUnits.length} long units`);
     for (const u of fullUnits) touched.add(u.id);
     const allCodes = new Set(themeGroups.flatMap(g => [...g.themeCodes]));
@@ -457,10 +458,14 @@ async function extractThemeContent(documentId: string, options: any) {
     }
     const fullFailed = fullUnits.filter(u => !fullDone.has(u.id)).length;
     if (fullFailed > 0) console.warn(`⚠️  ${fullFailed} long units not extracted; re-run to retry them`);
-  }
+  };
 
-  await runExtractPass(work, shortBatchSize, "p1", 'short');
-  await runExtractPass(work, shortBatchSize, "p1", 'long');
+  // The passes are independent; in batch mode their jobs wait in the queue together
+  await Promise.all([
+    fullStage(),
+    runExtractPass(work, shortBatchSize, "p1", 'short'),
+    runExtractPass(work, shortBatchSize, "p1", 'long'),
+  ]);
 
   // Short units missing from a batched response get a call of their own
   const retry = new Map<string, { short: Unit[]; long: Unit[] }>();
