@@ -14,7 +14,8 @@ Regulations.gov comment analysis pipeline. Loads public comments on federal regu
 ## Key guidance
 - Never skip attachments (`-s`) unless explicitly asked
 - Use `--no-clustering` for dockets under ~1000 comments
-- Models are set per step in `batch-config.json`: `gemini-3.5-flash-lite` for mechanical work (transcription), `gemini-3.8-flash` for everything else. Don't pass `-m` to `pipeline` unless you mean to override every step
+- Models are set per step (and per role within a step) in `batch-config.json`; see "Models and cost" below. Don't pass `-m` to `pipeline` unless you mean to override every step and role
+- Add `--batch` to run the per-comment LLM steps through the Gemini Batch API at half price; each such step then takes minutes to hours
 - Default concurrency: `-c 20`
 - The `.env` file contains API keys (`GEMINI_API_KEY`, `REGSGOV_API_KEY`); the code reads `REGSGOV_API_KEY`, not `REGULATIONS_GOV_API_KEY`
 - For large dockets (>~5k comments) load with `--mirrulations` instead of the API — the API listing caps at 10k comments
@@ -73,18 +74,37 @@ Re-running any load is safe: comments already in the DB are skipped by ID. Attac
 
 2. **Use `--no-clustering` for small dockets.** Dockets under ~1000 comments don't benefit from clustering and it can cause problems (especially with many attachment-only comments). Only enable clustering for 1000+ comment dockets.
 
-### Pipeline steps (1-10)
+### Pipeline steps (1-11)
 
-1. **load** - Load comments from regulations.gov API or CSV (downloads attachments)
+1. **load** - Load comments from regulations.gov API, Mirrulations or CSV (downloads attachments)
 2. **cluster** - Group form letters (skipped with `--no-clustering`; see "Form-letter clustering" below)
-3. **transcribe** - Convert attachments/PDFs to clean markdown
-4. **condense** - Structurally summarize each comment
-5. **discover-themes** - Build hierarchical taxonomy of policy themes
-6. **extract-theme-content** - Extract theme-specific text from each comment (batched by top-level theme group, uses Gemini prompt caching)
-7. **summarize-themes** - Synthesize extracts into narrative theme analysis (includes post-processing to fix partial comment IDs)
-8. **discover-entities** - Identify organizations and named entities
-9. **build-website** - Export analysis to JSON for web dashboard (uses docket ID from DB metadata for output paths)
-10. **vacuum-db** - Optimize SQLite database
+3. **triage** - Label short ungrouped typed comments (<80 words) `no_substance` / `stance_only` / `substantive`, batched ~100 per Flash-Lite call. Condense skips the first two; theme extraction skips `no_substance` and reads `stance_only` comments' raw text so they still count toward themes
+4. **transcribe** - Convert attachments/PDFs to clean markdown. Comments without attachments are stored as-is with no LLM call
+5. **condense** - Structurally summarize each comment
+6. **discover-themes** - Build hierarchical taxonomy of policy themes
+7. **extract-theme-content** - Extract theme-specific text from each comment, in two phases (see below)
+8. **summarize-themes** - Synthesize extracts into narrative theme analysis (includes post-processing to fix partial comment IDs)
+9. **discover-entities** - Identify organizations and named entities
+10. **build-website** - Export analysis to JSON for web dashboard (uses docket ID from DB metadata for output paths; `detailedContent` comes from the transcription)
+11. **vacuum-db** - Optimize SQLite database
+
+### Models and cost
+
+Per-step models live in `batch-config.json` (`tasks.<step>.model`, or `tasks.<step>.models.<role>` read via `getTaskRoleModel`). Defaults and why:
+
+| Step | Model | Notes |
+|---|---|---|
+| triage | `gemini-3.5-flash-lite` | ~100 comments per call |
+| transcribe | `gemini-3.5-flash-lite`; failures retried once on `gemini-3.8-flash` (`models.fallback`) | Thinking budget and 3.8 Flash changed nothing in a trial (same length and source overlap, 2–5× cost). Flash-Lite occasionally returns an empty response for an ordinary letter |
+| condense | typed → `gemini-3.5-flash-lite`, attachment letters and promoted members → `gemini-3.8-flash` | Flash-Lite matched 3.8 on typed comments but omitted recommendations in long multi-issue letters |
+| extract-theme-content | gate → `gemini-3.5-flash-lite`; extraction → `gemini-3.8-flash` | Flash-Lite as extractor over-split themes in a blind comparison |
+| everything else | `gemini-3.8-flash` | |
+
+Thinking: 3.5 Flash-Lite doesn't think unless given a budget. 3.8 Flash can't turn it off; it defaults to `thinkingLevel: minimal` (set in `GEMINI_MODELS`, `src/lib/llm-providers.ts`), and still spends ~1–2k thought tokens per call — often more than its visible output, so it is the largest cost line wherever 3.8 Flash runs.
+
+All per-comment LLM calls go through `runLlmRequests` (`src/lib/step-runner.ts`): live (parallel with retries) or `--batch` (`src/lib/gemini-batch.ts`: uploads a JSONL file, polls, records jobs in `batch_jobs` so a restarted step resumes the same job instead of paying twice, deletes the input file when done). Text-only results are cached in `llm_cache`. Each step prints tokens (input, cached, output, thoughts) and estimated cost at the end.
+
+**Theme extraction (step 7)**: (1) a *gate* asks Flash-Lite which top-level theme groups each unit substantively discusses (short units 40 per call), stored in `comment_theme_groups`; (2) extraction runs only for gated groups — long units one call per group, short units (≤400 words) batched up to 15 per call per group — with the group's instructions and themes first in the prompt and the comment(s) after, and the model emits only themes the comment substantively addresses. `--gate-only` runs phase 1; progress is tracked per (unit, group) in `comment_theme_extract_status`, so reruns resume. In a 34-unit comparison this cost ~$0.018/unit vs $0.104/unit for the old one-call-per-group-per-unit design, with ~93% content-level recall of the old extracts (73% exact comment-theme pairs; most differences were the old method filing the same content under two groups).
 
 ### After pipeline completes
 

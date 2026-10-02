@@ -3,6 +3,7 @@ import { basename, extname } from "path";
 import { loadCommentsCommand } from "./load-comments";
 import { clusterCommentsFastCommand } from "./cluster-comments-fast";
 import { clusterFormLettersCommand } from "./cluster-form-letters";
+import { triageCommand } from "./triage";
 import { transcribeCommand } from "./transcribe";
 import { condenseCommand } from "./condense";
 import { discoverThemesCommand } from "./discover-themes";
@@ -15,7 +16,7 @@ import { openDb } from "../lib/database";
 import { checkClusteringStatus } from "../lib/comment-processing";
 
 export const pipelineCommand = new Command("pipeline")
-  .description("Run the complete analysis pipeline: load, cluster, condense, discover themes, extract theme content, summarize themes, discover entities, build website, and vacuum database")
+  .description("Run the complete analysis pipeline: load, cluster, triage, transcribe, condense, discover themes, extract theme content, summarize themes, discover entities, build website, and vacuum database")
   .argument("<source-arg>", "Source argument (e.g., CMS-2025-0050-0031 or path to CSV)")
   .option("-s, --skip-attachments", "Skip downloading attachments")
   .option("--mirrulations", "Load comments from the Mirrulations S3 mirror instead of the regulations.gov API (best for large dockets)")
@@ -23,8 +24,9 @@ export const pipelineCommand = new Command("pipeline")
   .option("-d, --debug", "Enable debug mode for all steps")
   .option("-o, --output <dir>", "Output directory for website files", "dist/data")
   .option("-l, --limit-total-comment-load <N>", "Limit initial number of comments loaded")
-  .option("--start-at <step>", "Start at a specific step (1-10): 1=load, 2=cluster, 3=transcribe, 4=condense, 5=discover-themes, 6=extract-theme-content, 7=summarize-themes, 8=discover-entities, 9=build-website, 10=vacuum-db")
+  .option("--start-at <step>", "Start at a specific step (1-11): 1=load, 2=cluster, 3=triage, 4=transcribe, 5=condense, 6=discover-themes, 7=extract-theme-content, 8=summarize-themes, 9=discover-entities, 10=build-website, 11=vacuum-db")
   .option("-c, --concurrency <N>", "Number of concurrent operations")
+  .option("--batch", "Run per-comment LLM steps (triage, transcribe, condense, theme extraction) through the Gemini Batch API: half price, minutes-to-hours per step")
   .option("--max-crashes <N>", "Maximum number of crashes before giving up (default: 10)", parseInt)
   .option("-m, --model <model>", "Override the per-step models in batch-config.json for every step (e.g. gemini-3.8-flash, gemini-3.5-flash-lite, claude)")
   .option("--no-clustering", "Skip clustering entirely (process all comments)")
@@ -40,8 +42,9 @@ export const pipelineCommand = new Command("pipeline")
     const startStep = options.startAt ? parseInt(options.startAt) : 1;
     const maxCrashes = options.maxCrashes || 10;
     
-    if (isNaN(startStep) || startStep < 1 || startStep > 9) {
-      console.error("❌ Invalid start step. Please provide a number between 1 and 9.");
+    const STEP_COUNT = 11;
+    if (isNaN(startStep) || startStep < 1 || startStep > STEP_COUNT) {
+      console.error(`❌ Invalid start step. Please provide a number between 1 and ${STEP_COUNT}.`);
       process.exit(1);
     }
     
@@ -97,6 +100,21 @@ export const pipelineCommand = new Command("pipeline")
       },
       {
         num: 3,
+        name: "Triaging short comments",
+        icon: "🚦",
+        execute: async () => {
+          await triageCommand.parseAsync([
+            'bun', 'cli.ts',
+            documentId,
+            ...(options.debug ? ['--debug'] : []),
+            ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
+            ...(options.model ? ['--model', options.model] : []),
+            ...(options.batch ? ['--batch'] : []),
+          ]);
+        }
+      },
+      {
+        num: 4,
         name: "Transcribing comments",
         icon: "📜",
         execute: async () => {
@@ -107,11 +125,12 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
             ...(!!options.clustering ? ['--use-clustering'] : []),
+            ...(options.batch ? ['--batch'] : []),
           ]);
         }
       },
       {
-        num: 4,
+        num: 5,
         name: "Condensing comments",
         icon: "📝",
         execute: async () => {
@@ -121,11 +140,13 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.debug ? ['--debug'] : []),
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
+            ...(options.batch ? ['--batch'] : []),
+            ...(!!options.clustering ? ['--use-clustering'] : []),
           ]);
         }
       },
       {
-        num: 5,
+        num: 6,
         name: "Discovering themes",
         icon: "🔍",
         execute: async () => {
@@ -140,7 +161,7 @@ export const pipelineCommand = new Command("pipeline")
         }
       },
       {
-        num: 6,
+        num: 7,
         name: "Extracting theme content",
         icon: "🎯",
         execute: async () => {
@@ -151,11 +172,12 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
             ...(options.model ? ['--model', options.model] : []),
             ...(!!options.clustering ? ['--use-clustering'] : []),
+            ...(options.batch ? ['--batch'] : []),
           ]);
         }
       },
       {
-        num: 7,
+        num: 8,
         name: "Summarizing themes",
         icon: "📄",
         execute: async () => {
@@ -170,7 +192,7 @@ export const pipelineCommand = new Command("pipeline")
         }
       },
       {
-        num: 8,
+        num: 9,
         name: "Discovering entities",
         icon: "🏷️",
         execute: async () => {
@@ -183,7 +205,7 @@ export const pipelineCommand = new Command("pipeline")
         }
       },
       {
-        num: 9,
+        num: 10,
         name: "Building website files",
         icon: "🏗️",
         execute: async () => {
@@ -195,7 +217,7 @@ export const pipelineCommand = new Command("pipeline")
         }
       },
       {
-        num: 10,
+        num: 11,
         name: "Vacuuming database",
         icon: "🧹",
         execute: async () => {
@@ -211,17 +233,17 @@ export const pipelineCommand = new Command("pipeline")
     let crashCount = 0;
     let currentStep = startStep;
     
-    while (currentStep <= 9 && crashCount < maxCrashes) {
+    while (currentStep <= STEP_COUNT && crashCount < maxCrashes) {
       try {
         // Execute only steps from currentStep onwards
         for (const step of steps) {
           if (step.num >= currentStep) {
-            console.log(`\n${step.icon} Step ${step.num}/9: ${step.name}...`);
+            console.log(`\n${step.icon} Step ${step.num}/${STEP_COUNT}: ${step.name}...`);
             await step.execute();
             currentStep = step.num + 1; // Move to next step on success
           } else {
             if (crashCount === 0) { // Only log skipping on first attempt
-              console.log(`\n⏭️  Skipping step ${step.num}/9: ${step.name}`);
+              console.log(`\n⏭️  Skipping step ${step.num}/${STEP_COUNT}: ${step.name}`);
             }
           }
         }
