@@ -27,6 +27,8 @@ export interface GenerationResult {
 // 2026-10 trial. 3.5 Flash-Lite doesn't think unless given a thinking budget.
 export const GEMINI_MODELS: Record<string, { id: string; config?: GenerateContentConfig }> = {
   "gemini-3.8-flash": { id: "gemini-3.8-flash", config: { thinkingConfig: { thinkingLevel: "minimal" } as any } },
+  // Same model with a zero thinking budget (the API still allows a little thinking)
+  "gemini-3.8-flash-nothink": { id: "gemini-3.8-flash", config: { thinkingConfig: { thinkingBudget: 0 } } },
   "gemini-3.5-flash-lite": { id: "gemini-3.5-flash-lite" },
   // Legacy names, kept so existing commands and configs keep working
   "gemini-3-flash": { id: "gemini-3-flash-preview" },

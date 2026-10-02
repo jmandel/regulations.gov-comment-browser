@@ -35,10 +35,10 @@
       "concurrency": 5,
       "model": "gemini-3.8-flash",
       "batching": false,
-      "description": "Extracts structured sections; Flash-Lite for typed comments, 3.8 Flash for attachment letters (Flash-Lite omitted recommendations in long letters in a 2026-10 trial)",
+      "description": "Extracts structured sections; Flash-Lite for typed comments, 3.8 Flash with thinking off for attachment letters (Flash-Lite omitted recommendations in long letters; thinking added cost with no quality gain in 2026-10 trials)",
       "models": {
         "typed": "gemini-3.5-flash-lite",
-        "attachment": "gemini-3.8-flash"
+        "attachment": "gemini-3.8-flash-nothink"
       }
     },
     "discoverThemes": {
@@ -58,8 +58,8 @@
       "description": "Gate: which top-level theme groups a unit addresses; then extract only those groups. Short units are batched several per call",
       "models": {
         "gate": "gemini-3.5-flash-lite",
-        "short": "gemini-3.8-flash",
-        "long": "gemini-3.8-flash"
+        "short": "gemini-3.8-flash-nothink",
+        "long": "gemini-3.8-flash-nothink"
       },
       "thresholds": {
         "shortMaxWords": 400,

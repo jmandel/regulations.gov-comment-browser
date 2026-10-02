@@ -43,15 +43,15 @@ export interface RunSummary {
   costUsd: number;
 }
 
-// $ per 1M tokens [input, output, cached input]; batch mode is billed at half
+// $ per 1M tokens [input, output, cached input], keyed by API model ID; batch mode is billed at half
 const PRICES: Record<string, [number, number, number]> = {
   "gemini-3.8-flash": [0.75, 3.75, 0.075],
   "gemini-3.5-flash-lite": [0.30, 2.50, 0.03],
-  "gemini-3-flash": [0.50, 3.00, 0.05],
+  "gemini-3-flash-preview": [0.50, 3.00, 0.05],
 };
 
 export function estimateCost(model: string, u: UsageMetadata, batch = false): number {
-  const p = PRICES[model];
+  const p = PRICES[GEMINI_MODELS[model]?.id ?? model];
   if (!p) return 0;
   const fresh = u.promptTokenCount - u.cachedContentTokenCount;
   const cost = (fresh * p[0] + u.cachedContentTokenCount * p[2] + (u.candidatesTokenCount + (u.thoughtsTokenCount || 0)) * p[1]) / 1e6;

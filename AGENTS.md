@@ -96,11 +96,11 @@ Per-step models live in `batch-config.json` (`tasks.<step>.model`, or `tasks.<st
 |---|---|---|
 | triage | `gemini-3.5-flash-lite` | ~100 comments per call |
 | transcribe | `gemini-3.5-flash-lite`; failures retried once on `gemini-3.8-flash` (`models.fallback`) | Thinking budget and 3.8 Flash changed nothing in a trial (same length and source overlap, 2–5× cost). Flash-Lite occasionally returns an empty response for an ordinary letter |
-| condense | typed → `gemini-3.5-flash-lite`, attachment letters and promoted members → `gemini-3.8-flash` | Flash-Lite matched 3.8 on typed comments but omitted recommendations in long multi-issue letters |
-| extract-theme-content | gate → `gemini-3.5-flash-lite`; extraction → `gemini-3.8-flash` | Flash-Lite as extractor over-split themes in a blind comparison |
+| condense | typed → `gemini-3.5-flash-lite`, attachment letters and promoted members → `gemini-3.8-flash-nothink` | Flash-Lite matched 3.8 on typed comments but omitted recommendations in long multi-issue letters |
+| extract-theme-content | gate → `gemini-3.5-flash-lite`; extraction → `gemini-3.8-flash-nothink` | Flash-Lite as extractor over-split themes in a blind comparison |
 | everything else | `gemini-3.8-flash` | |
 
-Thinking: 3.5 Flash-Lite doesn't think unless given a budget. 3.8 Flash can't turn it off; it defaults to `thinkingLevel: minimal` (set in `GEMINI_MODELS`, `src/lib/llm-providers.ts`), and still spends ~1–2k thought tokens per call — often more than its visible output, so it is the largest cost line wherever 3.8 Flash runs.
+Thinking: 3.5 Flash-Lite doesn't think unless given a budget. `gemini-3.8-flash` defaults to `thinkingLevel: minimal`, which still spends ~1–2k thought tokens per call, often more than the visible output. `gemini-3.8-flash-nothink` (same model, `thinkingBudget: 0`, both in `GEMINI_MODELS` in `src/lib/llm-providers.ts`) produces no thought tokens; on attachment-letter condensing and theme extraction it cut cost 41–61% with equal or better blind-judged quality (extraction completeness 4.74 vs 4.35/5, half the omissions). Theme discovery, summaries and entities still use minimal thinking (untested without it).
 
 All per-comment LLM calls go through `runLlmRequests` (`src/lib/step-runner.ts`): live (parallel with retries) or `--batch` (`src/lib/gemini-batch.ts`: uploads a JSONL file, polls, records jobs in `batch_jobs` so a restarted step resumes the same job instead of paying twice, deletes the input file when done). Text-only results are cached in `llm_cache`. Each step prints tokens (input, cached, output, thoughts) and estimated cost at the end.
 
