@@ -1,18 +1,68 @@
 # Agents Guide
 
+## Project overview
+Regulations.gov comment analysis pipeline. Loads public comments on federal regulations, clusters similar ones, uses LLMs (primarily Gemini) to transcribe/condense/analyze themes, and builds a web dashboard.
+
+## Tech stack
+- **Runtime**: Bun (not Node.js)
+- **Language**: TypeScript
+- **Database**: SQLite (via bun:sqlite)
+- **LLMs**: Gemini (primary), Claude (secondary) — see `src/lib/llm-providers.ts`
+- **CLI**: Commander.js — entry point is `src/cli.ts`
+- **Dashboard**: React app in `dashboard/`
+
+## Key guidance
+- Never skip attachments (`-s`) unless explicitly asked
+- Use `--no-clustering` for dockets under ~1000 comments
+- Models are set per step in `batch-config.json`: `gemini-3.5-flash-lite` for mechanical work (transcription), `gemini-3.8-flash` for everything else. Don't pass `-m` to `pipeline` unless you mean to override every step
+- Default concurrency: `-c 20`
+- The `.env` file contains API keys (`GEMINI_API_KEY`, `REGSGOV_API_KEY`); the code reads `REGSGOV_API_KEY`, not `REGULATIONS_GOV_API_KEY`
+- For large dockets (>~5k comments) load with `--mirrulations` instead of the API — the API listing caps at 10k comments
+- When adding features, flags or methods, update this file in the same change
+- Design docs for proposed (not yet built) features live in `docs/design/`
+
+## ID conventions
+- **Docket ID**: e.g., `HHS-ONC-2026-0067` — the regulatory proceeding
+- **Document ID**: e.g., `HHS-ONC-2026-0067-0001` — a specific document within the docket (pipeline input)
+- **Comment ID**: e.g., `HHS-ONC-2026-0067-0042` — shares the docket prefix, not the document prefix
+- DB files are named by document ID (`dbs/HHS-ONC-2026-0067-0001.sqlite`)
+- Website output uses docket ID for URL paths (read from DB metadata at build time)
+- Old document-ID-based URLs get HTML redirects for backward compatibility
+
 ## Running the Pipeline for a Docket
 
 ### Command format
 
 ```bash
-bun run src/cli.ts pipeline <document-id> -m gemini-3-flash -c 20 --no-clustering
+bun run src/cli.ts pipeline <document-id> -c 20 --no-clustering
 ```
 
 - `<document-id>`: Document ID from regulations.gov (e.g., `CMS-2025-0058-0002`) or CSV file path
-- `-m gemini-3-flash`: Default and recommended model
+- Add `--mirrulations` for large dockets (see below)
+- Models come from `batch-config.json` per step. `-m <model>` overrides all steps at once; accepted names are `gemini-3.8-flash`, `gemini-3.5-flash-lite`, legacy `gemini-3-flash` (3 Flash preview), `gemini-pro`/`gemini-flash`/`gemini-flash-lite` (2.5), and `claude`. Add new models in `GEMINI_MODELS` in `src/lib/llm-providers.ts`
 - `-c 20`: Concurrency — safe with Gemini Tier 1 rate limits (2000 RPM)
 - `--no-clustering`: Use for dockets under ~1000 comments (most dockets)
 - The DB is created at `dbs/<document-id>.sqlite`
+
+### Choosing a load source
+
+| Source | Flag | Use when |
+|---|---|---|
+| regulations.gov API | (default) | Small dockets. The comment listing caps at 10,000 results (page 40 × 250), and the API key allows 1,000 requests/hour, so large dockets fail or take days |
+| Mirrulations S3 mirror | `--mirrulations` | Large dockets (thousands of comments). Public bucket `s3://mirrulations`, no credentials or API key; ~43k comments + 4 GB attachments load in well under an hour |
+| Bulk CSV | pass a `.csv` path | You already have a regulations.gov bulk export. Name it `<document-id>.csv` |
+
+Mirrulations options (on both `load` and `pipeline`):
+- `--whole-docket`: include comments on every document in the docket. Large rules often have two copies of the proposed rule (e.g. `-0001` and `-0002`) with comments split between them, so this is usually what you want.
+- `--fill-unavailable`: Mirrulations marks some comments `<id>_UNAVAILABLE`; this fetches those from the regulations.gov API (needs `REGSGOV_API_KEY`). Without it, they are reported and skipped.
+- `-c <N>` (load only): parallel downloads, default 16.
+
+```bash
+bun run src/cli.ts load CMS-2026-2377-0002 --mirrulations --whole-docket -c 24
+bun run src/cli.ts load CMS-2026-2377-0002 --mirrulations --whole-docket --fill-unavailable   # second pass for the gaps
+```
+
+Re-running any load is safe: comments already in the DB are skipped by ID. Attachment files missing from S3 are fetched from `downloads.regulations.gov` (no API key needed).
 
 ### Critical rules
 
@@ -26,7 +76,7 @@ bun run src/cli.ts pipeline <document-id> -m gemini-3-flash -c 20 --no-clusterin
 ### Pipeline steps (1-10)
 
 1. **load** - Load comments from regulations.gov API or CSV (downloads attachments)
-2. **cluster** - Group similar comments (skipped with `--no-clustering`)
+2. **cluster** - Group form letters (skipped with `--no-clustering`; see "Form-letter clustering" below)
 3. **transcribe** - Convert attachments/PDFs to clean markdown
 4. **condense** - Structurally summarize each comment
 5. **discover-themes** - Build hierarchical taxonomy of policy themes
@@ -51,7 +101,7 @@ bun run src/cli.ts pipeline <document-id> -m gemini-3-flash -c 20 --no-clusterin
 The pipeline has crash recovery (up to 10 retries). To manually resume from a specific step:
 
 ```bash
-bun run src/cli.ts pipeline <document-id> -m gemini-3-flash -c 20 --start-at <step-number>
+bun run src/cli.ts pipeline <document-id> -c 20 --start-at <step-number>
 ```
 
 ### Verifying results
@@ -70,5 +120,30 @@ sqlite3 dbs/<id>.sqlite "
   FROM comment_clusters cc
   JOIN comments c ON cc.representative_comment_id = c.id
   ORDER BY cc.cluster_size DESC LIMIT 5;
+"
+```
+
+### Form-letter clustering
+
+Step 2 defaults to `cluster-form-letters` (`--cluster-method form-letters`); the older whole-comment n-gram clusterer is still available as `--cluster-method fast` / the `cluster-comments-fast` command.
+
+How it works (`src/commands/cluster-form-letters.ts`):
+- Text per comment = comment field + attachment text. Attachment text is extracted locally (`pdftotext`, `pandoc`; no LLM) and cached in `attachment_text`, so reruns take under a minute.
+- "See attached"-style stubs (<40 words of form text when attachments have text) are dropped so they can't link unrelated letters.
+- A 5-word phrase is *shared* if it appears in ≥5 comments (`--min-shared-df`). Comments whose text is ≥30% shared (`--min-shared-fraction`), or short comments (<30 phrases) that are ≥80% shared, are linked when their shared text has Jaccard ≥0.5 (`--similarity-threshold`), via MinHash LSH + union-find, then split around a medoid so chained campaigns don't merge. Groups under 4 (`--min-cluster-size`) become singletons.
+- Each group's template = phrases in ≥50% of members; the representative is the member closest to the template. Each member's own added text goes in `form_letter_additions`.
+- Members adding ≥300 words (`--promote-added-words`), typically organizations that used a campaign letter and appended their own material, are promoted to their own singleton cluster (`form_letter_additions.promoted = 1` keeps the link).
+- Every comment gets a membership row (ungrouped comments are singletons).
+
+Reference run: CMS-2026-2377 (CY2027 PFS, 43.1k comments) → 320 groups covering 23.4k comments, 20.0k units after collapsing, 349 promoted members; ~3 min including text extraction, ~40 s with cached text. Of the ungrouped, ~8k typed comments share <10% of their text with other comments, i.e. word overlap can't collapse them further (paraphrased campaigns would need semantic similarity).
+
+Check group tightness after clustering — `similarity_score` is the member's coverage of its group template, so loose groups show low average coverage or large additions:
+```bash
+sqlite3 dbs/<id>.sqlite "
+  SELECT cc.cluster_size, cc.representative_comment_id, round(avg(m.similarity_score),2) avg_cov,
+         round(avg(COALESCE(fa.added_word_count,0))) avg_added
+  FROM comment_clusters cc JOIN comment_cluster_membership m USING(cluster_id)
+  LEFT JOIN form_letter_additions fa ON fa.comment_id = m.comment_id AND fa.promoted = 0
+  WHERE cc.cluster_size >= 4 GROUP BY cc.cluster_id ORDER BY cc.cluster_size DESC LIMIT 20;
 "
 ```
