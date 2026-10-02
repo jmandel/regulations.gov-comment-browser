@@ -9,6 +9,7 @@ import { useState } from 'react'
 import type { Comment, ThemeExtract } from '../types'
 import CopyCommentsModal from './CopyCommentsModal'
 import { useCommentContent } from '../utils/commentData'
+import CampaignBadge from './CampaignBadge'
 
 // True once the element has come within ~1 screen of the viewport
 function useNearViewport<T extends Element>(enabled: boolean) {
@@ -93,6 +94,7 @@ function CommentCard({
             <h4 className="font-semibold text-gray-900 truncate">{comment.submitter}</h4>
             <span className="text-sm text-gray-600 flex-shrink-0 hidden sm:inline">• {comment.submitterType}</span>
           </div>
+          <CampaignBadge comment={comment} />
           {/* Cluster Badge */}
           {comment.clusterSize && comment.clusterSize > 1 && comment.isClusterRepresentative && (
             <span 

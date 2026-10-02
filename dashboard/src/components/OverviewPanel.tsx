@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { MessageSquare, BarChart3, Tag, Users, ArrowRight, FileText } from 'lucide-react'
+import { MessageSquare, BarChart3, Tag, Users, ArrowRight, FileText, Megaphone } from 'lucide-react'
 import useStore from '../store/useStore'
 import StatCard from './StatCard'
 
 
 function OverviewPanel() {
-  const { meta, themes, entities, comments } = useStore()
+  const { meta, themes, entities, comments, campaigns } = useStore()
   const navigate = useNavigate()
   const stats = meta?.stats || {
     totalComments: 0,
@@ -119,6 +119,36 @@ function OverviewPanel() {
           />
         </Link>
       </div>
+
+      {/* Organized campaigns (tag-campaigns): each comment counts in at most one campaign */}
+      {campaigns.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-amber-600" /> Organized campaigns
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {(stats.campaignComments ?? campaigns.reduce((s, c) => s + c.total, 0)).toLocaleString()} of {stats.totalComments.toLocaleString()} comments
+                {stats.totalComments ? ` (${Math.round(((stats.campaignComments ?? 0) / stats.totalComments) * 100)}%)` : ''} belong to {campaigns.length.toLocaleString()} campaigns;
+                {' '}{(stats.paraphrasedCampaignComments ?? campaigns.reduce((s, c) => s + c.paraphrased, 0)).toLocaleString()} of those are reworded letters rather than copies.
+              </p>
+            </div>
+            <Link to="/campaigns" className="text-sm text-blue-600 hover:underline flex items-center gap-1 flex-shrink-0">
+              All <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="mt-3 space-y-1">
+            {campaigns.slice(0, 6).map(c => (
+              <Link key={c.id} to={`/campaigns/${c.id}`} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50">
+                <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">{c.name}</span>
+                <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:inline">{c.paraphrased > 0 ? `${c.paraphrased.toLocaleString()} reworded` : 'copies'}</span>
+                <span className="text-sm text-blue-600 font-medium flex-shrink-0 tabular-nums">{c.total.toLocaleString()}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Themes */}

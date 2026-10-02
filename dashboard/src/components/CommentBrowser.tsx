@@ -17,10 +17,11 @@ interface FilterOptions {
   themes: string[]
   entities: string[]
   submitterTypes: string[]
+  campaigns?: string[]
   searchQuery: string
 }
 
-type PrefixType = 'theme' | 'entity' | 'type'
+type PrefixType = 'theme' | 'entity' | 'type' | 'campaign'
 
 interface PrefixDetection {
   type: PrefixType
@@ -28,7 +29,7 @@ interface PrefixDetection {
   prefixStart: number
 }
 
-const PREFIX_REGEX = /(?:^|\s)(theme|entity|type):(.*)$/i
+const PREFIX_REGEX = /(?:^|\s)(theme|entity|type|campaign):(.*)$/i
 
 function detectPrefix(query: string, cursorPos: number): PrefixDetection | null {
   const textToCursor = query.slice(0, cursorPos)
@@ -43,7 +44,7 @@ function detectPrefix(query: string, cursorPos: number): PrefixDetection | null 
 }
 
 function CommentBrowser() {
-  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering } = useStore()
+  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering, campaigns = [] } = useStore()
   const [searchParams] = useSearchParams()
   const [page, setPage] = useState(0)
   const [showCopyModal, setShowCopyModal] = useState(false)
@@ -88,6 +89,10 @@ function CommentBrowser() {
         ...prev,
         submitterTypes: [submitterType]
       }))
+    }
+    const campaign = searchParams.get('campaign')
+    if (campaign) {
+      setFilters((prev: FilterOptions) => ({ ...prev, campaigns: [campaign] }))
     }
   }, [searchParams, setFilters])
 
@@ -204,10 +209,20 @@ function CommentBrowser() {
           }))
           .filter(item => !q || item.label.toLowerCase().includes(q))
 
+      case 'campaign':
+        return campaigns
+          .map(c => ({
+            key: String(c.id),
+            label: c.name,
+            count: c.total,
+            selected: (filters?.campaigns || []).includes(String(c.id)),
+          }))
+          .filter(item => !q || item.label.toLowerCase().includes(q))
+
       default:
         return []
     }
-  }, [inlinePickerType, inlineFilterText, themes, entities, availableSubmitterTypes, filters])
+  }, [inlinePickerType, inlineFilterText, themes, entities, availableSubmitterTypes, filters, campaigns])
 
   // Reset highlight when items change
   useEffect(() => {
@@ -291,6 +306,12 @@ function CommentBrowser() {
     handleFilterChange('submitterTypes', updated)
   }, [filters?.submitterTypes, handleFilterChange])
 
+  const handleToggleCampaign = useCallback((id: string) => {
+    const current = filters?.campaigns || []
+    const updated = current.includes(id) ? current.filter((v: string) => v !== id) : [...current, id]
+    handleFilterChange('campaigns', updated)
+  }, [filters?.campaigns, handleFilterChange])
+
   const handleInlineSelect = useCallback((key: string) => {
     if (!inlinePickerType) return
 
@@ -304,11 +325,12 @@ function CommentBrowser() {
       case 'theme': handleToggleTheme(key); break
       case 'entity': handleToggleEntity(key); break
       case 'type': handleToggleSubmitterType(key); break
+      case 'campaign': handleToggleCampaign(key); break
     }
 
     closeInlinePicker()
     setTimeout(() => searchInputRef.current?.focus(), 0)
-  }, [inlinePickerType, localSearchQuery, prefixStart, debouncedSetSearchQuery, closeInlinePicker, handleToggleTheme, handleToggleEntity, handleToggleSubmitterType])
+  }, [inlinePickerType, localSearchQuery, prefixStart, debouncedSetSearchQuery, closeInlinePicker, handleToggleTheme, handleToggleEntity, handleToggleSubmitterType, handleToggleCampaign])
 
   const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!inlinePickerType || inlinePickerItems.length === 0) return
@@ -346,6 +368,7 @@ function CommentBrowser() {
         submitterTypes: [],
         themes: [],
         entities: [],
+        campaigns: [],
         searchQuery: ''
       }))
       setPage(0)
@@ -363,6 +386,7 @@ function CommentBrowser() {
   const inlinePickerLabel = inlinePickerType === 'theme' ? 'Select theme...'
     : inlinePickerType === 'entity' ? 'Select entity...'
     : inlinePickerType === 'type' ? 'Select submitter type...'
+    : inlinePickerType === 'campaign' ? 'Select campaign...'
     : ''
 
   return (
@@ -467,6 +491,8 @@ function CommentBrowser() {
           themes={filters.themes || []}
           entities={filters.entities || []}
           submitterTypes={filters.submitterTypes || []}
+          campaigns={(filters.campaigns || []).map(id => ({ id, name: campaigns.find(c => String(c.id) === id)?.name || `Campaign ${id}` }))}
+          onRemoveCampaign={(id) => handleFilterChange('campaigns', (filters.campaigns || []).filter((v: string) => v !== id))}
           themeList={themes}
           entityMap={entities}
           onRemoveSearchToken={handleRemoveSearchToken}

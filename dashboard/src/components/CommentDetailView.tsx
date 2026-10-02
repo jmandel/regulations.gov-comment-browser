@@ -7,6 +7,7 @@ import { getRegulationsGovUrl, formatDate } from '../utils/helpers'
 import useStore from '../store/useStore'
 import type { Comment } from '../types'
 import { useCommentContent } from '../utils/commentData'
+import CampaignBadge from './CampaignBadge'
 
 interface CommentDetailViewProps {
   comment: Comment
@@ -37,6 +38,7 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
             <span className="text-sm text-gray-600 flex-shrink-0 hidden sm:inline">• {comment.submitterType}</span>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+            <CampaignBadge comment={comment} />
             {/* Cluster Badge */}
             {comment.clusterSize && comment.clusterSize > 1 && comment.isClusterRepresentative && (
               <span

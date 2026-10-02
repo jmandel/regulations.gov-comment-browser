@@ -297,6 +297,47 @@ export function initSchema(db: Database) {
     CREATE INDEX IF NOT EXISTS idx_cluster_membership_cluster ON comment_cluster_membership(cluster_id);
     CREATE INDEX IF NOT EXISTS idx_cluster_membership_representative ON comment_cluster_membership(is_representative);
     CREATE INDEX IF NOT EXISTS idx_cluster_representative ON comment_clusters(representative_comment_id);
+
+    -- Cached text embeddings (tag-campaigns); vector = L2-normalized Float32 array
+    CREATE TABLE IF NOT EXISTS comment_embeddings (
+      comment_id TEXT NOT NULL,
+      model TEXT NOT NULL,
+      dims INTEGER NOT NULL,
+      text_hash TEXT NOT NULL,
+      vector BLOB NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (comment_id, model, dims)
+    );
+
+    -- Organized comment campaigns (tag-campaigns). Tags only: clusters/units are not changed.
+    -- method: 'paraphrase' (LLM-verified group of reworded letters, may include exact-copy groups)
+    --         or 'form-letter' (a large exact-copy group on its own)
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      method TEXT NOT NULL,
+      evidence TEXT,               -- judge's stated shared features (paraphrase campaigns)
+      level REAL,                  -- cosine cut level the group was accepted at
+      unit_count INTEGER NOT NULL, -- distinct analysis units (form-letter groups count once)
+      exact_count INTEGER NOT NULL,
+      paraphrase_count INTEGER NOT NULL,
+      total_count INTEGER NOT NULL,
+      model TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- A comment belongs to at most one campaign; how = 'exact' (member of a form-letter group in
+    -- the campaign) or 'paraphrase'; similarity = cosine of its unit to the campaign centroid
+    CREATE TABLE IF NOT EXISTS comment_campaigns (
+      comment_id TEXT PRIMARY KEY,
+      campaign_id INTEGER NOT NULL,
+      how TEXT NOT NULL CHECK(how IN ('exact', 'paraphrase')),
+      similarity REAL,
+      FOREIGN KEY (comment_id) REFERENCES comments(id),
+      FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_comment_campaigns_campaign ON comment_campaigns(campaign_id);
   `);
 }
 

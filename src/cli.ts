@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { loadCommentsCommand } from "./commands/load-comments";
 import { clusterCommentsFastCommand } from "./commands/cluster-comments-fast";
 import { clusterFormLettersCommand } from "./commands/cluster-form-letters";
+import { tagCampaignsCommand } from "./commands/tag-campaigns";
 import { transcribeCommand } from "./commands/transcribe";
 import { triageCommand } from "./commands/triage";
 import { condenseCommand } from "./commands/condense";
@@ -27,6 +28,7 @@ const program = new Command()
 program.addCommand(loadCommentsCommand);
 program.addCommand(clusterCommentsFastCommand);
 program.addCommand(clusterFormLettersCommand);
+program.addCommand(tagCampaignsCommand);
 program.addCommand(transcribeCommand);
 program.addCommand(triageCommand);
 program.addCommand(condenseCommand);

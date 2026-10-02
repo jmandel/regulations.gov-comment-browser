@@ -74,19 +74,20 @@ Re-running any load is safe: comments already in the DB are skipped by ID. Attac
 
 2. **Use `--no-clustering` for small dockets.** Dockets under ~1000 comments don't benefit from clustering and it can cause problems (especially with many attachment-only comments). Only enable clustering for 1000+ comment dockets.
 
-### Pipeline steps (1-11)
+### Pipeline steps (1-12)
 
 1. **load** - Load comments from regulations.gov API, Mirrulations or CSV (downloads attachments)
 2. **cluster** - Group form letters (skipped with `--no-clustering`; see "Form-letter clustering" below)
-3. **triage** - Label short ungrouped typed comments (<80 words) `no_substance` / `stance_only` / `substantive`, batched ~100 per Flash-Lite call. Condense skips the first two; theme extraction skips `no_substance` and reads `stance_only` comments' raw text so they still count toward themes
-4. **transcribe** - Convert attachments/PDFs to clean markdown. Comments without attachments are stored as-is with no LLM call
-5. **condense** - Structurally summarize each comment
-6. **discover-themes** - Build hierarchical taxonomy of policy themes from a sample: every form-letter template, promoted member and attachment letter, plus `thresholds.typedSample` (1,000) seeded-random typed comments (`--typed-sample`, `--seed`; triaged-out comments excluded). On PFS: ~4,870 units, 15 batches, 3 merges
-7. **extract-theme-content** - Extract theme-specific text from each comment, in two phases (see below)
-8. **summarize-themes** - Synthesize extracts into narrative theme analysis, in phases across all themes: per-batch summaries, level-by-level 4-way merges, then JSON structuring (includes post-processing to fix partial comment IDs). Sub-themes need ≥5 extracts (`thresholds.minCommentsPerTheme`). Top-level themes with sub-themes instead get a *group report* (Phase 4) synthesized from their sub-themes' reports plus their direct extracts — extraction files content under the most specific theme, so a top-level theme's own extracts are a small slice. Group reports are marked `reportType: "group"` and rebuilt when a sub-theme is re-summarized (or with `--force`); ~$1.50 for 11 groups on the 1-in-20 PFS sample
-9. **discover-entities** - Build an entity taxonomy from a seeded sample in one call, then tag every unit's text by term matching (local, no LLM). Entities need mentions in min(1%, 10) units
-10. **build-website** - Export analysis for the web dashboard (uses docket ID from DB metadata for output paths). Writes a lean `comments-index.json` loaded at startup (form-letter members point to their representative plus a snippet of their own added text) and on-demand data: `comment-details/` and `comment-text/` shards (condensed sections; full text from the transcription), `theme-extracts/<code>.json`, and a `search/` word index. At PFS scale (43k comments) startup downloads ~3.4 MB gzipped
-11. **vacuum-db** - Optimize SQLite database
+3. **tag-campaigns** - Optional (`--tag-campaigns`): tag organized campaigns, including paraphrased ones that clustering can't see. Tags only; units are unchanged. See "Campaign tagging" below
+4. **triage** - Label short ungrouped typed comments (<80 words) `no_substance` / `stance_only` / `substantive`, batched ~100 per Flash-Lite call. Condense skips the first two; theme extraction skips `no_substance` and reads `stance_only` comments' raw text so they still count toward themes
+5. **transcribe** - Convert attachments/PDFs to clean markdown. Comments without attachments are stored as-is with no LLM call
+6. **condense** - Structurally summarize each comment
+7. **discover-themes** - Build hierarchical taxonomy of policy themes from a sample: every form-letter template, promoted member and attachment letter, plus `thresholds.typedSample` (1,000) seeded-random typed comments (`--typed-sample`, `--seed`; triaged-out comments excluded). On PFS: ~4,870 units, 15 batches, 3 merges
+8. **extract-theme-content** - Extract theme-specific text from each comment, in two phases (see below)
+9. **summarize-themes** - Synthesize extracts into narrative theme analysis, in phases across all themes: per-batch summaries, level-by-level 4-way merges, then JSON structuring (includes post-processing to fix partial comment IDs). Sub-themes need ≥5 extracts (`thresholds.minCommentsPerTheme`). Top-level themes with sub-themes instead get a *group report* (Phase 4) synthesized from their sub-themes' reports plus their direct extracts — extraction files content under the most specific theme, so a top-level theme's own extracts are a small slice. Group reports are marked `reportType: "group"` and rebuilt when a sub-theme is re-summarized (or with `--force`); ~$1.50 for 11 groups on the 1-in-20 PFS sample
+10. **discover-entities** - Build an entity taxonomy from a seeded sample in one call, then tag every unit's text by term matching (local, no LLM). Entities need mentions in min(1%, 10) units
+11. **build-website** - Export analysis for the web dashboard (uses docket ID from DB metadata for output paths). Writes a lean `comments-index.json` loaded at startup (form-letter members point to their representative plus a snippet of their own added text) and on-demand data: `comment-details/` and `comment-text/` shards (condensed sections; full text from the transcription), `theme-extracts/<code>.json`, a `search/` word index, and `campaigns.json` (when step 3 ran; each index entry carries its `campaign` id). At PFS scale (43k comments) startup downloads ~3.4 MB gzipped
+12. **vacuum-db** - Optimize SQLite database
 
 ### Models and cost
 
@@ -101,12 +102,13 @@ Per-step models live in `batch-config.json` (`tasks.<step>.model`, or `tasks.<st
 | discover-themes | `gemini-3.8-flash` (minimal thinking) | Without thinking it found fewer themes and missed issues (won 3 of 4 blind comparisons with thinking) |
 | summarize-themes | `gemini-3.8-flash` (minimal thinking) | Slightly better summaries and JSON structuring with thinking (7.69 vs 7.31); ~$3.6 difference at PFS scale |
 | discover-entities | `gemini-3.8-flash-nothink` | Won both blind comparisons and kept more entities |
+| tag-campaigns | judge/merge/expand → `gemini-3.8-flash-nothink`; naming → `gemini-3.5-flash-lite`; embeddings `gemini-embedding-2` | Flash-Lite as judge accepted 71% of candidate groups, including plainly independent dermatology letters; 3.8 Flash without thinking matched hand review far better |
 
 Thinking: 3.5 Flash-Lite doesn't think unless given a budget. `gemini-3.8-flash` defaults to `thinkingLevel: minimal`, which still spends ~1–2k thought tokens per call, often more than the visible output. `gemini-3.8-flash-nothink` (same model, `thinkingBudget: 0`, both in `GEMINI_MODELS` in `src/lib/llm-providers.ts`) produces no thought tokens; on attachment-letter condensing and theme extraction it cut cost 41–61% with equal or better blind-judged quality (extraction completeness 4.74 vs 4.35/5, half the omissions). Theme discovery, summaries and entities still use minimal thinking (untested without it).
 
 All per-comment LLM calls go through `runLlmRequests` (`src/lib/step-runner.ts`): live (parallel with retries) or `--batch` (`src/lib/gemini-batch.ts`: uploads a JSONL file, polls, records jobs in `batch_jobs` so a restarted step resumes the same job instead of paying twice, deletes the input file when done). Text-only results are cached in `llm_cache`. Each step prints tokens (input, cached, output, thoughts) and estimated cost at the end.
 
-**Theme extraction (step 7)**: *Short units* (≤400 words): a Flash-Lite *gate* picks the top-level theme groups each unit substantively discusses (40 units per call, stored in `comment_theme_groups`), then extraction runs per gated group, batching up to 15 short units per call. *Long units* (`thresholds.longMode: "full"`, the default): no gate — one call per unit with the whole taxonomy, recorded in `comment_theme_extract_status` under group `*`. Every extraction prompt puts the instructions and themes first and the comment(s) last, so Gemini's implicit cache reuses the shared prefix (63% of long-unit input was cached in testing), and the model emits only themes the comment substantively addresses. `--long-mode gated` restores per-group calls for long units; `--gate-only` runs just the gate; reruns resume per (unit, group).
+**Theme extraction (step 8)**: *Short units* (≤400 words): a Flash-Lite *gate* picks the top-level theme groups each unit substantively discusses (40 units per call, stored in `comment_theme_groups`), then extraction runs per gated group, batching up to 15 short units per call. *Long units* (`thresholds.longMode: "full"`, the default): no gate — one call per unit with the whole taxonomy, recorded in `comment_theme_extract_status` under group `*`. Every extraction prompt puts the instructions and themes first and the comment(s) last, so Gemini's implicit cache reuses the shared prefix (63% of long-unit input was cached in testing), and the model emits only themes the comment substantively addresses. `--long-mode gated` restores per-group calls for long units; `--gate-only` runs just the gate; reruns resume per (unit, group).
 
 Evidence (292-unit PFS fixture, blind-judged by 3.8 Flash at high thinking): versus the original one-call-per-group-per-unit design, gated extraction cost ~$0.018 vs $0.104/unit with ~93% content-level recall; for long units, the full-taxonomy call then beat gated per-group calls on accuracy (4.91 vs 4.84/5), completeness (4.67 vs 4.62), theme fit (4.56 vs 4.10) and errors (0.11 vs 0.22/unit), preferred 47–20, at 43% lower cost — gate misses on long letters were the main source of lost content.
 
@@ -172,3 +174,25 @@ sqlite3 dbs/<id>.sqlite "
   WHERE cc.cluster_size >= 4 GROUP BY cc.cluster_id ORDER BY cc.cluster_size DESC LIMIT 20;
 "
 ```
+
+### Campaign tagging
+
+`tag-campaigns` (`src/commands/tag-campaigns.ts`, pipeline step 3 with `--tag-campaigns`; off by default because it costs ~$3–4 and ~4 min of CPU at PFS scale, and its precision is good but not exact) finds organized campaigns, including *paraphrased* ones: senders given a brief or talking points (often AI-personalized) whose letters share an ask and structure but little wording.
+
+```bash
+bun run src/cli.ts tag-campaigns <document-id> -c 20 [--report groups.json]
+```
+
+How it works:
+1. **Units**: form-letter representatives (≥10 words) and ungrouped comments (≥40 words); text = typed comment + attachment text, first 1,500 words. Embedded with `gemini-embedding-2` (768-d, $0.20/1M tokens), cached in `comment_embeddings` (keyed by text hash), so reruns are free.
+2. **Candidates**: average-linkage clustering of the embeddings (all pairs ≥ `levels[0]` → connected components → NN-chain linkage per component), cut at cosine 0.92; groups of ≥4 units.
+3. **Judge**: 3.8 Flash (no thinking) reads 10 letters spread from most to least typical (first 300 words each) and answers campaign / mixed / same_topic, with quoted evidence and a name. Mixed or same_topic groups are split at 0.94, then 0.96, and re-judged.
+4. Form-letter groups of ≥10 (`minExact`) not in an accepted group become exact-only campaigns (named by Flash-Lite).
+5. **Merge**: campaigns whose centroids are within average-linkage 0.95 are shown to the LLM together, which says which are the same campaign (e.g. a form letter and its reworded versions; one brief split by sender type).
+6. **Expand**: unassigned units with ≥2 members of one campaign at ≥0.92 are checked by the LLM against that campaign (12 per call). A "yes" counts only if the quoted shared phrase (≥6 words) occurs in the candidate and in ≥2 members and is specific to the campaign (in <1% of units, or mostly in that campaign's units); without that check the expansion added mostly same-topic letters.
+7. **Tags** (`campaigns`, `comment_campaigns`): a form-letter representative brings its whole exact-copy group and members promoted out of it (`how = 'exact'`); other units are `paraphrase`. A comment is in at most one campaign, so campaign counts never double-count. `campaigns.method` is `paraphrase` when any member is reworded, else `form-letter`.
+
+Thresholds and evidence (CMS-2026-2377, 15.4k units): random-pair cosine median 0.75, p99 0.887. At 0.92, 3,423 units fall in 361 groups; the judge accepted 214 (+14 after splits). Hand review of a stratified sample of 26 accepted groups: 19 clear campaigns (shared citation strings such as "Section (46), Lactation Care Services, CPT codes 978XX and 978X1, 91 FR 43890 to 43891", identical openings, letterhead, leftover `[placeholders]`), 4 plausible (employer-organized staff letters, shared talking points), 3 same-topic (dermatology/modifier-25 letters). The errors are all in the dense modifier-25 topic; rejected groups sampled were all correctly independent. Expansion, after the phrase check: ~11 of 14 sampled additions were real members. Result: 292 campaigns, 25,675 comments (23,221 exact, 2,454 reworded); 211 campaigns include reworded letters. Recall against known campaigns (ungrouped comments matching each campaign's keywords): skilled-nursing technical correction 173/173, lactation 978XX 68%, OT-on-SLP 67%, G2211/MOD1 60%, "50% cut to same-day care" 50%, health coaching 0591T 55%; most misses are personal stories with too little shared wording to cross 0.92. Cost on PFS: embeddings ~$1.7, LLM ~$1.9 (judge $1.1, expansion $0.7).
+
+Dashboard: a Campaigns tab (list with exact vs reworded counts, detail page with form-letter groups and reworded letters), a campaign badge on comment cards and details, a `campaign:` picker in comment search (also `#/comments?campaign=<id>`), and an Overview panel.
+

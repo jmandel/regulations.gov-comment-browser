@@ -104,6 +104,24 @@
         "minUnitsCap": 10
       }
     },
+    "tagCampaigns": {
+      "concurrency": 10,
+      "model": "gemini-3.8-flash-nothink",
+      "description": "Embeds units (gemini-embedding-2), groups them by average-linkage cosine at levels[0], and has an LLM judge each group as a campaign (common template/brief) or same-topic letters; rejected groups are split at the next level and re-judged. Then merges duplicate campaigns (centroids >= mergeLevel, LLM-confirmed) and adds near-miss comments (>= expandMinNeighbors members at >= expandLevel, LLM-confirmed). Judge: 3.5 Flash-Lite accepted 71% of candidate groups including plainly independent dermatology letters; 3.8 Flash without thinking was stricter and matched hand review",
+      "models": {
+        "judge": "gemini-3.8-flash-nothink",
+        "name": "gemini-3.5-flash-lite"
+      },
+      "thresholds": {
+        "levels": [0.92, 0.94, 0.96],
+        "minUnits": 4,
+        "minExact": 10,
+        "mergeLevel": 0.95,
+        "expandLevel": 0.92,
+        "expandMinNeighbors": 2,
+        "embeddingModel": "gemini-embedding-2"
+      }
+    },
     "loadComments": {
       "rateLimiting": {
         "apiCallDelay": 1200,

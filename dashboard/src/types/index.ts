@@ -7,7 +7,27 @@ export interface Meta {
     totalThemes: number
     totalEntities: number
     scoredComments: number
+    // Present when tag-campaigns ran; each comment is in at most one campaign
+    campaigns?: number
+    campaignComments?: number
+    paraphrasedCampaignComments?: number
+    paraphraseCampaigns?: number
   }
+}
+
+// An organized comment campaign (campaigns.json, from tag-campaigns). method 'paraphrase': has
+// reworded letters (maybe plus exact-copy groups); 'form-letter': exact-copy groups only.
+export interface Campaign {
+  id: number
+  name: string
+  description?: string | null
+  method: 'paraphrase' | 'form-letter'
+  evidence?: string | null
+  total: number
+  exact: number
+  paraphrased: number
+  units: number
+  example?: string
 }
 
 export interface Theme {
@@ -144,6 +164,9 @@ export interface Comment {
   // Form-letter members: words this member added to the template, and the start of that text
   addedWords?: number
   addedSnippet?: string
+  // Organized campaign this comment belongs to, and whether it is a reworded (not exact) copy
+  campaignId?: number
+  campaignParaphrase?: boolean
   // Shards holding this comment's content (for members: the representative's)
   detailShard?: number
   textShard?: number
@@ -174,6 +197,8 @@ export interface CommentsIndexFile {
     textShard?: number
     themes?: string[]
     entities?: number[]
+    campaign?: number
+    campaignParaphrase?: boolean
   }>
 }
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile } from '../types'
+import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile, Campaign } from '../types'
 import { parseThemeDescription } from '../utils/helpers'
 import { parseSearchQuery, matchesSearchQuery } from '../utils/searchParser'
 import { loadSearchIndex, searchWithIndex, verifyCandidates } from '../utils/fullTextSearch'
@@ -8,6 +8,7 @@ interface FilterOptions {
   themes: string[]
   entities: string[]
   submitterTypes: string[]
+  campaigns?: string[] // campaign ids
   searchQuery: string
 }
 
@@ -34,6 +35,8 @@ interface StoreState {
   comments: Comment[]
   commentsById: Map<string, Comment>
   units: Comment[] // comments with their own content: representatives, or all without clustering
+  campaigns: Campaign[]
+  campaignsById: Map<number, Campaign>
   hasClustering: boolean
   filters: FilterOptions
   searchQuery: string
@@ -143,6 +146,8 @@ const useStore = create<StoreState>((set, get) => {
     comments: [],
     commentsById: new Map(),
     units: [],
+    campaigns: [],
+    campaignsById: new Map(),
     hasClustering: false,
     themeIndex: {},
     entityIndex: {},
@@ -163,6 +168,7 @@ const useStore = create<StoreState>((set, get) => {
       themes: [],
       entities: [],
       submitterTypes: [],
+      campaigns: [],
       searchQuery: ''
     },
 
@@ -202,12 +208,14 @@ const useStore = create<StoreState>((set, get) => {
           if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`)
           return r.json()
         })
-        const [meta, themes, themeSummaries, entities, index] = await Promise.all([
+        const [meta, themes, themeSummaries, entities, index, campaigns] = await Promise.all([
           getJson('./data/meta.json'),
           getJson('./data/themes.json'),
           getJson('./data/theme-summaries.json'),
           getJson('./data/entities.json'),
           getJson('./data/comments-index.json') as Promise<CommentsIndexFile>,
+          // Optional: only present when tag-campaigns ran
+          (getJson('./data/campaigns.json') as Promise<Campaign[]>).catch(() => [] as Campaign[]),
         ])
         const t0 = performance.now()
 
@@ -246,6 +254,8 @@ const useStore = create<StoreState>((set, get) => {
           comments,
           commentsById,
           units,
+          campaigns,
+          campaignsById: new Map(campaigns.map(c => [c.id, c])),
           hasClustering: index.clustered,
           themeIndex,
           entityIndex,
@@ -297,6 +307,12 @@ const useStore = create<StoreState>((set, get) => {
             return c.entities!.some(e => e.category === category && e.label === label)
           })
         })
+      }
+
+      // Apply campaign filters (a unit's tag covers its exact-copy members)
+      if (state.filters.campaigns?.length) {
+        const wanted = new Set(state.filters.campaigns.map(Number))
+        filtered = filtered.filter(c => c.campaignId !== undefined && wanted.has(c.campaignId))
       }
 
       // Apply submitter type filters
@@ -361,6 +377,10 @@ function expandCommentsIndex(index: CommentsIndexFile) {
       for (const code of raw.themes) c.themeScores[code] = 1
     }
     if (raw.entities) c.entities = raw.entities.map(i => entityObjects[i])
+    if (raw.campaign !== undefined) {
+      c.campaignId = raw.campaign
+      if (raw.campaignParaphrase) c.campaignParaphrase = true
+    }
     if (raw.addedWords) {
       c.addedWords = raw.addedWords
       c.addedSnippet = raw.addedSnippet

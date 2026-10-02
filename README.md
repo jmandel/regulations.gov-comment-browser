@@ -107,14 +107,14 @@ bun run cli vacuum-db CMS-2025-0050-0031
 
 ### `pipeline` - Run the Full Pipeline
 
-Execute the entire 8-step pipeline in sequence with automatic crash recovery.
+Execute the entire 12-step pipeline in sequence with automatic crash recovery.
 
 ```bash
 # Run the complete pipeline with a CSV file
 bun run cli pipeline CMS-2025-0050-0031.csv
 
-# Start from a specific step (e.g., step 4 = extract-theme-content)
-bun run cli pipeline CMS-2025-0050-0031.csv --start-at 4
+# Start from a specific step (e.g., step 8 = extract-theme-content; see `--help` for the list)
+bun run cli pipeline CMS-2025-0050-0031.csv --start-at 8
 
 # Filter duplicates and set a similarity threshold
 bun run cli pipeline CMS-2025-0050-0031.csv --filter-duplicates --similarity-threshold 0.75

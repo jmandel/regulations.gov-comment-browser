@@ -55,6 +55,7 @@ function SearchHelpModal({ isOpen, onClose }: SearchHelpModalProps) {
                 <Row syntax="theme:" desc="Filter by theme" />
                 <Row syntax="entity:" desc="Filter by entity" />
                 <Row syntax="type:" desc="Filter by submitter type" />
+                <Row syntax="campaign:" desc="Filter by organized campaign" />
               </tbody>
             </table>
             <p className="text-xs text-gray-400 mt-1.5">

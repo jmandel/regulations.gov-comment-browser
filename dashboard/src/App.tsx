@@ -10,6 +10,8 @@ import EntityBrowser from './components/EntityBrowser'
 import EntityDetail from './components/EntityDetail'
 import CommentBrowser from './components/CommentBrowser'
 import CommentDetail from './components/CommentDetail'
+import CampaignBrowser from './components/CampaignBrowser'
+import CampaignDetail from './components/CampaignDetail'
 import LoadingScreen from './components/LoadingScreen'
 import ErrorScreen from './components/ErrorScreen'
 import ScrollToTop from './components/ScrollToTop'
@@ -38,6 +40,8 @@ function App() {
           <Route path="entities/:category/:label" element={<EntityDetail />} />
           <Route path="comments" element={<CommentBrowser />} />
           <Route path="comments/:commentId" element={<CommentDetail />} />
+          <Route path="campaigns" element={<CampaignBrowser />} />
+          <Route path="campaigns/:campaignId" element={<CampaignDetail />} />
         </Route>
       </Routes>
     </HashRouter>
