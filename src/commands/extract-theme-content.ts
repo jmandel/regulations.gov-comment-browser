@@ -419,31 +419,44 @@ async function extractThemeContent(documentId: string, options: any) {
     for (const u of fullUnits) touched.add(u.id);
     const allCodes = new Set(themeGroups.flatMap(g => [...g.themeCodes]));
     const prefix = buildThemeExtractPrefix(themeGroups.map(g => g.hierarchyText).join("\n\n"));
-    const requests: LlmRequest[] = fullUnits.map(u => ({
-      key: `full-${u.id}`,
-      model: models.long,
-      parts: [{ text: prefix }, { text: buildThemeExtractComments([{ id: 'c1', text: u.text }]) }],
-      config: { responseMimeType: "application/json" },
-    }));
-    const byKey = new Map(fullUnits.map(u => [`full-${u.id}`, u]));
-    phases.push(["extract long full", await runLlmRequests(requests, async (req, res) => {
-      const u = byKey.get(req.key)!;
-      if (options.debug) await debugSave(`theme_extract_${req.key}_response.txt`, res.text);
-      let parsed = parseObject(res.text);
-      if (!('c1' in parsed) && Object.keys(parsed).every(k => allCodes.has(k))) parsed = { c1: parsed };
-      const entry = parsed.c1;
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error("no c1 object in response");
-      withTransaction(db, () => {
-        for (const [themeCode, raw] of Object.entries(entry)) {
-          if (!allCodes.has(themeCode)) { offGroup++; continue; }
-          const cleaned = cleanExtract(raw);
-          if (!cleaned) continue;
-          insertExtract.run(u.id, themeCode, JSON.stringify(cleaned), u.clusterSize);
-          saved++;
-        }
-        markExtracted.run(u.id, FULL);
-      });
-    }, { db, task: "theme-extract-long-full", mode, concurrency, label: `theme-extract-long-full:${documentId}` })]);
+    const fullDone = new Set<string>();
+    const runFullPass = async (items: Unit[], pass: string) => {
+      const requests: LlmRequest[] = items.map(u => ({
+        key: `full-${pass}-${u.id}`,
+        model: models.long,
+        parts: [{ text: prefix }, { text: buildThemeExtractComments([{ id: 'c1', text: u.text }]) }],
+        config: { responseMimeType: "application/json" },
+      }));
+      const byKey = new Map(items.map(u => [`full-${pass}-${u.id}`, u]));
+      phases.push([`extract long full ${pass}`, await runLlmRequests(requests, async (req, res) => {
+        const u = byKey.get(req.key)!;
+        if (options.debug) await debugSave(`theme_extract_${req.key}_response.txt`, res.text);
+        let parsed = parseObject(res.text);
+        if (!('c1' in parsed) && Object.keys(parsed).every(k => allCodes.has(k))) parsed = { c1: parsed };
+        const entry = parsed.c1;
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error("no c1 object in response");
+        withTransaction(db, () => {
+          for (const [themeCode, raw] of Object.entries(entry)) {
+            if (!allCodes.has(themeCode)) { offGroup++; continue; }
+            const cleaned = cleanExtract(raw);
+            if (!cleaned) continue;
+            insertExtract.run(u.id, themeCode, JSON.stringify(cleaned), u.clusterSize);
+            saved++;
+          }
+          markExtracted.run(u.id, FULL);
+        });
+        fullDone.add(u.id);
+      }, { db, task: "theme-extract-long-full", mode, concurrency, label: `theme-extract-long-full-${pass}:${documentId}` })]);
+    };
+    await runFullPass(fullUnits, "p1");
+    // Occasionally a response is malformed JSON; one more try usually succeeds
+    const fullRetry = fullUnits.filter(u => !fullDone.has(u.id));
+    if (fullRetry.length > 0) {
+      console.log(`🔁 Retrying ${fullRetry.length} long units whose extraction failed`);
+      await runFullPass(fullRetry, "p2");
+    }
+    const fullFailed = fullUnits.filter(u => !fullDone.has(u.id)).length;
+    if (fullFailed > 0) console.warn(`⚠️  ${fullFailed} long units not extracted; re-run to retry them`);
   }
 
   await runExtractPass(work, shortBatchSize, "p1", 'short');
