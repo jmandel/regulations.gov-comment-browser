@@ -136,7 +136,8 @@ async function summarizeThemesV2(documentId: string, options: any) {
             cte.cluster_size,
             cc.structured_sections
           FROM comment_theme_extracts cte
-          JOIN condensed_comments cc ON cte.comment_id = cc.comment_id
+          -- LEFT JOIN: stance_only triaged comments have extracts but no condensed row
+          LEFT JOIN condensed_comments cc ON cte.comment_id = cc.comment_id
           WHERE cte.theme_code = ?
         `;
         const extractParams: any[] = [theme.code];

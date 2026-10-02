@@ -236,6 +236,14 @@ export function initSchema(db: Database) {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Which (unit, group) theme extractions are done, including ones that yielded no extracts
+    CREATE TABLE IF NOT EXISTS comment_theme_extract_status (
+      comment_id TEXT NOT NULL,
+      group_code TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (comment_id, group_code)
+    );
+
     -- Gemini Batch API jobs, so a step can resume polling after a restart
     CREATE TABLE IF NOT EXISTS batch_jobs (
       job_name TEXT PRIMARY KEY,      -- Gemini batch resource name (batches/...)

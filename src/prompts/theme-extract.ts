@@ -1,63 +1,57 @@
-// Batched prompt: instructions + comment form the shared prefix (cacheable by Gemini),
-// then the theme group hierarchy is appended per call as the varying suffix.
-// Structure: [instructions ~750 tokens] + [comment ~4,610 tokens] = prefix > 1,024 token cache minimum
-// Then: [theme group ~880 tokens] varies per call
-export function buildBatchedThemeExtractPrompt(commentText: string, themeGroupText: string): string {
-  return `You are extracting the authentic substance of what a commenter is saying about specific regulatory themes. Your goal is to capture their actual thinking, specific details, and unique perspective - not generic summaries.
-
-## Comment to Analyze
-${commentText}
-
----
+// Theme extraction prompt for one top-level theme group and one or more comments.
+// The fixed part (instructions + the group's themes) comes first and is identical for every
+// call on that group, so Gemini's implicit caching can reuse it; the comments come last.
+// The model emits entries only for themes a comment substantively addresses.
+export function buildThemeExtractPrefix(themeGroupText: string): string {
+  return `You are extracting the authentic substance of what commenters say about specific regulatory themes. Your goal is to capture their actual thinking, specific details, and unique perspective - not generic summaries.
 
 ## Theme Group to Extract
 ${themeGroupText}
 
 ## Your Mission
-For each theme in this group, extract EXACTLY what this commenter says about it. Capture their actual arguments, specific examples, unique insights, and emotional tone. If they don't address a theme, mark it as not addressed.
+For each comment at the end of this prompt, find the themes in this group that the comment SUBSTANTIVELY discusses (states a position, reason, concern, experience, recommendation or data about it), and extract EXACTLY what the commenter says about each. Capture their actual arguments, specific examples, unique insights, and emotional tone.
+
+- Include a theme ONLY if the comment substantively discusses it. Omit themes that are not addressed or only mentioned in passing — do not output entries for them at all.
+- A comment that substantively discusses none of these themes gets an empty object {}.
+- Each comment is a separate submission from a different person or organization. Never mix content between comments; quotes must be verbatim from that comment.
 
 ## Output Format
+Return ONLY a JSON object keyed by comment id (every id given, exactly as given), each mapping theme codes to extracts:
 \`\`\`json
 {
-  "1": { // Theme Code (numbers and dots)
-    "relevance": 1,  // 1=substantive discussion, 2=brief mention, 3=not addressed
-    "extract": {
+  "c1": {
+    "3.1": { // Theme Code (numbers and dots) — only themes this comment substantively discusses
       "positions": [
         // Their ACTUAL stance with their ACTUAL reasoning
         // Include numbers, specifics, conditions they mention
-        // LEAVE ARRAY EMPTY [] if they express no positions on this theme
       ],
       "concerns": [
         // Their SPECIFIC worries with the DETAILS they provide
         // Include who/what/when/where/why as they describe it
-        // LEAVE ARRAY EMPTY [] if they raise no concerns about this theme
       ],
       "recommendations": [
         // Their EXACT suggestions with implementation details
         // Include timelines, methods, conditions they specify
-        // LEAVE ARRAY EMPTY [] if they make no recommendations for this theme
       ],
       "experiences": [
         // Their ACTUAL stories, examples, data
         // Include names, places, numbers, outcomes they share
-        // LEAVE ARRAY EMPTY [] if they share no relevant experiences
       ],
       "key_quotes": [
         // Powerful verbatim quotes that capture their essence
         // Choose quotes that would make policymakers stop and think
-        // LEAVE ARRAY EMPTY [] if there are no compelling quotes for this theme
       ]
     }
-  }
+  },
+  "c2": {}
 }
 \`\`\`
 
 ## CRITICAL RULES FOR EMPTY SECTIONS:
-- If a commenter doesn't address a particular aspect (e.g., no recommendations), leave that array EMPTY []
+- If a commenter doesn't address a particular aspect of a theme (e.g., no recommendations), omit that section or leave it EMPTY []
 - NEVER write placeholder text like "No recommendations provided" or "Nothing to extract"
 - NEVER write explanatory text like "The commenter did not discuss..."
-- An empty array [] is the correct way to indicate no content for that section
-- Only include actual content from the comment - if it's not there, leave it empty
+- Only include actual content from the comment - if it's not there, leave it out
 
 ## Extraction Principles
 
@@ -93,16 +87,23 @@ What does THIS commenter know/see/experience that others might not?
 3. **Follow the Guidelines**: Use the detailed theme descriptions to determine fit
 
 ## Thoroughness
-For themes where the commenter has substantial input (relevance=1), be THOROUGH. Capture ALL distinct arguments, ALL specific evidence, ALL concrete recommendations. A commenter who devotes three paragraphs to a theme should produce a proportionally detailed extract — don't compress a rich discussion into two bullet points to save space. When a commenter provides a concrete detail that no other commenter is likely to provide — a vivid analogy, a personal experience, a specific data point — that is high-value signal that must be preserved.
+For every theme you include, be THOROUGH. Capture ALL distinct arguments, ALL specific evidence, ALL concrete recommendations. A commenter who devotes three paragraphs to a theme should produce a proportionally detailed extract — don't compress a rich discussion into two bullet points to save space. A brief comment gets a brief extract: don't pad it. When a commenter provides a concrete detail that no other commenter is likely to provide — a vivid analogy, a personal experience, a specific data point — that is high-value signal that must be preserved.
 
 ## Quality Checks
 - Would a policymaker learn something SPECIFIC from this extract?
 - Could you identify this commenter's unique perspective from the extract?
 - Did you capture details that differentiate this from generic feedback?
 - Would this extract help identify patterns when aggregated with others?
-- For high-relevance themes: did you capture EVERYTHING substantive, or did you leave detail on the table?
+- Did you capture EVERYTHING substantive, or did you leave detail on the table?
 
-Remember: You're preserving testimony that will inform critical policy decisions. Every specific detail, compelling story, and unique insight matters.`;
+Remember: You're preserving testimony that will inform critical policy decisions. Every specific detail, compelling story, and unique insight matters.
+
+## Comments to Analyze
+`;
+}
+
+export function buildThemeExtractComments(comments: { id: string; text: string }[]): string {
+  return comments.map(c => `<comment id="${c.id}">\n${c.text}\n</comment>`).join("\n\n") + "\n";
 }
 
 // Legacy single-call prompt (kept for backwards compatibility)
