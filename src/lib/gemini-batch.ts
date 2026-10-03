@@ -152,7 +152,10 @@ export async function runGeminiBatch(requests: LlmRequest[], opts: BatchOptions)
     ON CONFLICT(job_name) DO UPDATE SET state = excluded.state, updated_at = CURRENT_TIMESTAMP`);
   const setState = db.prepare("UPDATE batch_jobs SET state = ?, updated_at = CURRENT_TIMESTAMP WHERE job_name = ?");
 
-  // Resume: reuse recorded jobs for this label whose keys are all still requested, with unchanged content
+  // Resume: reuse recorded jobs for this label that cover still-requested keys. When every key of
+  // the job is still requested, its content hash must match (prompts unchanged). When only some
+  // are (a previous run saved part of the job's results before stopping), reuse it for the rest
+  // rather than paying for those requests again.
   const jobs: Job[] = [];
   const covered = new Set<string>();
   const recorded = db.prepare(
@@ -160,8 +163,10 @@ export async function runGeminiBatch(requests: LlmRequest[], opts: BatchOptions)
   ).all(label, model) as { job_name: string; request_keys: string; state: string }[];
   for (const row of recorded) {
     if (FAILED_STATES.has(row.state)) continue;
-    const keys: string[] = JSON.parse(row.request_keys);
-    if (!keys.length || !keys.every(k => lineByKey.has(k) && !covered.has(k))) continue;
+    const allKeys: string[] = JSON.parse(row.request_keys);
+    const keys = allKeys.filter(k => lineByKey.has(k) && !covered.has(k));
+    if (!keys.length) continue;
+    const partial = keys.length < allKeys.length;
     let job: any;
     try {
       job = await rest("GET", `v1beta/${row.job_name}`);
@@ -172,9 +177,9 @@ export async function runGeminiBatch(requests: LlmRequest[], opts: BatchOptions)
     const state = jobState(job);
     setState.run(state, row.job_name);
     const displayName: string = job?.metadata?.displayName ?? job?.displayName ?? "";
-    const hash = contentHash(keys.map(k => lineByKey.get(k)!));
-    if (FAILED_STATES.has(state) || !displayName.endsWith(hash)) continue;
-    console.log(`♻️  [${task}] Resuming batch ${row.job_name} (${keys.length} requests, ${state})`);
+    if (FAILED_STATES.has(state)) continue;
+    if (!partial && !displayName.endsWith(contentHash(keys.map(k => lineByKey.get(k)!)))) continue;
+    console.log(`♻️  [${task}] Resuming batch ${row.job_name} (${keys.length}${partial ? ` of ${allKeys.length} still needed` : ""} requests, ${state})`);
     jobs.push({ name: row.job_name, keys, state, done: false });
     for (const k of keys) covered.add(k);
   }
