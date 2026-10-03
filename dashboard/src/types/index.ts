@@ -84,6 +84,9 @@ export interface OverviewData {
   arrivals: Array<{ date: string; count: number }>
   themeGists: Record<string, string>
   themeComposition: Record<string, CompositionCounts>
+  // Per top-level theme: distinct letters (form-letter groups once) and those over longLetterWords
+  themeLetters?: Record<string, { letters: number; long: number; longOrg?: number }>
+  longLetterWords?: number
 }
 
 // An organized comment campaign (campaigns.json, from tag-campaigns). method 'paraphrase': has

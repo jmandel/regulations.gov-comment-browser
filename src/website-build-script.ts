@@ -400,6 +400,26 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
     themeComposition[code] = c;
   }
 
+  // Distinct letters per top-level theme (each form-letter group once) and how many run past
+  // LONG_LETTER_WORDS: the Overview ranks issues by long letters by default, since comment counts
+  // mostly measure organizing
+  const wordsOf = new Map<string, number>();
+  if (hasTable(db, "transcriptions")) {
+    for (const r of db.prepare(`SELECT comment_id, markdown FROM transcriptions WHERE status = 'completed'`).all() as any[]) {
+      wordsOf.set(r.comment_id, String(r.markdown || "").split(/\s+/).filter(Boolean).length);
+    }
+  }
+  const themeLetters: Record<string, { letters: number; long: number; longOrg?: number }> = {};
+  for (const [code, units] of unitsByTheme) {
+    let long = 0, longOrg = 0;
+    for (const u of units) {
+      if ((wordsOf.get(u) || 0) <= LONG_LETTER_WORDS) continue;
+      long++;
+      if (classifications.get(u)?.speaksFor === "organization") longOrg++;
+    }
+    themeLetters[code] = { letters: units.size, long, ...(classified ? { longOrg } : {}) };
+  }
+
   const themeGists: Record<string, string> = {};
   for (const t of themes) {
     if (t.parent_code) continue;
@@ -407,8 +427,10 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
     if (gist) themeGists[t.code] = gist;
   }
 
-  return { version: 2, composition, submitters, typeSource: classified ? "ai" : "filed", filedAs: filedAsCounts, geography, arrivals, themeGists, themeComposition };
+  return { version: 2, composition, submitters, typeSource: classified ? "ai" : "filed", filedAs: filedAsCounts, geography, arrivals, themeGists, themeComposition, ...(wordsOf.size ? { themeLetters, longLetterWords: LONG_LETTER_WORDS } : {}) };
 }
+
+const LONG_LETTER_WORDS = 1500;
 
 // A short gist of a theme report: its first sentence without the "Across N submissions (M distinct
 // ...)," preamble (the Overview shows the count beside it), cut at a clause break when long.
