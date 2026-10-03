@@ -118,6 +118,14 @@ function ThemeExplorer({ hideTopLevelMetrics = false }: ThemeExplorerProps = {})
     setExpandedNodes(new Set())
   }
   
+  // Codes at each tree level get the width of the longest code there ("12" vs "3", "12.10" vs
+  // "3.1"), so labels line up; the monospace font makes ch an exact character width
+  const codeWidthByDepth = useMemo(() => {
+    const w: number[] = []
+    for (const t of themes) { const d = t.code.split('.').length - 1; w[d] = Math.max(w[d] || 0, t.code.length) }
+    return w
+  }, [themes])
+
   const renderThemeNode = (theme: Theme, depth: number = 0) => {
     const children = themeTree[theme.code] || []
     const hasChildren = children.length > 0
@@ -154,8 +162,8 @@ function ThemeExplorer({ hideTopLevelMetrics = false }: ThemeExplorerProps = {})
                 >
                   {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                 </button>
-              ) : null}
-              {theme.code}
+              ) : <span className="w-[1.375rem] -ml-1 flex-shrink-0" aria-hidden="true" />}
+              <span className="inline-block text-right" style={{ minWidth: `${codeWidthByDepth[theme.code.split('.').length - 1] || theme.code.length}ch` }}>{theme.code}</span>
             </span>
             
             {/* Label + comment count in a column */}
