@@ -17,6 +17,7 @@ import { readDocumentInfo, type DocumentInfo } from "./document-meta";
 import { htmlToText, wordCount } from "./text";
 import { reportItems, reportMarkdown } from "./theme-report-markdown";
 import { exampleAnalyses, ANALYSIS_TIPS, type ExampleParams } from "./dataset-pack-examples";
+import { foldCategory, filedAs, submitterName, normalizeState, loadClassifications, SUBMITTER_TYPES, type SubmitterClassification } from "./submitter-meta";
 
 export type PackKind = "slim" | "full";
 export interface PackFile {
@@ -41,21 +42,6 @@ const MAX_PUBLISHED_BYTES = 100 * 1024 * 1024;
 const SIZE_BUDGET: Record<PackKind, number> = { slim: 50e6, full: 95e6 };
 const SEARCH_GROWTH = 1.8;
 const ZIP_MTIME = new Date("2000-01-01T00:00:00Z");
-
-// regulations.gov mixes two category vocabularies ("Physician - HC005" and "Health Care
-// Professional/Association - Physician"); fold them onto one plain name. Shared with the Overview.
-export function submitterCategoryLabel(raw: string): string {
-  let s = raw.trim().replace(/\s+-\s+[A-Z]{1,3}\d{3,4}$/, "");
-  s = s.replace(/^Health Care (Professional|Provider)(\/| or )Association\s+-\s+/, "");
-  const fixes: Record<string, string> = {
-    "Other Practitione": "Other Practitioner", "Occupational Therapis": "Occupational Therapist",
-    "Dietician/Nutritionist": "Dietitian/Nutritionist", "Federal Government": "Government - Federal",
-    "State Government": "Government - State", "Other Government": "Government - Other",
-    "Health Care Professional or Association": "Other Health Care Professional",
-    "Health Care Provider/Association": "Other Health Care Provider", "Other": "Other",
-  };
-  return fixes[s] || s;
-}
 
 // ---------------------------------------------------------------------------------------------
 // Reading the pipeline database
@@ -99,6 +85,7 @@ interface Source {
   campaigns: any[];
   campaignOf: Map<string, { id: number; how: string }>;
   triage: Map<string, { label: string; topic: string | null; stance: string | null }>;
+  classifications: Map<string, SubmitterClassification>;
   themes: any[];
   summaries: Map<string, any>;
   unitThemes: Map<string, Set<string>>;  // theme code -> units with a direct extract
@@ -118,7 +105,7 @@ function stepOf(task: string): string {
   if (t.startsWith("discover-entities")) return "discover-entities";
   return t;
 }
-const STEP_ORDER = ["triage", "transcribe", "tag-campaigns", "condense", "discover-themes", "extract-theme-content", "summarize-themes", "discover-entities"];
+const STEP_ORDER = ["triage", "transcribe", "tag-campaigns", "condense", "classify-submitters", "discover-themes", "extract-theme-content", "summarize-themes", "discover-entities"];
 
 function loadSource(db: Database, documentId: string): Source {
   const info = readDocumentInfo(db, documentId);
@@ -148,7 +135,7 @@ function loadSource(db: Database, documentId: string): Source {
     const m = membership.get(r.id);
     const rep = m ? clusterRep.get(m.cluster) : undefined;
     const unitId = rep && rep !== r.id && !m!.isRep ? rep : r.id;
-    const submitter = attrs.organization || `${attrs.firstName || ""} ${attrs.lastName || ""}`.trim() || "Anonymous";
+    const submitter = submitterName(attrs);
     submissions.push({ id: r.id, attrs, unitId, isRep: unitId === r.id, submitter });
   }
   const known = new Set(submissions.map(s => s.id));
@@ -216,6 +203,8 @@ function loadSource(db: Database, documentId: string): Source {
   if (hasTable(db, "comment_triage")) {
     for (const r of db.prepare(`SELECT comment_id, label, topic, stance FROM comment_triage`).all() as any[]) triage.set(r.comment_id, { label: r.label, topic: r.topic, stance: r.stance });
   }
+
+  const classifications = loadClassifications(db);
 
   const themes = db.prepare(`SELECT code, description, level, parent_code, ${hasColumn(db, "theme_hierarchy", "detailed_guidelines") ? "detailed_guidelines" : "NULL AS detailed_guidelines"} FROM theme_hierarchy ORDER BY code`).all() as any[];
   const themeCodes = new Set(themes.map(t => t.code));
@@ -287,13 +276,14 @@ function loadSource(db: Database, documentId: string): Source {
   }
 
   return {
-    info, clustered, submissions, units, attachments, attachmentCount, additions, campaigns, campaignOf, triage,
+    info, clustered, submissions, units, attachments, attachmentCount, additions, campaigns, campaignOf, triage, classifications,
     themes, summaries, unitThemes, extracts, entities, unitEntities, provenance, generatedAt,
     features: {
       clustering: clustered,
       additions: additions.size > 0,
       campaigns: campaigns.length > 0,
       triage: triage.size > 0,
+      classified: classifications.size > 0,
       transcripts: transcripts.size > 0,
       condensed: condensed.size > 0,
       extracts: extracts.length > 0,
@@ -394,12 +384,17 @@ function schema(kind: PackKind, docketId: string): string[] {
     ["id TEXT PRIMARY KEY", "regulations.gov comment ID, e.g. CMS-2026-2377-0042"],
     ["posted_date TEXT", "date regulations.gov posted it (ISO)"],
     ["received_date TEXT", "date the agency received it (ISO)"],
-    ["submitter_name TEXT", "organization if given, else 'First Last', else 'Anonymous' (as entered)"],
+    ["submitter_name TEXT", "organization if given, else 'First Last', else a name given in the title, else 'Anonymous' (as entered; 'Anonymous Anonymous' becomes 'Anonymous')"],
     ["organization TEXT", "organization field as entered; NULL for most individuals"],
-    ["category TEXT", "submitter category chosen on regulations.gov (raw, two vocabularies mixed)"],
-    ["category_group TEXT", "category normalized to one plain vocabulary (e.g. 'Physician'); 'Individual'/'Organization' when none chosen"],
+    ["filed_as TEXT", "how it was filed, from the name fields alone: 'organization' (organization field set) | 'person' (a name) | 'anonymous'"],
+    ["category TEXT", "submitter category chosen on regulations.gov (raw, two vocabularies mixed); NULL when none was chosen"],
+    ["category_group TEXT", "category folded to one plain vocabulary (e.g. 'Physician', 'Provider - Hospital'); 'Not specified' when none was chosen (a blank is not evidence of an individual)"],
+    ["ai_speaks_for TEXT", "LLM (classify-submitters): who the submission speaks for, 'individual' | 'organization', judged from the form fields and the start and end of the text; NULL when not classified"],
+    ["ai_type TEXT", "LLM: commenter type, a submitter_types.key (e.g. 'physician', 'hospital'); NULL when not classified"],
+    ["ai_organization TEXT", "LLM: the organization it speaks for, when ai_speaks_for = 'organization'"],
+    ["ai_method TEXT", "'llm' = classified from its own text; 'representative' = form-letter copy with its representative's organization, given the representative's classification; 'form-letter-member' = other form-letter copies: an individual, with the representative's type when that is an individual type"],
     ["city TEXT", "as entered; often NULL"],
-    ["state TEXT", "state/province as entered; often NULL"],
+    ["state TEXT", "state/province as entered; often NULL (US state names are given as postal codes)"],
     ["country TEXT", "as entered"],
     ["unit_id TEXT NOT NULL", "the unit whose content stands for this submission (FK units.id); = id for representatives and individual comments"],
     ["is_unit_representative INTEGER", "1 if this submission is the one whose text was analyzed for its unit"],
@@ -415,6 +410,14 @@ function schema(kind: PackKind, docketId: string): string[] {
       ["added_text TEXT", "ORIGINAL words a form-letter member added to the template (NULL if none); promoted members keep it too"],
     ] as Array<[string, string]> : []),
     ["regulations_gov_url TEXT", "the comment on regulations.gov"],
+  ]));
+
+  out.push(table("submitter_types", [
+    "The commenter types classify-submitters assigns (submissions.ai_type), the same for every docket.",
+  ], [
+    ["key TEXT PRIMARY KEY", "submissions.ai_type value"],
+    ["grp TEXT NOT NULL", "'individual' | 'organization'"],
+    ["label TEXT NOT NULL", "plain-language name shown on the dashboard"],
   ]));
 
   out.push(table("units", [
@@ -566,7 +569,10 @@ function schema(kind: PackKind, docketId: string): string[] {
     ["s.posted_date", "posted_date", "date posted"],
     ["s.submitter_name", "submitter_name", "as entered"],
     ["s.organization", "organization", "as entered"],
-    ["s.category_group", "category_group", "normalized submitter category"],
+    ["s.filed_as", "filed_as", "organization | person | anonymous"],
+    ["s.category_group", "category_group", "normalized submitter category ('Not specified' when none chosen)"],
+    ["s.ai_type", "ai_type", "LLM-assigned commenter type (submitter_types.key)"],
+    ["s.ai_organization", "ai_organization", "LLM: organization it speaks for"],
     ["s.state", "state", "as entered"],
     ["s.unit_id", "unit_id", "unit whose content stands for it"],
     ["u.kind", "unit_kind", "form_letter | near_copy | promoted | individual"],
@@ -591,12 +597,15 @@ function schema(kind: PackKind, docketId: string): string[] {
     ["s.submitter_name", "submitter_name", "representative submission's submitter"],
     ["s.organization", "organization", "representative's organization"],
     ["s.category_group", "category_group", "representative's category"],
+    ["s.ai_type", "ai_type", "representative's LLM-assigned commenter type"],
+    ["s.ai_organization", "ai_organization", "representative's LLM-assigned organization"],
   ], `FROM extract_items e\nJOIN themes t ON t.code = e.theme_code\nJOIN submissions s ON s.id = e.unit_id`));
 
   out.push(
     "CREATE INDEX submissions_unit ON submissions(unit_id)",
     "CREATE INDEX submissions_campaign ON submissions(campaign_id)",
     "CREATE INDEX submissions_category ON submissions(category_group)",
+    "CREATE INDEX submissions_ai_type ON submissions(ai_type)",
     "CREATE INDEX units_kind ON units(kind, submissions)",
     "CREATE INDEX themes_parent ON themes(parent_code)",
     "CREATE INDEX unit_themes_theme ON unit_themes(theme_code)",
@@ -696,7 +705,7 @@ function readmeSections(src: Source, kind: PackKind, docketUrl: string, dashboar
     "## Tables",
     "",
     "- `docket` — the rule and headline counts (one row).",
-    "- `submissions` — one row per comment as filed: submitter, category (raw and normalized `category_group`), dates, location, its `unit_id`, campaign tag, triage label" + (full ? ", original comment-box `typed_text` and form-letter `added_text`." : "."),
+    "- `submissions` — one row per comment as filed: submitter, how it was filed (`filed_as`), category (raw and normalized `category_group`), dates, location, its `unit_id`, campaign tag, triage label" + (f.classified ? ", and the LLM-assigned commenter type and organization (`ai_*`; labels in `submitter_types`)" : "") + (full ? ", original comment-box `typed_text` and form-letter `added_text`." : "."),
     "- `units` — one row per analyzed piece of content: kind (form_letter / near_copy / promoted / individual), weight (`submissions`), LLM condensed summary columns" + (full ? ", and the full `text` with its `text_source`." : "."),
     "- `themes` — the theme taxonomy with rolled-up counts (submissions and units). `unit_themes` links units to themes.",
     "- `extract_items` — each position / concern / recommendation / experience / quote a unit made about a theme. The most precise way to answer \"who argued what\".",
@@ -720,6 +729,7 @@ function readmeSections(src: Source, kind: PackKind, docketUrl: string, dashboar
     "- `extract_items`: theme-specific points; `kind = 'quote'` rows are meant to be verbatim but verify before quoting.",
     "- `themes` (taxonomy, labels, guidelines), `theme_reports`, `theme_report_items`: synthesized narrative; support levels are the LLM's wording, not counts — use the tables to count.",
     "- `campaigns` names/descriptions/evidence, campaign tags, and `triage_*` labels.",
+    "- `submissions.ai_*` (when present): who each submission speaks for, its commenter type and organization, assigned by an LLM from the form fields and the start and end of the text. The filed fields (`organization`, `category`, `filed_as`) are kept unchanged beside them.",
     "- `entities` taxonomy (mentions are found by plain term matching).",
   ].join("\n")]);
 
@@ -728,6 +738,7 @@ function readmeSections(src: Source, kind: PackKind, docketUrl: string, dashboar
     transcribe: "transcribe comments with attachments into markdown (typed-only comments kept verbatim)",
     "tag-campaigns": "embed units, cluster, and have an LLM judge which groups are organized campaigns",
     condense: "structured summary of each unit",
+    "classify-submitters": "who each submission speaks for, commenter type and organization, from the form fields and the start and end of the text",
     "discover-themes": "build the theme taxonomy from a sample of units",
     "extract-theme-content": "extract each unit's points per theme",
     "summarize-themes": "write theme reports from the extracts; group reports for top-level themes",
@@ -763,6 +774,8 @@ function readmeSections(src: Source, kind: PackKind, docketUrl: string, dashboar
     "- **Themes.** The taxonomy was built from a sample; extraction files each point under the most specific theme, so top-level counts in `themes` roll up their sub-themes. A unit usually appears under several themes.",
     "- **Reports** exist only for themes with at least 5 extracts (current pipeline)" + (f.groupReports ? "; top-level themes with sub-themes have a `group` report synthesized from the sub-theme reports plus direct extracts." : "."),
     "- **Counts in reports** (\"most commenters\", \"9 of 10\") are LLM wording over the units it read, not submissions; use SQL for numbers.",
+    "- **Who commented.** Most submitters choose no category (`category_group = 'Not specified'`); a blank is not evidence of an individual. Chosen categories are often loose: many citizens pick 'Government - Federal' or 'Congressional' because they are writing to the government, and organizations sometimes file under a person's name or as 'Anonymous'." +
+      (f.classified ? " `ai_type` / `ai_organization` correct much of this (on a hand-checked, population-weighted sample of 276 submissions from 9 dockets: individual-vs-organization right ~99.9%, type right ~98%), but they are LLM judgments; form-letter copies mostly inherit their representative's type (`ai_method`)." : ""),
     "- Some comments posted on regulations.gov may be missing (withdrawn or unavailable when loaded); attachment files that could not be read have no transcript.",
   ].join("\n")]);
 
@@ -771,6 +784,7 @@ function readmeSections(src: Source, kind: PackKind, docketUrl: string, dashboar
   if (f.clustering && !f.additions) missing.push("Per-member added text (`added_words`, `added_text`) is not available; `kind = 'promoted'` does not occur.");
   if (!f.campaigns) missing.push("Campaign tagging was not run: `campaigns` is empty and `submissions.campaign_id` is NULL.");
   if (!f.triage) missing.push("Triage was not run: `triage_*` columns are NULL.");
+  if (!f.classified) missing.push("Submitter classification was not run: `submissions.ai_*` columns are NULL; use the filed `category_group` and `filed_as`.");
   if (!f.transcripts) missing.push(full ? "No separate transcription step: `units.text` for comments with attachments is the LLM's full-content rendering from the condense step when available, else only the typed comment." : "No separate transcription step was recorded.");
   if (!f.groupReports) missing.push("No group reports: top-level themes have reports only if built from their own extracts.");
   if (!f.entities) missing.push("Entity tagging was not run: `entities` is empty.");
@@ -884,14 +898,14 @@ function exampleParams(src: Source, rollUnits: Map<string, Set<string>>, labels:
 
   return {
     topTheme: top, topThemeLabel: labels.get(top) || top, subTheme: sub, subThemeLabel: labels.get(sub) || sub,
-    match, matchLabel, pivotThemes: tops.slice(0, 6), organization: org,
+    match, matchLabel, pivotThemes: tops.slice(0, 6), organization: org, classified: src.features.classified,
   };
 }
 
 // Hash of the code that shapes the export, recorded instead of a git commit: a commit id would
 // change every zip on every push, and publish-data-packs.sh re-uploads only zips whose bytes change
 function exportCodeHash(): string {
-  const files = ["dataset-pack.ts", "dataset-pack-examples.ts", "theme-report-markdown.ts", "document-meta.ts", "text.ts"];
+  const files = ["dataset-pack.ts", "dataset-pack-examples.ts", "theme-report-markdown.ts", "document-meta.ts", "text.ts", "submitter-meta.ts"];
   const h = new Bun.CryptoHasher("sha256");
   for (const f of files) h.update(readFileSync(join(import.meta.dir, f)));
   return h.digest("hex").slice(0, 12);
@@ -927,20 +941,22 @@ function writeDatabase(path: string, src: Source, kind: PackKind, siteUrl: strin
   let extractItems = 0;
   const tx = out.transaction(() => {
     // submissions
-    const insSub = out.prepare(`INSERT INTO submissions (id, posted_date, received_date, submitter_name, organization, category, category_group,
+    const insSub = out.prepare(`INSERT INTO submissions (id, posted_date, received_date, submitter_name, organization, filed_as, category, category_group,
+      ai_speaks_for, ai_type, ai_organization, ai_method,
       city, state, country, unit_id, is_unit_representative, campaign_id, campaign_how, triage_label, triage_stance, triage_topic,
       has_attachments, added_words, ${full ? "typed_text, added_text, " : ""}regulations_gov_url)
-      VALUES (${Array(full ? 22 : 20).fill("?").join(", ")})`);
+      VALUES (${Array(full ? 27 : 25).fill("?").join(", ")})`);
     for (const s of src.submissions) {
       const a = s.attrs;
       const add = src.additions.get(s.id);
       const camp = src.campaignOf.get(s.id);
       const tri = src.triage.get(s.id);
-      const raw = a.category || (a.organization ? "Organization" : "Individual");
       const isMember = !s.isRep;
+      const cls = src.classifications.get(s.id);
       const vals: any[] = [
-        s.id, a.postedDate || null, a.receiveDate || null, s.submitter, a.organization || null, a.category || null, submitterCategoryLabel(raw),
-        a.city || null, a.stateProvinceRegion || null, a.country || null, s.unitId, s.isRep ? 1 : 0, camp?.id ?? null, camp?.how ?? null,
+        s.id, a.postedDate || null, a.receiveDate || null, s.submitter, a.organization || null, filedAs(a), a.category || null, foldCategory(a.category),
+        cls?.speaksFor ?? null, cls?.type ?? null, cls?.organization ?? null, cls?.method ?? null,
+        a.city || null, normalizeState(a.stateProvinceRegion), a.country || null, s.unitId, s.isRep ? 1 : 0, camp?.id ?? null, camp?.how ?? null,
         tri?.label ?? null, tri?.stance ?? null, tri?.topic ?? null,
         (src.attachmentCount.get(s.id) || 0) > 0 ? 1 : 0, add ? add.words : null,
       ];
@@ -969,6 +985,9 @@ function writeDatabase(path: string, src: Source, kind: PackKind, siteUrl: strin
       if (full) vals.push(u.text, u.textSource);
       insUnit.run(...vals);
     }
+
+    const insType = out.prepare(`INSERT INTO submitter_types VALUES (?, ?, ?)`);
+    for (const t of SUBMITTER_TYPES) insType.run(t.key, t.group, t.label);
 
     // themes
     const insTheme = out.prepare(`INSERT INTO themes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);

@@ -56,6 +56,7 @@ export interface BatchConfigFile {
     discoverEntities?: EntityTaskConfig;
     tagCampaigns?: TaskConfig;
     scopeRelevance?: TaskConfig;
+    classifySubmitters?: TaskConfig;
   };
 }
 

@@ -39,6 +39,14 @@
         "attachment": "gemini-3.8-flash-nothink"
       }
     },
+    "classifySubmitters": {
+      "concurrency": 10,
+      "model": "gemini-3.8-flash-nothink",
+      "description": "Who each submission speaks for (individual or organization), the organization's name and a commenter type, from the filed metadata and the start and end of the text, batchSize units per call. Form-letter members without their own organization or substantial added text are derived from their representative without a call. On a hand-checked sample of 68 units from 9 dockets, 3.8 Flash without thinking got individual/organization right on 66 and the type on 65; 3.5 Flash-Lite on 63 and 59 (it trusted letterheads and organization fields on personal letters and missed 'on behalf of')",
+      "thresholds": {
+        "batchSize": 30
+      }
+    },
     "discoverThemes": {
       "concurrency": 5,
       "mergeWidth": 10,

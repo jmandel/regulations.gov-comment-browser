@@ -8,17 +8,17 @@ import ActiveFilterChips from './ActiveFilterChips'
 import FilterAddButtons from './FilterAddButtons'
 import InlineFilterDropdown from './InlineFilterDropdown'
 import SearchHelpModal from './SearchHelpModal'
-import { getUniqueValues } from '../utils/helpers'
 import { parseSearchQuery, tokensToString, removeToken } from '../utils/searchParser'
 import { debounce } from 'lodash'
 import type { PickerItem } from './FilterAddButtons'
-import type { CompositionCounts } from '../types'
-import { PARTS, partLabel } from './overview/overviewData'
+import { PARTS, partLabel, FILED_AS_LABELS } from './overview/overviewData'
 
 interface FilterOptions {
   themes: string[]
   entities: string[]
   submitterTypes: string[]
+  filedAs?: string[]
+  states?: string[]
   campaigns?: string[]
   parts?: string[]
   searchQuery: string
@@ -47,7 +47,7 @@ function detectPrefix(query: string, cursorPos: number): PrefixDetection | null 
 }
 
 function CommentBrowser() {
-  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering, campaigns = [], scope, commentScope, setCommentScope, meta, getUnitParts } = useStore()
+  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering, campaigns = [], scope, commentScope, setCommentScope, meta, getSubmissionMatches, typeSource } = useStore()
   const wholeDocket = !!scope && commentScope === 'docket'
   const docketTotal = scope?.counts.docketSubmissions ?? 0
   const [searchParams] = useSearchParams()
@@ -97,22 +97,19 @@ function CommentBrowser() {
 
   // Apply URL query parameters on mount
   useEffect(() => {
-    // Repeatable: ?submitterType=A&submitterType=B (the Overview links a category's variants)
+    // Links from the Overview and elsewhere: ?submitterType=, ?filedAs=, ?state= (repeatable),
+    // ?campaign=, ?part=. Arriving with any of them replaces the structured filters, so the list
+    // shows exactly what the link counted.
     const submitterTypes = searchParams.getAll('submitterType')
-    if (submitterTypes.length) {
-      setFilters((prev: FilterOptions) => ({
-        ...prev,
-        submitterTypes
-      }))
-    }
+    const filedAs = searchParams.getAll('filedAs')
+    const states = searchParams.getAll('state')
     const campaign = searchParams.get('campaign')
-    if (campaign) {
-      setFilters((prev: FilterOptions) => ({ ...prev, campaigns: [campaign] }))
-    }
-    // ?part=<key>: a segment of the Overview's composition bar
     const part = searchParams.get('part')
-    if (part && PARTS.some(p => p.key === part)) {
-      setFilters((prev: FilterOptions) => ({ ...prev, parts: [part] }))
+    const parts = part && PARTS.some(p => p.key === part) ? [part] : []
+    if (submitterTypes.length || filedAs.length || states.length || campaign || parts.length) {
+      setFilters((prev: FilterOptions) => ({
+        ...prev, themes: [], entities: [], submitterTypes, filedAs, states, campaigns: campaign ? [campaign] : [], parts,
+      }))
     }
   }, [searchParams, setFilters])
 
@@ -154,14 +151,15 @@ function CommentBrowser() {
     return getFilteredComments()
   }, [getFilteredComments, filters, search, commentScope])
 
-  // Available submitter types (with 5+ comments)
-  const availableSubmitterTypes = useMemo(() => {
-    const counts = comments.reduce((acc, c) => {
-      acc[c.submitterType] = (acc[c.submitterType] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-    return getUniqueValues(comments, 'submitterType').filter(t => counts[t] >= 5)
+  // Picker values with their submission counts, largest first
+  const countBy = useCallback((key: (c: typeof comments[number]) => string | undefined) => {
+    const counts = new Map<string, number>()
+    for (const c of comments) { const k = key(c); if (k) counts.set(k, (counts.get(k) || 0) + 1) }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([value, count]) => ({ value, count }))
   }, [comments])
+  const availableSubmitterTypes = useMemo(() => countBy(c => c.submitterType), [countBy])
+  const availableFiledAs = useMemo(() => typeSource === 'ai' ? [] : countBy(c => c.filedAs), [countBy, typeSource])
+  const availableStates = useMemo(() => countBy(c => c.state), [countBy])
 
   // Pagination — memoize so keystroke re-renders don't recompute
   const { totalPages, paginatedComments } = useMemo(() => {
@@ -176,18 +174,16 @@ function CommentBrowser() {
   // Submissions the listed units stand for (a form-letter group counts all its members)
   const representedCount = useMemo(() => filteredComments.reduce((n, c) => n + (c.clusterSize || 1), 0), [filteredComments])
 
-  // With a composition-part filter, the number of comments in that part among the listed units
+  // With submission filters (type, filed as, state, part), how many submissions among the listed
+  // units match them: the number the Overview shows for the same selection
   const activeParts = filters?.parts || []
-  const partCommentCount = useMemo(() => {
-    if (!activeParts.length) return null
-    const unitParts = getUnitParts()
+  const matchedCount = useMemo(() => {
+    const matches = getSubmissionMatches()
+    if (!matches) return null
     let n = 0
-    for (const c of filteredComments) {
-      const counts = unitParts.get(c.id)
-      if (counts) for (const p of activeParts) n += counts[p as keyof CompositionCounts] || 0
-    }
+    for (const c of filteredComments) n += matches.get(c.id) || 0
     return n
-  }, [filteredComments, activeParts.join(), getUnitParts, commentScope])
+  }, [filteredComments, getSubmissionMatches, filters, commentScope])
   const partName = (key: string) => {
     const p = PARTS.find(x => x.key === key)
     return p ? partLabel(p, campaigns.length > 0) : key
@@ -246,9 +242,10 @@ function CommentBrowser() {
       case 'type':
         return availableSubmitterTypes
           .map(t => ({
-            key: t,
-            label: t,
-            selected: (filters?.submitterTypes || []).includes(t),
+            key: t.value,
+            label: t.value,
+            count: t.count,
+            selected: (filters?.submitterTypes || []).includes(t.value),
           }))
           .filter(item => !q || item.label.toLowerCase().includes(q))
 
@@ -349,6 +346,11 @@ function CommentBrowser() {
     handleFilterChange('submitterTypes', updated)
   }, [filters?.submitterTypes, handleFilterChange])
 
+  const toggleIn = useCallback((key: 'filedAs' | 'states', value: string) => {
+    const current = filters?.[key] || []
+    handleFilterChange(key, current.includes(value) ? current.filter((v: string) => v !== value) : [...current, value])
+  }, [filters?.filedAs, filters?.states, handleFilterChange])
+
   const handleToggleCampaign = useCallback((id: string) => {
     const current = filters?.campaigns || []
     const updated = current.includes(id) ? current.filter((v: string) => v !== id) : [...current, id]
@@ -409,6 +411,8 @@ function CommentBrowser() {
       setFilters((prev: FilterOptions) => ({
         ...prev,
         submitterTypes: [],
+        filedAs: [],
+        states: [],
         themes: [],
         entities: [],
         campaigns: [],
@@ -443,8 +447,10 @@ function CommentBrowser() {
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{scope ? (wholeDocket ? 'All comments in the docket' : 'Comments in this scope') : 'Browse Comments'}</h1>
               <p className="text-sm text-gray-500 mt-1 truncate sm:whitespace-normal">
-                {partCommentCount !== null ? (
-                  <>Showing {filteredComments.length.toLocaleString()} {unitNoun}{hasClustering || scope ? <> representing {partCommentCount.toLocaleString()} comments</> : null} in {activeParts.map(partName).join(' or ')}</>
+                {matchedCount !== null ? (
+                  hasClustering || scope
+                    ? <>Showing {filteredComments.length.toLocaleString()} {unitNoun} with {matchedCount.toLocaleString()} matching comment{matchedCount === 1 ? '' : 's'}</>
+                    : <>Showing {matchedCount.toLocaleString()} of {comments.length.toLocaleString()} comments</>
                 ) : scope ? (
                   wholeDocket
                     ? <>Showing {filteredComments.length.toLocaleString()} {unitNoun} from all {docketTotal.toLocaleString()} submissions, in or out of scope</>
@@ -564,10 +570,14 @@ function CommentBrowser() {
           themes={filters.themes || []}
           entities={filters.entities || []}
           submitterTypes={filters.submitterTypes || []}
+          typeLabel={typeSource === 'ai' ? 'Commenter type' : 'Category'}
           campaigns={(filters.campaigns || []).map(id => ({ id, name: campaigns.find(c => String(c.id) === id)?.name || `Campaign ${id}` }))}
           onRemoveCampaign={(id) => handleFilterChange('campaigns', (filters.campaigns || []).filter((v: string) => v !== id))}
-          parts={activeParts.map(key => ({ key, label: partName(key) }))}
-          onRemovePart={(key) => handleFilterChange('parts', activeParts.filter((v: string) => v !== key))}
+          parts={[
+            ...activeParts.map(key => ({ key, label: partName(key), onRemove: () => handleFilterChange('parts', activeParts.filter((v: string) => v !== key)) })),
+            ...(filters.filedAs || []).map(v => ({ key: `filed-${v}`, label: `Filed as: ${FILED_AS_LABELS[v] || v}`, onRemove: () => toggleIn('filedAs', v) })),
+            ...(filters.states || []).map(v => ({ key: `state-${v}`, label: `State: ${v}`, onRemove: () => toggleIn('states', v) })),
+          ]}
           themeList={themes}
           entityMap={entities}
           onRemoveSearchToken={handleRemoveSearchToken}
@@ -584,6 +594,11 @@ function CommentBrowser() {
             themes={themes}
             entities={entities}
             submitterTypes={availableSubmitterTypes}
+            typeLabel={typeSource === 'ai' ? 'Commenter type' : 'Category'}
+            extraPickers={[
+              ...(availableFiledAs.length ? [{ label: 'Filed as', items: availableFiledAs.map(f => ({ key: f.value, label: FILED_AS_LABELS[f.value] || f.value, count: f.count, selected: (filters.filedAs || []).includes(f.value) })), onSelect: (k: string) => toggleIn('filedAs', k) }] : []),
+              ...(availableStates.length ? [{ label: 'State', items: availableStates.map(f => ({ key: f.value, label: f.value, count: f.count, selected: (filters.states || []).includes(f.value) })), onSelect: (k: string) => toggleIn('states', k) }] : []),
+            ]}
             selectedThemes={filters.themes || []}
             selectedEntities={filters.entities || []}
             selectedSubmitterTypes={filters.submitterTypes || []}

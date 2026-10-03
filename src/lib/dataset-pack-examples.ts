@@ -11,6 +11,7 @@ export interface ExampleParams {
   matchLabel: string;    // what it searches for, in words
   pivotThemes: string[]; // top-level theme codes for the stakeholder matrix columns
   organization: string | null; // an organization with a substantial comment
+  classified: boolean;   // submissions.ai_* filled in (classify-submitters ran)
 }
 
 export interface Example {
@@ -131,20 +132,38 @@ ORDER BY submissions DESC`,
   });
 
   const pivot = p.pivotThemes.map(c => `       SUM(top = ${lit(c)}) AS "${c}"`).join(",\n");
+  // Group by the LLM-assigned commenter type when there is one, else the filed category
+  const who = p.classified ? "COALESCE(t.label, 'Not classified')" : "s.category_group";
   ex.push({
     title: "Stakeholder matrix: who raised which issues",
-    question: "How do submitter categories spread across the main issue areas?",
+    question: `How do ${p.classified ? "commenter types" : "submitter categories"} spread across the main issue areas?`,
     sql: `
 WITH tu AS (${TOP_UNITS}),
-     st AS (SELECT DISTINCT s.id, s.category_group, tu.top
-            FROM tu JOIN submissions s ON s.unit_id = tu.unit_id)
-SELECT category_group,
+     st AS (SELECT DISTINCT s.id, ${who} AS who, tu.top
+            FROM tu JOIN submissions s ON s.unit_id = tu.unit_id${p.classified ? "\n            LEFT JOIN submitter_types t ON t.key = s.ai_type" : ""})
+SELECT who,
        COUNT(DISTINCT id) AS submissions${pivot ? `,\n${pivot}` : ""}
 FROM st
-GROUP BY category_group
+GROUP BY who
 ORDER BY submissions DESC
 LIMIT 15`,
-    read: "Columns are top-level theme codes (see `themes.label`); each cell counts submissions in that category whose content touches the theme, so a row's cells can sum to more than `submissions`. `category_group` is the regulations.gov category, normalized.",
+    read: "Columns are top-level theme codes (see `themes.label`); each cell counts submissions of that kind whose content touches the theme, so a row's cells can sum to more than `submissions`. " +
+      (p.classified ? "`who` is the LLM-assigned commenter type (`submissions.ai_type`); swap in `s.category_group` for the category submitters chose themselves." : "`who` is the regulations.gov category, normalized ('Not specified' when none was chosen)."),
+  });
+
+  if (p.classified) ex.push({
+    title: "Organizations that filed under a person's name or anonymously",
+    question: "Which organizations does the filed metadata hide, and what did they file as?",
+    sql: `
+SELECT s.ai_organization, t.label AS type, s.filed_as, s.submitter_name, s.category_group,
+       u.submissions, u.one_line_summary
+FROM submissions s
+JOIN units u ON u.id = s.unit_id AND s.is_unit_representative = 1
+JOIN submitter_types t ON t.key = s.ai_type
+WHERE s.ai_speaks_for = 'organization' AND s.filed_as <> 'organization'
+ORDER BY u.submissions DESC, s.ai_organization
+LIMIT 25`,
+    read: "Each row is an analyzed unit whose text (letterhead, 'on behalf of', signature) says it speaks for an organization although the organization field was blank. These are LLM judgments; check the full text (full database) before relying on one.",
   });
 
   ex.push({

@@ -457,15 +457,22 @@ group (plus singletons) in a clustered one. Form-letter members point at their r
   "version": 2,
   "documentId": "HHS-ONC-2025-0005",
   "clustered": true,
-  "submitterTypes": ["Individual", "Organization"],
+  "typeSource": "ai",
+  "submitterTypes": ["Physician", "Patient, family or caregiver", "Professional or trade association"],
+  "typeGroups": ["individual", "individual", "organization"],
+  "states": ["MA", "TX"],
+  "countries": ["United States"],
   "entityKeys": ["Health IT Standards|FHIR", "Government Bodies|ONC"],
   "comments": [
     {
       "id": "HHS-ONC-2025-0005-0002",
       "submitter": "Jane Doe",
-      "submitterType": 0,
+      "submitterType": 2,
+      "org": "Massachusetts Medical Society",
+      "filedAs": "p",
       "date": "2025-05-15T04:00:00.000Z",
-      "location": "MA, United States",
+      "state": 0,
+      "country": 0,
       "hasAttachments": true,
       "isRep": true,
       "clusterSize": 12,
@@ -480,6 +487,7 @@ group (plus singletons) in a clustered one. Form-letter members point at their r
       "id": "HHS-ONC-2025-0005-0107",
       "submitter": "John Roe",
       "submitterType": 0,
+      "filedAs": "p",
       "date": "2025-05-16T04:00:00.000Z",
       "rep": "HHS-ONC-2025-0005-0002",
       "addedWords": 45,
@@ -490,7 +498,17 @@ group (plus singletons) in a clustered one. Form-letter members point at their r
 }
 \`\`\`
 
-- \`submitterType\` and \`entities\` are indexes into \`submitterTypes\` and \`entityKeys\` ("Category|Label")
+- \`submitterType\` is an index into \`submitterTypes\`, the commenter type. With \`typeSource: "ai"\` these are
+  types assigned by an LLM (classify-submitters) from the form fields and the start and end of the text,
+  \`typeGroups\` says which are individual and which organization types, and \`org\` is the organization
+  the comment speaks for (when it differs from \`submitter\`). With \`typeSource: "filed"\` they are the
+  regulations.gov category the submitter chose, folded to one vocabulary; "Not specified" means none was chosen
+  (most submitters choose none, so it does not mean "individual")
+- \`filedAs\`: how it was filed, from the name fields: \`o\` organization field set, \`p\` a person's name, \`a\` anonymous.
+  \`submitter\` is the organization, else the person, else a name from the title (\`nameFromTitle\`), else "Anonymous"
+- \`state\` / \`country\` are indexes into \`states\` / \`countries\` (as entered; US state names as postal codes); \`city\` is a string.
+  \`date\` is when the agency received the comment
+- \`entities\` are indexes into \`entityKeys\` ("Category|Label")
 - \`summary\` is the one-line summary; \`themes\` lists theme codes the comment has extracts for
 - \`clusterSize\` > 1 marks a form-letter representative; \`rep\` on a member names its
   representative, whose summary, themes and text stand for the member. \`addedWords\` /

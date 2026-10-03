@@ -5,7 +5,10 @@ import type { Theme } from '../types'
 interface FilterAddButtonsProps {
   themes: Theme[]
   entities: Record<string, { label: string; definition?: string; mentionCount: number }[]>
-  submitterTypes: string[]
+  submitterTypes: { value: string; count: number }[]
+  typeLabel?: string
+  // More pickers (filed as, state); items carry their own selection state
+  extraPickers?: { label: string; items: PickerItem[]; onSelect: (key: string) => void }[]
   selectedThemes: string[]
   selectedEntities: string[]
   selectedSubmitterTypes: string[]
@@ -18,6 +21,8 @@ function FilterAddButtons({
   themes,
   entities,
   submitterTypes,
+  typeLabel = 'Type',
+  extraPickers = [],
   selectedThemes,
   selectedEntities,
   selectedSubmitterTypes,
@@ -57,15 +62,19 @@ function FilterAddButtons({
         onSelect={(key) => onAddEntity(key)}
       />
       <FilterPicker
-        label="Type"
+        label={typeLabel}
         colorClass="purple"
-        items={submitterTypes.map(type => ({
-          key: type,
-          label: type,
-          selected: selectedSubmitterTypes.includes(type),
+        items={submitterTypes.map(t => ({
+          key: t.value,
+          label: t.value,
+          count: t.count,
+          selected: selectedSubmitterTypes.includes(t.value),
         }))}
         onSelect={(key) => onAddSubmitterType(key)}
       />
+      {extraPickers.map(p => (
+        <FilterPicker key={p.label} label={p.label} colorClass="purple" items={p.items} onSelect={p.onSelect} />
+      ))}
     </div>
   )
 }
@@ -201,7 +210,7 @@ function FilterPicker({ label, colorClass, items, onSelect }: FilterPickerProps)
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Filter ${label.toLowerCase()}s...`}
+                placeholder={`Filter ${label.toLowerCase()}...`}
                 className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>

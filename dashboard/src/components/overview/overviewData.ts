@@ -15,6 +15,8 @@ export const PARTS: Array<{ key: Part; label: string; description: string; plain
 
 export const fmt = (n: number) => n.toLocaleString('en-US')
 
+export const FILED_AS_LABELS: Record<string, string> = { organization: 'Organization', person: 'Named person', anonymous: 'Anonymous' }
+
 export const pct = (n: number, total: number) => {
   if (!total) return '0%'
   const p = (n / total) * 100
@@ -59,7 +61,7 @@ export function deriveOverview(
   return {
     version: 0,
     composition,
-    submitters: [...byType.entries()].map(([label, count]) => ({ label, count, types: [label] })).sort((a, b) => b.count - a.count),
+    submitters: [...byType.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
     arrivals,
     themeGists,
     themeComposition: {},

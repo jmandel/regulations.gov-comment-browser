@@ -1,4 +1,4 @@
-import { ExternalLink, Paperclip, Calendar, MapPin, User, Quote, Users } from 'lucide-react'
+import { ExternalLink, Paperclip, Calendar, MapPin, Quote, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -8,6 +8,7 @@ import useStore from '../store/useStore'
 import type { Comment } from '../types'
 import { useCommentContent } from '../utils/commentData'
 import CampaignBadge from './CampaignBadge'
+import { SubmitterIcon, SubmitterName, SubmitterType } from './SubmitterInfo'
 import { useMemo } from 'react'
 import { excerptPassages, countPassagesIn, remarkHighlightPassages } from '../utils/scopeHighlight'
 
@@ -42,9 +43,9 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
         {/* Row 1: Author + actions */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center space-x-2 min-w-0 flex-1">
-            <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
-            <h4 className="font-semibold text-gray-900 truncate">{comment.submitter}</h4>
-            <span className="text-sm text-gray-600 flex-shrink-0 hidden sm:inline">• {comment.submitterType}</span>
+            <SubmitterIcon comment={comment} />
+            <SubmitterName comment={comment} />
+            <SubmitterType comment={comment} className="flex-shrink min-w-0 truncate hidden sm:inline" />
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
             <CampaignBadge comment={comment} />
@@ -73,13 +74,13 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
 
         {/* Row 2: Metadata */}
         <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-2 text-sm text-gray-600">
-          <span className="text-sm text-gray-600 sm:hidden">• {comment.submitterType}</span>
-          <span className="flex items-center space-x-1">
+          <SubmitterType comment={comment} className="sm:hidden" />
+          <span className="flex items-center space-x-1" title="Date received">
             <Calendar className="h-3 w-3 flex-shrink-0" />
             <span>{formatDate(comment.date)}</span>
           </span>
           {comment.location && (
-            <span className="flex items-center space-x-1 hidden sm:flex">
+            <span className="flex items-center space-x-1">
               <MapPin className="h-3 w-3" />
               <span>{comment.location}</span>
             </span>
@@ -175,6 +176,11 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
               <div className="mb-6">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
                   <span className="bg-gray-600 text-white px-2 py-0.5 rounded text-xs mr-2">COMMENTER PROFILE</span>
+                  {representativeComment && (
+                    <span className="normal-case font-normal">
+                      of the representative comment by {representativeComment.submitter} (<Link to={`/comments/${representativeComment.id}`} className="underline">#{representativeComment.id}</Link>), not of {comment.submitter}
+                    </span>
+                  )}
                 </h5>
                 <div className="text-sm pl-4 border-l-2 border-gray-200">
                   <ReactMarkdown 

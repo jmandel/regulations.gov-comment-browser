@@ -4,7 +4,8 @@ import { mkdir, writeFile, rm } from "fs/promises";
 import { readdirSync, statSync } from "fs";
 import { join } from "path";
 import { readDocumentInfo } from "./lib/document-meta";
-import { buildDatasetPacks, submitterCategoryLabel, DEFAULT_SITE_URL, packDownloadsBaseUrl } from "./lib/dataset-pack";
+import { buildDatasetPacks, DEFAULT_SITE_URL, packDownloadsBaseUrl } from "./lib/dataset-pack";
+import { submitterView, loadClassifications, foldCategory, type FiledAs } from "./lib/submitter-meta";
 import { PhraseIndexBuilder } from "./lib/phrase-index";
 import { openScopeDbReadOnly, getScope, relevanceIsCurrent, scopeCounts, listPublishableScopes } from "./lib/scope-db";
 
@@ -319,9 +320,17 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
   type Part = "campaignCopies" | "campaignReworded" | "typed" | "attached";
   const composition: Record<Part, number> = { campaignCopies: 0, campaignReworded: 0, typed: 0, attached: 0 };
   const partOf = new Map<string, Part>();
-  const byCategory = new Map<string, { count: number; types: Map<string, number> }>();
+  // Who commented, from one source (see submitterView): AI-assigned types when classify-submitters
+  // ran, else the folded category each submitter chose. Plus how they filed and where they are.
+  const classifications = loadClassifications(db);
+  const classified = classifications.size > 0;
+  const byType = new Map<string, { count: number; group: string | null; key: string | null; orgs: Map<string, number> }>();
+  const filedAsCounts: Record<FiledAs, number> = { organization: 0, person: 0, anonymous: 0 };
+  const byState = new Map<string, number>(), byCountry = new Map<string, number>();
+  let withState = 0, withCountry = 0;
   const byDay = new Map<string, number>();
-  for (const r of db.prepare(`SELECT id, json_extract(attributes_json, '$.category') AS category, json_extract(attributes_json, '$.organization') AS org,
+  const ATTRS = ["category", "organization", "firstName", "lastName", "title", "city", "stateProvinceRegion", "country"];
+  for (const r of db.prepare(`SELECT id, ${ATTRS.map(a => `json_extract(attributes_json, '$.${a}') AS ${a}`).join(", ")},
       COALESCE(json_extract(attributes_json, '$.receiveDate'), json_extract(attributes_json, '$.postedDate')) AS received FROM comments`).all() as any[]) {
     if (inScope && !inScope.has(r.id)) continue;
     const reworded = campaignOf.get(r.id);
@@ -329,11 +338,14 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
     composition[part]++;
     partOf.set(r.id, part);
 
-    // Same expression as comments-index.json's submitterType, so the browser filter matches
-    const raw = r.category || (r.org ? "Organization" : "Individual");
-    const label = submitterCategoryLabel(raw);
-    let c = byCategory.get(label); if (!c) byCategory.set(label, c = { count: 0, types: new Map() });
-    c.count++; c.types.set(raw, (c.types.get(raw) || 0) + 1);
+    // Same labels as comments-index.json, so the browser filters match these counts
+    const v = submitterView(r, classifications.get(r.id), classified);
+    let t = byType.get(v.type); if (!t) byType.set(v.type, t = { count: 0, group: v.typeGroup, key: v.typeKey, orgs: new Map() });
+    t.count++;
+    if (v.organization) t.orgs.set(v.organization, (t.orgs.get(v.organization) || 0) + 1);
+    filedAsCounts[v.filedAs]++;
+    if (v.state) { withState++; byState.set(v.state, (byState.get(v.state) || 0) + 1); }
+    if (v.country) { withCountry++; byCountry.set(v.country, (byCountry.get(v.country) || 0) + 1); }
 
     if (typeof r.received === "string" && /^\d{4}-\d{2}-\d{2}/.test(r.received)) {
       const day = r.received.slice(0, 10);
@@ -351,9 +363,21 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
     }
   }
 
-  const submitters = [...byCategory.entries()]
-    .map(([label, c]) => ({ label, count: c.count, types: [...c.types.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t) }))
+  const sortedCounts = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const submitters = [...byType.entries()]
+    .map(([label, t]) => ({
+      label, count: t.count,
+      ...(t.group ? { group: t.group } : {}),
+      // A few of the organizations behind an organization type, by submissions
+      ...(t.orgs.size ? { organizations: sortedCounts(t.orgs).slice(0, 3).map(([name, count]) => ({ name, count })), organizationCount: t.orgs.size } : {}),
+    }))
     .sort((a, b) => b.count - a.count);
+  const total = composition.campaignCopies + composition.campaignReworded + composition.typed + composition.attached;
+  const geography = {
+    total, withState, withCountry,
+    states: sortedCounts(byState).map(([state, count]) => ({ state, count })),
+    countries: sortedCounts(byCountry).map(([country, count]) => ({ country, count })),
+  };
 
   // The same split within each top-level theme: a unit's extracts speak for its form-letter copies
   const membersOf = new Map<string, string[]>();
@@ -382,7 +406,7 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
     if (gist) themeGists[t.code] = gist;
   }
 
-  return { version: 1, composition, submitters, arrivals, themeGists, themeComposition };
+  return { version: 2, composition, submitters, typeSource: classified ? "ai" : "filed", filedAs: filedAsCounts, geography, arrivals, themeGists, themeComposition };
 }
 
 // A short gist of a theme report: its first sentence without the "Across N submissions (M distinct
@@ -769,7 +793,7 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
   for (const r of rows) {
     if (isMember(r)) continue;
     const attrs = JSON.parse(r.attributes_json);
-    const submitter = attrs.organization || `${attrs.firstName || ''} ${attrs.lastName || ''}`.trim() || 'Anonymous';
+    const submitter = submitterView(attrs, undefined, false).name;
     let sections: any = null;
     const cc = condensed.get(r.id);
     if (cc) {
@@ -818,25 +842,36 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
   await flushDetail();
   await flushText();
 
-  const submitterTypes: string[] = [];
-  const typeIdx = new Map<string, number>();
-  const typeIndex = (t: string) => {
-    let i = typeIdx.get(t);
-    if (i === undefined) { i = submitterTypes.length; submitterTypes.push(t); typeIdx.set(t, i); }
-    return i;
+  // Submitter fields: one commenter type per comment (AI-assigned when classify-submitters ran,
+  // else the folded filed category; see submitterView), as indexes into small lookup arrays
+  const classifications = loadClassifications(db);
+  const classified = classifications.size > 0;
+  const lookup = () => {
+    const values: string[] = [], idx = new Map<string, number>();
+    return { values, of: (v: string) => { let i = idx.get(v); if (i === undefined) { i = values.length; values.push(v); idx.set(v, i); } return i; } };
   };
+  const types = lookup(), states = lookup(), countries = lookup();
+  const typeGroups: Array<string | null> = [];
   for (const r of rows) {
     const attrs = JSON.parse(r.attributes_json);
     const member = isMember(r);
     const repId = member ? r.representative_comment_id : r.id;
+    const v = submitterView(attrs, classifications.get(r.id), classified);
+    const typeIdx = types.of(v.type);
+    typeGroups[typeIdx] = v.typeGroup;
     const entry: any = {
       id: r.id,
-      submitter: attrs.organization || `${attrs.firstName || ''} ${attrs.lastName || ''}`.trim() || 'Anonymous',
-      submitterType: typeIndex(attrs.category || (attrs.organization ? 'Organization' : 'Individual')),
-      date: attrs.postedDate || attrs.receiveDate,
+      submitter: v.name,
+      submitterType: typeIdx,
+      filedAs: v.filedAs[0], // o | p | a
+      // When the agency received it (the Overview's arrivals chart uses the same date)
+      date: attrs.receiveDate || attrs.postedDate,
     };
-    const location = [attrs.city, attrs.stateProvinceRegion, attrs.country].filter(Boolean).join(', ');
-    if (location) entry.location = location;
+    if (v.nameFromTitle) entry.nameFromTitle = true;
+    if (v.organization && v.organization !== v.name) entry.org = v.organization;
+    if (v.city) entry.city = v.city;
+    if (v.state) entry.state = states.of(v.state);
+    if (v.country) entry.country = countries.of(v.country);
     if ((attachmentCounts.get(r.id) || 0) > 0) entry.hasAttachments = true;
     const camp = campaignOf.get(r.id);
     if (camp) {
@@ -874,7 +909,11 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
     version: 2,
     documentId,
     clustered: hasClusteringData,
-    submitterTypes,
+    typeSource: classified ? "ai" : "filed",
+    submitterTypes: types.values,
+    typeGroups: classified ? typeGroups : undefined,
+    states: states.values,
+    countries: countries.values,
     entityKeys,
     comments: index,
   }));
@@ -927,7 +966,7 @@ async function generateClusterReport(db: any, outputDir: string) {
       cc.representative_comment_id,
       cc.cluster_size,
       GROUP_CONCAT(ccm.comment_id) as member_ids,
-      json_extract(c.attributes_json, '$.submitterType') as submitter_type,
+      json_extract(c.attributes_json, '$.category') as category,
       json_extract(c.attributes_json, '$.organization') as organization,
       substr(json_extract(c.attributes_json, '$.comment'), 1, 200) as snippet
     FROM comment_clusters cc
@@ -962,7 +1001,7 @@ async function generateClusterReport(db: any, outputDir: string) {
       representative: c.representative_comment_id,
       members: c.member_ids.split(','),
       metadata: {
-        submitterType: c.submitter_type,
+        category: foldCategory(c.category),
         organization: c.organization,
         snippetPreview: c.snippet ? c.snippet.substring(0, 100) + (c.snippet.length > 100 ? '...' : '') : null
       }

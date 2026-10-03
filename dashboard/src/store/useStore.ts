@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile, Campaign, OverviewData, ScopeInfo, ScopeUnitsFile, CompositionCounts } from '../types'
+import type { FiledAs, Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile, Campaign, OverviewData, ScopeInfo, ScopeUnitsFile, CompositionCounts } from '../types'
 import { ownData, sharedData, setSharedDataBase } from '../utils/dataPaths'
 import { parseThemeDescription, commentPart } from '../utils/helpers'
 import { parseSearchQuery, buildSearchText, matchesSearchText, type SearchToken } from '../utils/searchParser'
@@ -8,10 +8,26 @@ import { loadSearchIndex, peekSearchIndex, matchPhrases, searchWithIndex, verify
 interface FilterOptions {
   themes: string[]
   entities: string[]
-  submitterTypes: string[]
+  submitterTypes: string[] // commenter type labels
+  filedAs?: string[] // organization | person | anonymous
+  states?: string[]
   campaigns?: string[] // campaign ids
   parts?: string[] // Overview composition parts (campaignCopies, campaignReworded, typed, attached)
   searchQuery: string
+}
+
+// Filters on what each submission is (its own type, filing, state, composition part) rather than
+// on a unit's content. A unit matches when any of its submissions (itself and its form-letter
+// members) passes all of them, the same way the Overview counts submissions.
+const SUBMISSION_FILTERS = ['parts', 'submitterTypes', 'filedAs', 'states'] as const
+function submissionPredicate(f: FilterOptions): ((c: Comment) => boolean) | null {
+  const parts = f.parts?.length ? new Set(f.parts) : null
+  const types = f.submitterTypes?.length ? new Set(f.submitterTypes) : null
+  const filed = f.filedAs?.length ? new Set(f.filedAs) : null
+  const states = f.states?.length ? new Set(f.states) : null
+  if (!parts && !types && !filed && !states) return null
+  return c => (!parts || parts.has(commentPart(c))) && (!types || types.has(c.submitterType))
+    && (!filed || (!!c.filedAs && filed.has(c.filedAs))) && (!states || (!!c.state && states.has(c.state)))
 }
 
 // Progress of the current text search. `ids` is the set of matching units shown so far:
@@ -47,6 +63,7 @@ interface StoreState {
   campaignsById: Map<number, Campaign>
   overview: OverviewData | null
   hasClustering: boolean
+  typeSource: 'ai' | 'filed'
   filters: FilterOptions
   searchQuery: string
   search: SearchState
@@ -78,10 +95,14 @@ interface StoreState {
   // Per browsed unit, how many of its comments (itself and its form-letter members) fall in each
   // Overview composition part
   getUnitParts: () => Map<string, CompositionCounts>
+  // With submission filters active (type, filed as, state, part): per browsed unit, how many of its
+  // submissions match them all; null when none are active
+  getSubmissionMatches: () => Map<string, number> | null
   getCommentById: (commentId: string) => Comment | undefined
 }
 
 let searchGeneration = 0
+let submissionMatchCache: { all: Comment[]; key: string; map: Map<string, number> } | null = null
 const unitPartsCache = new WeakMap<Comment[], Map<string, CompositionCounts>>()
 const themeExtractRequests = new Map<string, Promise<void>>()
 
@@ -192,6 +213,7 @@ const useStore = create<StoreState>((set, get) => {
     campaignsById: new Map(),
     overview: null,
     hasClustering: false,
+    typeSource: 'filed',
     themeIndex: {},
     entityIndex: {},
     themeExtracts: {},
@@ -211,6 +233,8 @@ const useStore = create<StoreState>((set, get) => {
       themes: [],
       entities: [],
       submitterTypes: [],
+      filedAs: [],
+      states: [],
       campaigns: [],
       parts: [],
       searchQuery: ''
@@ -333,6 +357,7 @@ const useStore = create<StoreState>((set, get) => {
           campaignsById: new Map(scopedCampaigns.map(c => [c.id, c])),
           overview,
           hasClustering: index.clustered,
+          typeSource: index.typeSource || 'filed',
           themeIndex,
           entityIndex,
           organizationCategory: orgCategory,
@@ -392,22 +417,10 @@ const useStore = create<StoreState>((set, get) => {
         filtered = filtered.filter(c => c.campaignId !== undefined && wanted.has(c.campaignId))
       }
 
-      // Apply composition-part filters: units with at least one comment in the part
-      if (state.filters.parts?.length) {
-        const unitParts = state.getUnitParts()
-        const wanted = state.filters.parts as (keyof CompositionCounts)[]
-        filtered = filtered.filter(c => {
-          const n = unitParts.get(c.id)
-          return !!n && wanted.some(p => n[p] > 0)
-        })
-      }
-
-      // Apply submitter type filters
-      if (state.filters.submitterTypes?.length > 0) {
-        filtered = filtered.filter(c =>
-          state.filters.submitterTypes.includes(c.submitterType)
-        )
-      }
+      // Submission filters (type, filed as, state, composition part): units with at least one
+      // submission that passes them all
+      const matches = state.getSubmissionMatches()
+      if (matches) filtered = filtered.filter(c => (matches.get(c.id) || 0) > 0)
 
       console.log(`Total filtering time: ${(performance.now() - startTime).toFixed(2)}ms (${browsedUnits(state).length} → ${filtered.length} comments)`)
       return filtered
@@ -428,6 +441,23 @@ const useStore = create<StoreState>((set, get) => {
         unitPartsCache.set(all, m)
       }
       return m
+    },
+
+    getSubmissionMatches: () => {
+      const state = get()
+      const test = submissionPredicate(state.filters)
+      if (!test) return null
+      const all = state.scope && state.commentScope === 'docket' ? state.docketComments : state.comments
+      const key = JSON.stringify(SUBMISSION_FILTERS.map(k => state.filters[k] || []))
+      if (submissionMatchCache && submissionMatchCache.all === all && submissionMatchCache.key === key) return submissionMatchCache.map
+      const map = new Map<string, number>()
+      for (const c of all) {
+        if (!test(c)) continue
+        const unit = c.isClusterRepresentative === false ? c.clusterRepresentativeId! : c.id
+        map.set(unit, (map.get(unit) || 0) + 1)
+      }
+      submissionMatchCache = { all, key, map }
+      return map
     },
 
     getCommentsForTheme: (themeCode: string) => {
@@ -531,14 +561,17 @@ function expandCommentsIndex(index: CommentsIndexFile) {
     const sep = key.indexOf('|')
     return { category: key.slice(0, sep), label: key.slice(sep + 1) }
   })
+  const FILED: Record<string, FiledAs> = { o: 'organization', p: 'person', a: 'anonymous' }
   const comments: Comment[] = index.comments.map(raw => {
+    const state = raw.state !== undefined ? index.states?.[raw.state] : undefined
+    const country = raw.country !== undefined ? index.countries?.[raw.country] : undefined
     const c: Comment = {
       id: raw.id,
       documentId: index.documentId,
       submitter: raw.submitter,
-      submitterType: index.submitterTypes[raw.submitterType] ?? 'Unknown',
+      submitterType: index.submitterTypes[raw.submitterType] ?? 'Not specified',
       date: raw.date,
-      location: raw.location,
+      location: raw.location ?? ([raw.city, state, country].filter(Boolean).join(', ') || undefined),
       hasAttachments: !!raw.hasAttachments,
       wordCount: raw.wordCount,
       clusterSize: raw.clusterSize || 1,
@@ -547,6 +580,14 @@ function expandCommentsIndex(index: CommentsIndexFile) {
       detailShard: raw.detailShard,
       textShard: raw.textShard,
     }
+    const group = index.typeGroups?.[raw.submitterType]
+    if (group) c.typeGroup = group
+    if (raw.filedAs) c.filedAs = FILED[raw.filedAs]
+    if (raw.nameFromTitle) c.nameFromTitle = true
+    if (raw.org) c.org = raw.org
+    if (raw.city) c.city = raw.city
+    if (state) c.state = state
+    if (country) c.country = country
     if (raw.summary) c.structuredSections = { oneLineSummary: raw.summary }
     if (raw.themes) {
       c.themeScores = {}
