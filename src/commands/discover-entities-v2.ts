@@ -48,6 +48,7 @@ export const discoverEntitiesV2Command = new Command("discover-entities-v2")
   .option("-m, --model <model>", "AI model to use (overrides batch-config)")
   .option("--batch", "Use the Gemini Batch API (half price, slower; one batch job per phase)")
   .option("--dry-run <file>", "Open the docket DB read-only and write the discovered taxonomy (with unit counts) to <file> instead of saving it; LLM responses are cached in <file>.cache.sqlite")
+  .option("--force", "Re-run discovery even if the docket already has entities (replaces them and their annotations)")
   .option("--discover-only", "Only discover entities, skip annotation")
   .option("--annotate-only", "Only annotate comments with existing entities")
   .action(discoverEntitiesV2);
@@ -88,9 +89,9 @@ async function discoverEntitiesV2(documentId: string, options: any) {
     // Check existing entities
     const existingEntities = db.prepare("SELECT COUNT(*) as count FROM entity_taxonomy").get() as { count: number };
     
-    if (shouldDiscover && existingEntities.count > 0 && !dryRun) {
+    if (shouldDiscover && existingEntities.count > 0 && !dryRun && !options.force) {
       console.log(`⚠️  Entities already discovered (${existingEntities.count} entities)`);
-      console.log("   To re-run discovery, clear entity_taxonomy table first");
+      console.log("   To re-run discovery, pass --force");
       if (!shouldAnnotate) {
         // User only wants to discover, but entities already exist
         db.close();
@@ -117,7 +118,7 @@ async function discoverEntitiesV2(documentId: string, options: any) {
     console.log(`📊 Found ${allComments.length} units (transcribed; representatives only if clustered; no_substance excluded)`);
     
     // Discovery phase
-    if (shouldDiscover && (existingEntities.count === 0 || dryRun)) {
+    if (shouldDiscover && (existingEntities.count === 0 || dryRun || options.force)) {
       const result = await discoverEntities(db, cacheDb, model, allComments, cfg, options.seed ?? 1, options.batch ? 'batch' : 'live');
       if (options.debug) await debugSave('entities_v2_taxonomy.json', toTaxonomy(result.entities));
       if (dryRun) {
@@ -703,6 +704,9 @@ function saveEntities(db: Database, entities: WorkEntity[]) {
      VALUES (?, ?, ?, ?)`
   );
   withTransaction(db, () => {
+    // Replaces any earlier taxonomy (--force); its annotations go too, and annotation rebuilds them
+    db.prepare("DELETE FROM comment_entities").run();
+    db.prepare("DELETE FROM entity_taxonomy").run();
     for (const e of entities) insertEntity.run(e.category, e.label, e.definition, JSON.stringify(e.terms));
   });
   console.log(`   ✅ Saved ${entities.length} entities to database`);
