@@ -1,7 +1,6 @@
 import { Command } from "commander";
 import { basename, extname } from "path";
 import { loadCommentsCommand } from "./load-comments";
-import { clusterCommentsFastCommand } from "./cluster-comments-fast";
 import { clusterFormLettersCommand } from "./cluster-form-letters";
 import { tagCampaignsCommand } from "./tag-campaigns";
 import { matchScansCommand } from "./match-scans";
@@ -35,9 +34,8 @@ export const pipelineCommand = new Command("pipeline")
   .option("-m, --model <model>", "Override the per-step models in batch-config.json for every step (e.g. gemini-3.8-flash, gemini-3.5-flash-lite)")
   .option("--no-clustering", "Skip clustering entirely (process all comments)")
   .option("--recluster", "Force reclustering even if it exists")
-  .option("--cluster-method <method>", "Clustering method: form-letters (shared-template detection, default) or fast (whole-comment n-gram similarity)", "form-letters")
   .option("--tag-campaigns", "Run step 6, tag-campaigns: detect organized (incl. paraphrased) comment campaigns with embeddings + an LLM judge (~$3-4 at 43k comments). Off by default")
-  .option("--similarity-threshold <N>", "Similarity threshold for clustering (default: 0.5 for form-letters, 0.8 for fast)", parseFloat)
+  .option("--similarity-threshold <N>", "Similarity threshold for form-letter clustering (default: 0.5)", parseFloat)
   .option("--scope <slug>", "Run a scoped analysis instead (scope-relevance, discover-themes, extract-theme-content, summarize-themes in the scope DB). Requires the docket's steps 1-7 to be done and the scope created with 'scope create'")
   .action(async (sourceArg: string, options: any) => {
     if (options.scope) return runScopedPipeline(sourceArg, options);
@@ -95,8 +93,7 @@ export const pipelineCommand = new Command("pipeline")
             return;
           }
           
-          const clusterCommand = options.clusterMethod === "fast" ? clusterCommentsFastCommand : clusterFormLettersCommand;
-          await clusterCommand.parseAsync([
+          await clusterFormLettersCommand.parseAsync([
             'bun', 'cli.ts',
             documentId,
             ...(options.similarityThreshold ? ['--similarity-threshold', options.similarityThreshold] : []),

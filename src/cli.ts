@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { loadCommentsCommand } from "./commands/load-comments";
-import { clusterCommentsFastCommand } from "./commands/cluster-comments-fast";
 import { clusterFormLettersCommand } from "./commands/cluster-form-letters";
 import { tagCampaignsCommand } from "./commands/tag-campaigns";
 import { matchScansCommand } from "./commands/match-scans";
@@ -9,7 +8,6 @@ import { transcribeCommand } from "./commands/transcribe";
 import { triageCommand } from "./commands/triage";
 import { condenseCommand } from "./commands/condense";
 import { discoverThemesCommand } from "./commands/discover-themes";
-import { summarizeThemesCommand } from "./commands/summarize-themes";
 import { extractThemeContentCommand } from "./commands/extract-theme-content";
 import { summarizeThemesV2Command } from "./commands/summarize-themes-v2";
 import { discoverEntitiesV2Command } from "./commands/discover-entities-v2";
@@ -28,7 +26,6 @@ const program = new Command()
 
 // Register all commands
 program.addCommand(loadCommentsCommand);
-program.addCommand(clusterCommentsFastCommand);
 program.addCommand(clusterFormLettersCommand);
 program.addCommand(tagCampaignsCommand);
 program.addCommand(matchScansCommand);
@@ -36,7 +33,6 @@ program.addCommand(transcribeCommand);
 program.addCommand(triageCommand);
 program.addCommand(condenseCommand);
 program.addCommand(discoverThemesCommand);
-program.addCommand(summarizeThemesCommand);
 program.addCommand(extractThemeContentCommand);
 program.addCommand(summarizeThemesV2Command);
 program.addCommand(discoverEntitiesV2Command);

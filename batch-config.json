@@ -16,7 +16,6 @@
     "transcribe": {
       "concurrency": 5,
       "model": "gemini-3.5-flash-lite",
-      "batching": false,
       "description": "Transcribes comments with attachments into clean markdown; typed-only comments are stored as-is without an LLM call",
       "models": {
         "fallback": "gemini-3.8-flash"
@@ -34,7 +33,6 @@
     "condense": {
       "concurrency": 5,
       "model": "gemini-3.8-flash",
-      "batching": false,
       "description": "Extracts structured sections; Flash-Lite for typed comments, 3.8 Flash with thinking off for attachment letters (Flash-Lite omitted recommendations in long letters; thinking added cost with no quality gain in 2026-10 trials)",
       "models": {
         "typed": "gemini-3.5-flash-lite",
@@ -63,8 +61,7 @@
     "extractThemeContent": {
       "concurrency": 10,
       "model": "gemini-3.8-flash",
-      "batching": false,
-      "description": "Short units: Flash-Lite gate picks theme groups, then batched extraction per group. Long units: one call each with the whole taxonomy (no gate)",
+      "description": "Short units: Flash-Lite gate picks theme groups, then batched extraction per group. Long units: one call each with the whole taxonomy",
       "models": {
         "gate": "gemini-3.5-flash-lite",
         "short": "gemini-3.8-flash-nothink",
@@ -73,8 +70,7 @@
       "thresholds": {
         "shortMaxWords": 400,
         "shortBatchSize": 15,
-        "gateBatchSize": 40,
-        "longMode": "full"
+        "gateBatchSize": 40
       }
     },
     "summarizeThemes": {
@@ -93,8 +89,7 @@
         "description": "Batching for v2 summarization based on extracted content"
       },
       "thresholds": {
-        "minCommentsPerTheme": 5,
-        "maxHierarchyDepth": 2
+        "minCommentsPerTheme": 5
       }
     },
     "discoverEntities": {
@@ -113,7 +108,11 @@
         "name": "gemini-3.5-flash-lite"
       },
       "thresholds": {
-        "levels": [0.92, 0.94, 0.96],
+        "levels": [
+          0.92,
+          0.94,
+          0.96
+        ],
         "minUnits": 4,
         "minExact": 10,
         "mergeLevel": 0.95,
@@ -138,35 +137,6 @@
         "longBatchWords": 12000,
         "longBatchSize": 4
       }
-    },
-    "loadComments": {
-      "rateLimiting": {
-        "apiCallDelay": 1200,
-        "attachmentDelay": 1000,
-        "pageSize": 250,
-        "description": "Rate limits for regulations.gov API"
-      }
-    }
-  },
-  "pipeline": {
-    "errorHandling": {
-      "maxCrashes": 10,
-      "defaultRetryDelay": 5000,
-      "description": "Pipeline-level error recovery settings"
-    }
-  },
-  "models": {
-    "gemini-pro": {
-      "concurrency": 3.0,
-      "description": "Standard concurrency"
-    },
-    "gemini-flash": {
-      "concurrency": 6,
-      "description": "Can handle 50% more concurrent requests"
-    },
-    "gemini-flash-lite": {
-      "concurrency": 10,
-      "description": "Can handle 2x concurrent requests"
     }
   }
 }

@@ -56,26 +56,7 @@ export interface BatchConfigFile {
     discoverEntities?: EntityTaskConfig;
     tagCampaigns?: TaskConfig;
     scopeRelevance?: TaskConfig;
-    loadComments?: {
-      rateLimiting?: {
-        apiCallDelay?: number;
-        attachmentDelay?: number;
-        pageSize?: number;
-        description?: string;
-      };
-    };
   };
-  pipeline?: {
-    errorHandling?: {
-      maxCrashes?: number;
-      defaultRetryDelay?: number;
-      description?: string;
-    };
-  };
-  models?: Record<string, {
-    concurrency?: number;
-    description?: string;
-  }>;
 }
 
 let configCache: BatchConfigFile | null = null;
@@ -111,17 +92,12 @@ export function getTaskConfig(taskName: keyof BatchConfigFile['tasks'], model?: 
   validation?: Record<string, any>;
   thresholds?: Record<string, any>;
   stages?: EntityTaskConfig['stages'];
-  rateLimiting?: any;
 } {
   const config = loadBatchConfig();
   const taskConfig = config.tasks[taskName] || {};
   const globalDefaults = config.global;
   
-  // Calculate effective concurrency based on model
-  let concurrency = (taskConfig as any).concurrency || globalDefaults.concurrency.default;
-  if (model && config.models?.[model]?.concurrency) {
-    concurrency = Math.round(concurrency * config.models[model].concurrency);
-  }
+  const concurrency = (taskConfig as any).concurrency || globalDefaults.concurrency.default;
   
   return {
     concurrency,

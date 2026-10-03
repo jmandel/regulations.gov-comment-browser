@@ -77,7 +77,7 @@ async function condenseComments(documentId: string, options: any) {
   if (options.useClustering) {
     const clusteringExists = checkClusteringStatus(db);
     if (!clusteringExists) {
-      console.error("❌ No clustering data found. Run 'cluster-comments-fast' first.");
+      console.error("❌ No clustering data found. Run 'cluster-form-letters' first.");
       process.exit(1);
     }
     console.log("🔗 Using stored clustering to process only representative comments");

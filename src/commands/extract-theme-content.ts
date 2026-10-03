@@ -24,7 +24,6 @@ export const extractThemeContentCommand = new Command("extract-theme-content")
   .option("--use-clustering", "Only extract from representative comments, include cluster sizes")
   .option("--force", "Re-gate and re-extract units that were already processed")
   .option("--batch", "Use the Gemini Batch API (half price, slower)")
-  .option("--long-mode <mode>", "Long units: gated (one call per gated group) or full (one call with the whole taxonomy, no gate); default from config")
   .option("--gate-only", "Run only the gate phase (which theme groups each unit discusses)")
   .option("-d, --debug", "Enable debug output")
   .option("-c, --concurrency <n>", "Number of parallel API calls", parseInt)
@@ -128,7 +127,6 @@ interface Unit {
   id: string;
   text: string;          // what the model sees: profile + overview + full comment
   words: number;         // words in the comment body, for the short/long split
-  gateText: string;      // what the gate sees: long units get their condensed summary up front
   clusterSize: number;
   stanceOnly: boolean;
 }
@@ -164,7 +162,7 @@ function loadUnits(db: Database, options: any, shortMaxWords: number): Unit[] {
     if (r.triage_label === 'stance_only') {
       const body = htmlToText(r.raw_comment || '');
       const text = `## Full Comment\n${body}`;
-      return { id: r.id, text, gateText: text, words: wordCount(body), clusterSize: r.cluster_size, stanceOnly: true };
+      return { id: r.id, text, words: wordCount(body), clusterSize: r.cluster_size, stanceOnly: true };
     }
     const sections = JSON.parse(r.structured_sections || '{}');
     let text = '';
@@ -172,12 +170,7 @@ function loadUnits(db: Database, options: any, shortMaxWords: number): Unit[] {
     if (sections.oneLineSummary) text += `## Comment Overview\n${sections.oneLineSummary}\n\n`;
     const body = r.markdown || JSON.stringify(sections);
     text += `## Full Comment\n${body}`;
-    // A dense summary of the letter's points before the full text helps the gate catch
-    // topics raised briefly deep inside long letters
-    const summary = ['corePosition', 'keyRecommendations', 'mainConcerns', 'notableExperiences']
-      .filter(k => sections[k]).map(k => `### ${k}\n${sections[k]}`).join('\n\n');
-    const gateText = summary && wordCount(body) > shortMaxWords ? `## Summary of the Comment's Points\n${summary}\n\n${text}` : text;
-    return { id: r.id, text, gateText, words: wordCount(body), clusterSize: r.cluster_size, stanceOnly: false };
+    return { id: r.id, text, words: wordCount(body), clusterSize: r.cluster_size, stanceOnly: false };
   });
 }
 
@@ -232,17 +225,16 @@ async function extractThemeContent(documentId: string, options: any) {
   const gateBatchSize: number = taskConfig.thresholds?.gateBatchSize ?? 40;
   // "gated": long units go through the gate and get one call per addressed group.
   // "full": long units skip the gate and get one call with the whole taxonomy (sent once, no gate misses).
-  const longMode: 'gated' | 'full' = options.longMode || taskConfig.thresholds?.longMode || 'gated';
   const concurrency: number = options.concurrency || taskConfig.concurrency || 5;
   const mode = options.batch ? "batch" : "live";
 
   console.log(`🎯 Extracting theme-specific content for document ${documentId}`);
   console.log(`   Models: gate=${models.gate}, short=${models.short}, long=${models.long} (${mode})`);
-  console.log(`   Short units ≤${shortMaxWords} words: ${gateBatchSize}/gate call, ${shortBatchSize}/extract call; long units: ${longMode === 'full' ? 'one call with the full taxonomy' : 'gated, one call per group'}`);
+  console.log(`   Short units ≤${shortMaxWords} words: ${gateBatchSize}/gate call, ${shortBatchSize}/extract call; long units: one call each with the full taxonomy`);
 
   if (options.useClustering) {
     if (!checkClusteringStatus(db)) {
-      console.error("❌ No clustering data found. Run 'cluster-comments-fast' first.");
+      console.error("❌ No clustering data found. Run 'cluster-form-letters' first.");
       process.exit(1);
     }
     console.log("🔗 Using stored clustering to process only representative comments");
@@ -285,7 +277,8 @@ async function extractThemeContent(documentId: string, options: any) {
 
   // ── Phase 1: gate ────────────────────────────────────────────────────────────────────────
   const gated = new Set((db.prepare("SELECT comment_id FROM comment_theme_group_status").all() as { comment_id: string }[]).map(r => r.comment_id));
-  const toGate = units.filter(u => !gated.has(u.id) && (longMode === 'gated' || isShort(u)));
+  // Only short units are gated; long units get one call with the whole taxonomy
+  const toGate = units.filter(u => !gated.has(u.id) && isShort(u));
   console.log(`\n🚪 Gate: ${toGate.length} units to gate (${units.length - toGate.length} already gated)`);
 
   if (toGate.length > 0) {
@@ -296,13 +289,12 @@ async function extractThemeContent(documentId: string, options: any) {
 
     const runGatePass = async (items: Unit[], shortSize: number, pass: string) => {
       const batches = new Map<string, Unit[]>();
-      chunk(items.filter(isShort), shortSize).forEach((b, i) => batches.set(`gate-${pass}-s${i}`, b));
-      for (const u of items.filter(u => !isShort(u))) batches.set(`gate-${pass}-l-${u.id}`, [u]);
+      chunk(items, shortSize).forEach((b, i) => batches.set(`gate-${pass}-s${i}`, b));
       const requests: LlmRequest[] = [...batches].map(([key, batch]) => ({
         key,
         model: models.gate,
         // Short local ids: models copy "c17" more reliably than long docket-prefixed ids
-        parts: [{ text: buildThemeGatePrompt(ruleTitle, gateGroupsText, batch.map((u, j) => ({ id: `c${j + 1}`, text: u.gateText })), scopeMd) }],
+        parts: [{ text: buildThemeGatePrompt(ruleTitle, gateGroupsText, batch.map((u, j) => ({ id: `c${j + 1}`, text: u.text })), scopeMd) }],
         config: { responseMimeType: "application/json" },
       }));
       if (options.debug) for (const r of requests.slice(0, 3)) await debugSave(`theme_${r.key}_prompt.txt`, r.parts[0].text!);
@@ -346,7 +338,7 @@ async function extractThemeContent(documentId: string, options: any) {
   const gatedNow = new Set((db.prepare("SELECT comment_id FROM comment_theme_group_status").all() as { comment_id: string }[]).map(r => r.comment_id));
   const gatedUnits = units.filter(u => gatedNow.has(u.id));
   const avg = (us: Unit[]) => us.length ? (us.reduce((s, u) => s + (unitGroups.get(u.id)?.length || 0), 0) / us.length).toFixed(1) : '-';
-  console.log(`   Groups per unit: short ${avg(gatedUnits.filter(isShort))}, long ${avg(gatedUnits.filter(u => !isShort(u)))} of ${themeGroups.length}; ${gatedUnits.filter(u => !unitGroups.has(u.id)).length} units address no group`);
+  console.log(`   Groups per short unit: ${avg(gatedUnits.filter(isShort))} of ${themeGroups.length}; ${gatedUnits.filter(u => isShort(u) && !unitGroups.has(u.id)).length} short units address no group`);
 
   if (options.gateOnly) {
     for (const [name, s] of phases) console.log(formatPhase(name, s));
@@ -357,16 +349,16 @@ async function extractThemeContent(documentId: string, options: any) {
   // ── Phase 2: extract ─────────────────────────────────────────────────────────────────────
   const extracted = new Set((db.prepare("SELECT comment_id || '|' || group_code AS k FROM comment_theme_extract_status").all() as { k: string }[]).map(r => r.k));
   // Work grouped by theme group so calls sharing a prefix run close together (implicit caching)
-  const work = new Map<string, { short: Unit[]; long: Unit[] }>();
-  for (const g of themeGroups) work.set(g.parentCode, { short: [], long: [] });
+  const work = new Map<string, Unit[]>();
+  for (const g of themeGroups) work.set(g.parentCode, []);
   let pairs = 0;
   const touched = new Set(toGate.map(u => u.id));   // units this run paid for, for the per-unit cost
   for (const u of units) {
-    if (longMode === 'full' && !isShort(u)) continue;   // handled by the full-taxonomy pass below
+    if (!isShort(u)) continue;   // long units: full-taxonomy pass below
     for (const code of unitGroups.get(u.id) || []) {
       if (extracted.has(`${u.id}|${code}`)) continue;
       touched.add(u.id);
-      (isShort(u) ? work.get(code)!.short : work.get(code)!.long).push(u);
+      work.get(code)!.push(u);
       pairs++;
     }
   }
@@ -380,18 +372,18 @@ async function extractThemeContent(documentId: string, options: any) {
   const doneExtract = new Set<string>();
   let saved = 0, offGroup = 0;
 
-  const runExtractPass = async (byGroup: Map<string, { short: Unit[]; long: Unit[] }>, shortSize: number, pass: string, role: 'short' | 'long') => {
+  // Short units, batched up to shortSize per call per theme group
+  const runShortPass = async (byGroup: Map<string, Unit[]>, shortSize: number, pass: string) => {
     const batches = new Map<string, { group: ThemeGroup; units: Unit[] }>();
-    for (const [code, w] of byGroup) {
+    for (const [code, items] of byGroup) {
       const group = groupByCode.get(code)!;
-      if (role === 'short') chunk(w.short, shortSize).forEach((b, i) => batches.set(`g${code}-${pass}-s${i}`, { group, units: b }));
-      else for (const u of w.long) batches.set(`g${code}-${pass}-l-${u.id}`, { group, units: [u] });
+      chunk(items, shortSize).forEach((b, i) => batches.set(`g${code}-${pass}-s${i}`, { group, units: b }));
     }
     if (batches.size === 0) return;
     const prefixes = new Map(themeGroups.map(g => [g.parentCode, buildThemeExtractPrefix(g.hierarchyText, scopeMd)]));
     const requests: LlmRequest[] = [...batches].map(([key, b]) => ({
       key,
-      model: models[role],
+      model: models.short,
       parts: [
         { text: prefixes.get(b.group.parentCode)! },
         { text: buildThemeExtractComments(b.units.map((u, j) => ({ id: `c${j + 1}`, text: u.text }))) },
@@ -400,7 +392,7 @@ async function extractThemeContent(documentId: string, options: any) {
     }));
     if (options.debug) for (const r of requests.slice(0, 3)) await debugSave(`theme_extract_${r.key}_prompt.txt`, r.parts.map(p => p.text).join(''));
 
-    phases.push([`extract ${role} ${pass}`, await runLlmRequests(requests, async (req, res) => {
+    phases.push([`extract short ${pass}`, await runLlmRequests(requests, async (req, res) => {
       const { group, units: batch } = batches.get(req.key)!;
       if (options.debug) await debugSave(`theme_extract_${req.key}_response.txt`, res.text);
       let parsed = parseObject(res.text);
@@ -421,12 +413,12 @@ async function extractThemeContent(documentId: string, options: any) {
           doneExtract.add(`${u.id}|${group.parentCode}`);
         });
       });
-    }, { db, task: `theme-extract-${role}`, mode, concurrency, label: `theme-extract-${role}-${pass}:${documentId}` })]);
+    }, { db, task: "theme-extract-short", mode, concurrency, label: `theme-extract-short-${pass}:${documentId}` })]);
   };
 
-  // Long units in "full" mode: one call each with the whole taxonomy; done-marker group_code '*'
+  // Long units: one call each with the whole taxonomy; done-marker group_code '*'
   const FULL = '*';
-  const fullUnits = longMode === 'full' ? units.filter(u => !isShort(u) && !extracted.has(`${u.id}|${FULL}`)) : [];
+  const fullUnits = units.filter(u => !isShort(u) && !extracted.has(`${u.id}|${FULL}`));
   const fullStage = async () => {
     if (fullUnits.length === 0) return;
     console.log(`📚 Full-taxonomy extraction for ${fullUnits.length} long units`);
@@ -474,22 +466,18 @@ async function extractThemeContent(documentId: string, options: any) {
   };
 
   // The passes are independent; in batch mode their jobs wait in the queue together
-  await Promise.all([
-    fullStage(),
-    runExtractPass(work, shortBatchSize, "p1", 'short'),
-    runExtractPass(work, shortBatchSize, "p1", 'long'),
-  ]);
+  await Promise.all([fullStage(), runShortPass(work, shortBatchSize, "p1")]);
 
   // Short units missing from a batched response get a call of their own
-  const retry = new Map<string, { short: Unit[]; long: Unit[] }>();
+  const retry = new Map<string, Unit[]>();
   let nRetry = 0;
-  for (const [code, w] of work) {
-    const missing = w.short.filter(u => !doneExtract.has(`${u.id}|${code}`));
-    if (missing.length > 0 && w.short.length > 1) { retry.set(code, { short: missing, long: [] }); nRetry += missing.length; }
+  for (const [code, items] of work) {
+    const missing = items.filter(u => !doneExtract.has(`${u.id}|${code}`));
+    if (missing.length > 0 && items.length > 1) { retry.set(code, missing); nRetry += missing.length; }
   }
   if (nRetry > 0) {
     console.log(`🔁 ${nRetry} short (unit, group) pairs missing from batched responses; retrying one per call`);
-    await runExtractPass(retry, 1, "p2", 'short');
+    await runShortPass(retry, 1, "p2");
   }
   const failedPairs = pairs - doneExtract.size;
   if (failedPairs > 0) console.warn(`⚠️  ${failedPairs} (unit, group) pairs not extracted; re-run to retry them`);
