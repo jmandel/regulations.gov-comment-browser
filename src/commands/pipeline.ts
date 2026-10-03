@@ -237,6 +237,7 @@ export const pipelineCommand = new Command("pipeline")
             documentId,
             ...(options.debug ? ['--debug'] : []),
             ...(options.model ? ['--model', options.model] : []),
+            ...(options.batch ? ['--batch'] : []),
           ]);
         }
       },

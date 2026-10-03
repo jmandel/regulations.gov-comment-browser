@@ -93,10 +93,16 @@
       }
     },
     "discoverEntities": {
+      "concurrency": 15,
       "model": "gemini-3.8-flash-nothink",
-      "description": "One LLM call builds an entity taxonomy (with match terms) from a seeded ~150k-word sample of units; every unit is then scanned locally. Entities are kept if found in at least min(1% of units, minUnitsCap) units and at most 50%",
+      "description": "Phases: a base taxonomy from a seeded random sample of wordsPerCall words; one call per top-level theme over that theme's units (long and attachment letters first, typedShare of the words for short typed comments) asking only for missing entities; a sweep reading every unit no call has read plus the rest of long letters (beyond maxWordsPerUnit) in parallel calls of sweepWordsPerCall words; one gap-fill call per top-level theme over the taxonomy and theme titles (no comment text) for broad, common entities the reading calls pass over; then one consolidation call over the entity lists, match counts and acronym contexts. Every unit is then scanned locally; entities are kept if found in at least min(1% of units, minUnitsCap) units and at most 50%",
       "thresholds": {
-        "minUnitsCap": 10
+        "minUnitsCap": 10,
+        "wordsPerCall": 150000,
+        "sweepWordsPerCall": 300000,
+        "maxWordsPerUnit": 4000,
+        "typedShare": 0.15,
+        "longMinWords": 400
       }
     },
     "tagCampaigns": {

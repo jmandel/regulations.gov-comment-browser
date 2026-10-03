@@ -141,6 +141,26 @@
             "minUnitsCap": {
               "type": "integer",
               "description": "Keep an entity found in at least min(1% of units, minUnitsCap) units"
+            },
+            "wordsPerCall": {
+              "type": "integer",
+              "description": "Words of comment text per base and theme call"
+            },
+            "sweepWordsPerCall": {
+              "type": "integer",
+              "description": "Words per sweep call; the sweep reads every unit no earlier call read, plus the rest of long letters"
+            },
+            "maxWordsPerUnit": {
+              "type": "integer",
+              "description": "Long letters are truncated to this many words in base and theme calls; the sweep reads the rest as further pieces"
+            },
+            "typedShare": {
+              "type": "number",
+              "description": "Share of a theme or sweep call's words given to short typed comments (the rest to long and attachment letters)"
+            },
+            "longMinWords": {
+              "type": "integer",
+              "description": "Units with attachments or more than this many words count as long letters"
             }
           }
         },
