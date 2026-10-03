@@ -2,7 +2,8 @@ import { Database } from "bun:sqlite";
 import { mkdir } from "fs/promises";
 import { join } from "path";
 
-export const DB_DIR = "dbs";
+// DB_DIR lets scripts (e.g. build-all-dashboards.sh --db-dir) point every command at another folder
+export const DB_DIR = process.env.DB_DIR || "dbs";
 
 // Ensure dbs directory exists
 await mkdir(DB_DIR, { recursive: true });

@@ -2,10 +2,11 @@ import { Command } from "commander";
 import { openDb } from "../lib/database";
 import { mkdir, writeFile, readdir } from "fs/promises";
 import { join } from "path";
+import { readDocumentInfo } from "../lib/document-meta";
 
 export const generateLandingPageCommand = new Command("generate-landing-page")
   .description("Generate static landing page listing all regulations")
-  .option("-d, --db-dir <dir>", "Directory containing SQLite databases", "dbs")
+  .option("-d, --db-dir <dir>", "Directory containing SQLite databases (default: $DB_DIR or dbs)", process.env.DB_DIR || "dbs")
   .option("-o, --output <file>", "Output HTML file path", "dist/index.html")
   .action(generateLandingPage);
 
@@ -60,35 +61,12 @@ async function generateLandingPage(options: any) {
     
     const db = openDb(documentId);
 
-    // Read document details from database
-    let title = documentId;
-    let docketId = documentId;
-    let agency = "Unknown Agency";
-    let commentEndDate = "";
-
-    const hasMetadata = db.prepare(`
-      SELECT name FROM sqlite_master
-      WHERE type='table' AND name='document_metadata'
-    `).get();
-
-    if (hasMetadata) {
-      const metadata = db.prepare(`
-        SELECT title, docket_id, agency_name, agency_id, comment_end_date
-        FROM document_metadata
-        LIMIT 1
-      `).get() as any;
-
-      if (metadata) {
-        title = metadata.title || documentId;
-        docketId = metadata.docket_id || documentId;
-        agency = metadata.agency_name || metadata.agency_id || "Unknown Agency";
-        if (metadata.comment_end_date) commentEndDate = metadata.comment_end_date;
-      } else {
-        console.warn(`  ⚠️  No metadata found in database for ${documentId}`);
-      }
-    } else {
-      console.warn(`  ⚠️  No document_metadata table in database for ${documentId}`);
-    }
+    // Read document details from database (with fallbacks for older databases)
+    const info = readDocumentInfo(db, documentId);
+    const title = info.title;
+    const docketId = info.docketId;
+    const agency = info.agency;
+    let commentEndDate = info.commentEndDate || "";
 
     // Get statistics
     const stats = {

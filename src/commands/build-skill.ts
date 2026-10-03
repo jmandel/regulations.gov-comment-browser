@@ -3,10 +3,11 @@ import { openDb } from "../lib/database";
 import { mkdir, writeFile, readdir } from "fs/promises";
 import { join } from "path";
 import { $ } from "bun";
+import { readDocumentInfo } from "../lib/document-meta";
 
 export const buildSkillCommand = new Command("build-skill")
   .description("Generate AI skill package from regulation databases")
-  .option("-d, --db-dir <dir>", "Directory containing SQLite databases", "dbs")
+  .option("-d, --db-dir <dir>", "Directory containing SQLite databases (default: $DB_DIR or dbs)", process.env.DB_DIR || "dbs")
   .option("-o, --output <dir>", "Output directory for skill files", "dist/skill")
   .option("--base-url <url>", "Base URL for published data", "https://joshuamandel.com/regulations.gov-comment-browser")
   .action(buildSkill);
@@ -60,29 +61,11 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
       let docketId = documentId;
 
       try {
-        const hasMetadata = db.prepare(`
-          SELECT name FROM sqlite_master
-          WHERE type='table' AND name='document_metadata'
-        `).get();
-
-        if (hasMetadata) {
-          const metadata = db.prepare(`
-            SELECT title, agency_name, agency_id, comment_end_date, docket_id
-            FROM document_metadata
-            LIMIT 1
-          `).get() as any;
-
-          if (metadata) {
-            title = metadata.title || documentId;
-            agency = metadata.agency_name || metadata.agency_id || "Unknown Agency";
-            if (metadata.comment_end_date) {
-              lastCommentDate = metadata.comment_end_date;
-            }
-            if (metadata.docket_id) {
-              docketId = metadata.docket_id;
-            }
-          }
-        }
+        const info = readDocumentInfo(db, documentId);
+        title = info.title;
+        agency = info.agency;
+        docketId = info.docketId;
+        if (info.commentEndDate) lastCommentDate = info.commentEndDate;
       } catch (_) {}
 
       // Fall back to latest comment date if no comment_end_date

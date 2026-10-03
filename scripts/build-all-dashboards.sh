@@ -161,7 +161,10 @@ main() {
                 ;;
         esac
     done
-    
+
+    # The pipeline commands read DB_DIR too (src/lib/database.ts), so --db-dir applies to them
+    export DB_DIR
+
     # Install dependencies unless skipped
     if [ "$SKIP_INSTALL" != "true" ]; then
         install_dependencies

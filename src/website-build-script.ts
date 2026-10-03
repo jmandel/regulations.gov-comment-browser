@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { openDb } from "./lib/database";
 import { mkdir, writeFile, rm } from "fs/promises";
 import { join } from "path";
+import { readDocumentInfo } from "./lib/document-meta";
 
 export const buildWebsiteCommand = new Command("build-website")
   .description("Generate static data files for web dashboard")
@@ -19,27 +20,19 @@ async function buildWebsite(documentId: string, options: any) {
   await mkdir(outputDir, { recursive: true });
   await mkdir(join(outputDir, "indexes"), { recursive: true });
   
-  // Look up docket ID from DB metadata (falls back to document ID)
-  const docMeta = db.prepare("SELECT docket_id, title, document_type, agency_id, comment_start_date, comment_end_date, metadata_json FROM document_metadata LIMIT 1").get() as
-    { docket_id?: string; title?: string; document_type?: string; agency_id?: string; comment_start_date?: string; comment_end_date?: string; metadata_json?: string } | null;
-  // Databases loaded before document_metadata existed: comment IDs carry the docket ID as their prefix
-  const firstCommentId = (db.prepare("SELECT id FROM comments ORDER BY id LIMIT 1").get() as { id?: string } | null)?.id;
-  const docketId = docMeta?.docket_id || firstCommentId?.match(/^(.+)-\d+$/)?.[1] || documentId;
-  // Some documents' title is only their Federal Register document number (e.g. "2025-13118"); prefer the subject
-  let title = docMeta?.title;
-  if (title && /^\d{4}-\d+$/.test(title.trim())) {
-    try { title = JSON.parse(docMeta?.metadata_json || "{}").subject || title; } catch {}
-  }
+  // Docket ID (used for URL paths) and title, with fallbacks for older databases
+  const info = readDocumentInfo(db, documentId);
+  const docketId = info.docketId;
 
   // 1. Generate metadata
   const meta = {
     documentId: docketId,
     sourceDocumentId: documentId,
-    title: title || docketId,
-    documentType: docMeta?.document_type || undefined,
-    agencyId: docMeta?.agency_id || undefined,
-    commentStartDate: docMeta?.comment_start_date || undefined,
-    commentEndDate: docMeta?.comment_end_date || undefined,
+    title: info.title,
+    documentType: info.documentType,
+    agencyId: info.agencyId,
+    commentStartDate: info.commentStartDate,
+    commentEndDate: info.commentEndDate,
     generatedAt: new Date().toISOString(),
     stats: getStats(db),
   };

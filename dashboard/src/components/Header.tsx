@@ -13,7 +13,7 @@ function Header() {
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Comment Analysis Dashboard</h1>
               <p className="text-sm text-gray-500 truncate">
-                Document: {meta?.documentId || 'Loading...'}
+                Docket {meta?.documentId || 'Loading...'}
                 {meta?.stats && (
                   <span className="ml-2">
                     • {meta.stats.totalComments.toLocaleString()} comments
