@@ -6,6 +6,8 @@ export interface Meta {
   commentStartDate?: string
   commentEndDate?: string
   generatedAt: string
+  // Downloadable analysis databases (zipped SQLite + README), in data/; absent in older builds
+  downloads?: Array<{ kind: 'slim' | 'full'; file: string; bytes: number; sqliteBytes?: number }>
   stats: {
     totalComments: number
     condensedComments: number

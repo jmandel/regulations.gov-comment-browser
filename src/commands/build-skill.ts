@@ -173,6 +173,56 @@ ${baseUrl}/{DOCKET_ID}/data/{FILE}
 
 Example: \`${baseUrl}/${dockets[0]?.id || "HHS-ONC-2025-0005-0001"}/data/meta.json\`
 
+## Downloadable Databases (best for serious analysis)
+
+If you can run code (a sandbox with Python or \`sqlite3\`), download a docket's analysis database
+instead of paging through JSON. Each docket publishes two zipped SQLite files, each with a README.md:
+
+\`\`\`
+${baseUrl}/{DOCKET_ID}/data/{DOCKET_ID}-slim.sqlite.zip   # metadata, groups, campaigns, summaries, themes, reports, extracted points
+${baseUrl}/{DOCKET_ID}/data/{DOCKET_ID}-full.sqlite.zip   # all of that + full comment text and attachment transcripts
+\`\`\`
+
+Exact file names and sizes are in \`meta.json\` → \`downloads\` (absent for dockets built before
+this feature). Start with the slim file (a few MB to tens of MB); fetch the full one when you need
+verbatim text or full-text search. The schema documents itself: \`.schema\` (or
+\`SELECT sql FROM sqlite_master\`) shows every table with a comment on each column, and
+\`SELECT section, body FROM _readme ORDER BY ord\` gives provenance, caveats and ~10 worked analyses.
+
+Key tables: \`docket\`, \`submissions\` (one row per comment as filed = people), \`units\`
+(one row per distinct analyzed text; \`units.submissions\` = how many people it stands for),
+\`themes\`, \`unit_themes\`, \`extract_items\` (each position/concern/recommendation/experience/quote
+per unit and theme), \`theme_reports\` (\`markdown\`), \`theme_report_items\`, \`campaigns\`,
+\`entities\`; FTS5 indexes \`extract_items_fts\`, \`summaries_fts\`, \`theme_reports_fts\`, and
+\`units_text_fts\` (full only). The largest dockets ship without the FTS indexes to stay small:
+if \`SELECT search_index FROM docket\` says \`not_included\`, run the SQL in
+\`SELECT body FROM _readme WHERE section = 'enable_search'\` once (about a minute) before MATCH queries.
+
+\`\`\`python
+import io, sqlite3, urllib.request, zipfile
+docket = "${dockets[0]?.id || "HHS-ONC-2025-0005"}"
+z = zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(f"${baseUrl}/{docket}/data/{docket}-slim.sqlite.zip").read()))
+z.extractall("."); db = sqlite3.connect(f"{docket}-slim.sqlite")
+print(db.execute("SELECT body FROM _readme WHERE section = 'counting'").fetchone()[0])
+\`\`\`
+
+\`\`\`sql
+-- Issues by people vs distinct texts (campaign amplification)
+SELECT code, label, submissions, units FROM themes WHERE parent_code IS NULL ORDER BY submissions DESC;
+-- Who recommended what on a topic, weighted by the people each text stands for
+SELECT s.submitter_name, s.organization, e.theme_code, e.text, e.submissions
+FROM extract_items_fts f JOIN extract_items e ON e.id = f.rowid JOIN submissions s ON s.id = e.unit_id
+WHERE extract_items_fts MATCH '"prior authorization"' AND e.kind = 'recommendation'
+ORDER BY bm25(extract_items_fts) LIMIT 20;
+-- Largest campaigns
+SELECT name, submissions, exact_copies, paraphrased FROM campaigns ORDER BY submissions DESC LIMIT 10;
+-- Read a theme report
+SELECT markdown FROM theme_reports WHERE theme_code = '1';
+\`\`\`
+
+Always say whether a number counts submissions (people) or units (distinct texts). Summaries,
+extracts, reports, transcripts of attachments, campaign tags and triage labels are LLM output.
+
 ## How to Approach Different Queries
 
 Think about what the user actually needs before fetching data. The pre-built theme summaries

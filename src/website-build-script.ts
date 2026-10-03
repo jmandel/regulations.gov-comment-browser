@@ -3,11 +3,14 @@ import { openDb } from "./lib/database";
 import { mkdir, writeFile, rm } from "fs/promises";
 import { join } from "path";
 import { readDocumentInfo } from "./lib/document-meta";
+import { buildDatasetPacks, submitterCategoryLabel, DEFAULT_SITE_URL } from "./lib/dataset-pack";
 
 export const buildWebsiteCommand = new Command("build-website")
   .description("Generate static data files for web dashboard")
   .argument("<document-id>", "Document ID (e.g., CMS-2025-0050-0031)")
   .option("-o, --output <dir>", "Output directory", "dist/data")
+  .option("--no-packs", "Skip the downloadable slim/full SQLite databases")
+  .option("--site-url <url>", "Published site base URL (recorded in the downloadable databases)", DEFAULT_SITE_URL)
   .action(buildWebsite);
 
 async function buildWebsite(documentId: string, options: any) {
@@ -25,7 +28,7 @@ async function buildWebsite(documentId: string, options: any) {
   const docketId = info.docketId;
 
   // 1. Generate metadata
-  const meta = {
+  const meta: Record<string, any> = {
     documentId: docketId,
     sourceDocumentId: documentId,
     title: info.title,
@@ -36,8 +39,6 @@ async function buildWebsite(documentId: string, options: any) {
     generatedAt: new Date().toISOString(),
     stats: getStats(db),
   };
-  await writeJson(join(outputDir, "meta.json"), meta);
-  
   // 2. Export theme hierarchy with counts
   const themes = getThemeHierarchy(db);
   await writeJson(join(outputDir, "themes.json"), themes);
@@ -67,6 +68,15 @@ async function buildWebsite(documentId: string, options: any) {
 
   // 10. Small precomputed figures for the Overview page
   await writeJson(join(outputDir, "overview.json"), getOverview(db, themes, themeSummaries));
+
+  // 11. Downloadable analysis databases (<docket>-slim.sqlite.zip, <docket>-full.sqlite.zip);
+  // the Overview lists them from meta.downloads
+  for (const stale of [`${docketId}-slim.sqlite.zip`, `${docketId}-full.sqlite.zip`]) await rm(join(outputDir, stale), { force: true });
+  if (options.packs !== false) {
+    const packs = await buildDatasetPacks(db, { documentId, outputDir, siteUrl: options.siteUrl });
+    if (packs.length) meta.downloads = packs.map(p => ({ kind: p.kind, file: p.file, bytes: p.bytes, sqliteBytes: p.sqliteBytes }));
+  }
+  await writeJson(join(outputDir, "meta.json"), meta);
 
   console.log(`✅ Website data built in ${outputDir}`);
   db.close();
@@ -227,21 +237,6 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
   }
 
   return { version: 1, composition, submitters, arrivals, themeGists, themeComposition };
-}
-
-// regulations.gov mixes two category vocabularies ("Physician - HC005" and "Health Care
-// Professional/Association - Physician"); fold them onto one plain name.
-function submitterCategoryLabel(raw: string): string {
-  let s = raw.trim().replace(/\s+-\s+[A-Z]{1,3}\d{3,4}$/, "");
-  s = s.replace(/^Health Care (Professional|Provider)(\/| or )Association\s+-\s+/, "");
-  const fixes: Record<string, string> = {
-    "Other Practitione": "Other Practitioner", "Occupational Therapis": "Occupational Therapist",
-    "Dietician/Nutritionist": "Dietitian/Nutritionist", "Federal Government": "Government - Federal",
-    "State Government": "Government - State", "Other Government": "Government - Other",
-    "Health Care Professional or Association": "Other Health Care Professional",
-    "Health Care Provider/Association": "Other Health Care Provider", "Other": "Other",
-  };
-  return fixes[s] || s;
 }
 
 // A short gist of a theme report: its first sentence without the "Across N submissions (M distinct

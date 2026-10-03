@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
 import useStore from '../store/useStore'
 import { CompositionBar, SplitBar, ArrivalsChart } from './overview/OverviewCharts'
+import { DataDownloads } from './overview/DataDownloads'
 import { deriveOverview, fmt, shareInWords, formatDay, PARTS, partLabel } from './overview/overviewData'
 
 const SUBMITTER_ROWS = 8
@@ -196,6 +197,8 @@ function OverviewPanel() {
               </ul>
             </section>
           )}
+
+          {meta?.downloads && meta.downloads.length > 0 && <DataDownloads downloads={meta.downloads} />}
         </aside>
       </div>
     </div>
