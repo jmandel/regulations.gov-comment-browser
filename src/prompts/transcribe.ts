@@ -12,6 +12,7 @@ Transcribe the FULL substantive content of the comment and all attachments into 
 - **Preserve section structure** — if the original has sections, headings, or numbered responses to specific questions, keep that organization
 - **Keep technical terms and acronyms** intact
 - **Keep all quotations, statistics, and specific references** verbatim
+- **Describe non-text content for a reader who can't see the page** — charts, figures, diagrams, images, and anything conveyed by color, shading or position (a Gantt chart, a shaded table, an annotated screenshot). State what it shows in words or as a table with the actual values and labels; for a timeline, give each row's start and end. Never leave table cells empty when the original shows something in them. Skip purely decorative images such as logos
 
 **The ONLY things to remove:**
 - Page headers/footers, letterhead artifacts, and formatting noise from PDF extraction
