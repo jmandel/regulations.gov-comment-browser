@@ -1,6 +1,6 @@
 # Design: Scoped Analysis
 
-Status: proposed (2026-10-02). Not implemented.
+Status: phase 1 (backend) implemented 2026-10-02: `src/lib/scope-db.ts`, `src/commands/scope.ts` (`scope create|show|edit|list`, `scope-relevance`), `--scope` on discover-themes / extract-theme-content / summarize-themes-v2 / pipeline. Website output (phase 2) is not built yet. Where this doc and the code differ, the code wins; notably: scope DBs are flat files `dbs/<doc>.scope.<slug>.sqlite` (the Drive download flattens folders); the `scope` table also has `name` (<= ~6 words) and `summary` (one sentence), drafted by Flash-Lite when not given; relevance uses 3.8 Flash without thinking for short and long units (Flash-Lite had very poor precision on short units); summaries open with the theme's in-scope count against the in-scope and docket totals and store a `scopeCounts` object.
 
 ## Problem
 
@@ -116,7 +116,7 @@ Theme tables today have one taxonomy per DB (`theme_hierarchy.code` is the prima
 
 ```
 dbs/CMS-2026-2377-0002.sqlite                  # docket DB (unchanged)
-dbs/CMS-2026-2377-0002.scopes/interop.sqlite   # scope DB
+dbs/CMS-2026-2377-0002.scope.interop.sqlite    # scope DB
 ```
 
 - The scope DB contains only: `scope` (slug, name, prompt_md, seed_comment_id, created_at, updated_at), `scope_relevance` (comment_id PK, relevant, excerpt, note, is_seed), `theme_hierarchy`, `comment_theme_extracts`, `theme_summaries`, `llm_cache`.

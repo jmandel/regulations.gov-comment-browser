@@ -122,6 +122,23 @@
         "embeddingModel": "gemini-embedding-2"
       }
     },
+    "scopeRelevance": {
+      "concurrency": 10,
+      "model": "gemini-3.5-flash-lite",
+      "description": "Scoped analyses: judges whether each analysis unit addresses the scope and copies the in-scope passages. Short typed units (typed text, or the condensed summary when shorter) are judged 40 per call; attachment letters, promoted members and long typed comments from their full transcript, packed up to longBatchWords/longBatchSize per call. Both use 3.8 Flash without thinking: on the PFS sample Flash-Lite marked 29 of 657 short units relevant for an interoperability scope, nearly all generic fee-cut letters (3.8 Flash: 0, and no in-scope short units were missed); for long letters, low thinking (14/20 known positives) and one letter per call (15/20) both found fewer than no-thinking packed calls (18/20). 'label' drafts a scope's name/summary, 'draft' drafts a scope prompt from a seed comment",
+      "models": {
+        "short": "gemini-3.8-flash-nothink",
+        "long": "gemini-3.8-flash-nothink",
+        "label": "gemini-3.5-flash-lite",
+        "draft": "gemini-3.8-flash"
+      },
+      "thresholds": {
+        "longMinWords": 400,
+        "shortBatchSize": 40,
+        "longBatchWords": 12000,
+        "longBatchSize": 4
+      }
+    },
     "loadComments": {
       "rateLimiting": {
         "apiCallDelay": 1200,

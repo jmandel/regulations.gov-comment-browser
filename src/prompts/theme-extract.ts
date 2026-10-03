@@ -1,8 +1,17 @@
+import { scopeBlock, insertBefore } from "./scope";
+
 // Theme extraction prompt for one top-level theme group and one or more comments.
 // The fixed part (instructions + the group's themes) comes first and is identical for every
 // call on that group, so Gemini's implicit caching can reuse it; the comments come last.
 // The model emits entries only for themes a comment substantively addresses.
-export function buildThemeExtractPrefix(themeGroupText: string): string {
+// With a scope, the scope block goes in this shared prefix (before the themes) so prompt caching
+// still applies; without one the prompt is unchanged.
+export function buildThemeExtractPrefix(themeGroupText: string, scopeMd?: string): string {
+  const prefix = buildThemeExtractPrefixBase(themeGroupText);
+  return scopeMd ? insertBefore(prefix, "## Theme Group to Extract", scopeBlock(scopeMd)) : prefix;
+}
+
+function buildThemeExtractPrefixBase(themeGroupText: string): string {
   return `You are extracting the authentic substance of what commenters say about specific regulatory themes. Your goal is to capture their actual thinking, specific details, and unique perspective - not generic summaries.
 
 ## Theme Group to Extract

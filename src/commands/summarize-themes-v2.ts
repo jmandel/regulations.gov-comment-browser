@@ -11,6 +11,8 @@ import { getTaskConfig, getTaskRoleModel, getBatchOptions } from "../lib/batch-c
 import { createEvenBatches, countWords } from "../lib/batch-processor";
 import { checkClusteringStatus, extractMetadata } from "../lib/comment-processing";
 import { runLlmRequests, type LlmRequest } from "../lib/step-runner";
+import { openScopeForAnalysis, scopeCounts, denominatorText, hasClustering, type ScopeCounts } from "../lib/scope-db";
+import { scopeBlock, insertBefore } from "../prompts/scope";
 
 // Summaries run in phases across all themes at once, so independent calls run in parallel and
 // each phase can use the Batch API:
@@ -33,6 +35,7 @@ export const summarizeThemesV2Command = new Command("summarize-themes-v2")
   .option("--use-clustering", "Use only cluster representatives' extracts (weighted by cluster size)")
   .option("--batch", "Run calls through the Gemini Batch API (half price, minutes-to-hours per phase)")
   .option("--force", "Rebuild top-level group reports even if they are up to date")
+  .option("--scope <slug>", "Summarize a scoped analysis (scope DB; prompts get the scope and its denominators)")
   .action(summarizeThemesV2);
 
 interface ExtractRow {
@@ -50,6 +53,7 @@ interface StructureItem {
   analysis: string;
   knownIds: Set<string>;
   commentCount: number;
+  submissions: number;   // sum of cluster sizes (scoped runs record it with the summary)
   extraSections?: Record<string, unknown>;
 }
 
@@ -62,7 +66,25 @@ interface ThemeWork {
 async function summarizeThemesV2(documentId: string, options: any) {
   await initDebug(options.debug);
 
-  const db = openDb(documentId);
+  let db: Database;
+  // Scoped runs: scope + denominators go in every summary / merge / group-report prompt
+  // scopeCtx(themeSubmissions, themeUnits) is undefined for open-ended runs
+  let scopeCtx: ((subs: number, units: number) => string) | undefined;
+  let counts: ScopeCounts | undefined;
+  if (options.scope) {
+    const opened = openScopeForAnalysis(documentId, options.scope);
+    db = opened.db;
+    const c = counts = scopeCounts(db);
+    scopeCtx = (subs, units) => `${scopeBlock(opened.scope.prompt_md)}
+### How much of the docket is in scope
+${denominatorText(c)}
+This theme covers ${subs.toLocaleString("en-US")} in-scope submissions (${units.toLocaleString("en-US")} distinct comments or form-letter groups). Open the executive summary by stating that figure against the in-scope total and the docket total, e.g. "${subs.toLocaleString("en-US")} of the ${c.inScopeSubmissions.toLocaleString("en-US")} in-scope submissions (out of ${c.docketSubmissions.toLocaleString("en-US")} in the docket) ...".
+`;
+    if (hasClustering(db)) options.useClustering = true;
+    console.log(`🔭 Scope: ${opened.scope.slug} (${opened.scope.name})`);
+  } else {
+    db = openDb(documentId);
+  }
   const models = {
     summary: getTaskRoleModel('summarizeThemes', 'summary', options.model),
     merge: getTaskRoleModel('summarizeThemes', 'merge', options.model),
@@ -146,7 +168,7 @@ async function summarizeThemesV2(documentId: string, options: any) {
     batches.forEach((b, i) => phase1.push({
       key: `${theme.code}|b${i}`,
       model: models.summary,
-      parts: [{ text: buildSummaryPrompt(theme, b.items) }],
+      parts: [{ text: withScope(buildSummaryPrompt(theme, b.items), "## Your Task", scopeCtx?.(sumSize(extracts), extracts.length)) }],
     }));
   }
   if (phase1.length > 0) console.log(`📋 Phase 1: ${phase1.length} summary calls for ${work.length} themes (largest theme: ${Math.max(...batchCount.values())} batches)`);
@@ -169,7 +191,7 @@ async function summarizeThemesV2(documentId: string, options: any) {
         if (group.length > 1) requests.push({
           key: `${w.theme.code}|L${level}|P${i}`,
           model: models.merge,
-          parts: [{ text: buildMergePrompt(w.theme, group) }],
+          parts: [{ text: withScope(buildMergePrompt(w.theme, group), "## Analyses to Merge", scopeCtx?.(sumSize(w.extracts), w.extracts.length)) }],
         });
       });
     }
@@ -214,6 +236,7 @@ async function summarizeThemesV2(documentId: string, options: any) {
         const fixed = fixPartialCommentIds(sections, item.knownIds);
         if (fixed > 0) console.log(`   🔧 ${req.key}: fixed ${fixed} partial comment IDs`);
         Object.assign(sections, item.extraSections || {});
+        if (counts) sections.scopeCounts = { themeSubmissions: item.submissions, themeUnits: item.commentCount, ...counts };
         withTransaction(db, () => insert.run(req.key, JSON.stringify(sections), item.commentCount, 0));
         saved.add(req.key);
         if (options.debug) await debugSave(`theme_summary_v2_structured_${req.key}.json`, sections);
@@ -228,6 +251,7 @@ async function summarizeThemesV2(documentId: string, options: any) {
     analysis: w.analyses[0],
     knownIds: new Set(w.extracts.map(e => e.comment_id)),
     commentCount: w.extracts.length,
+    submissions: sumSize(w.extracts),
   })), 'Phase 3');
 
   // ---- Phase 4: group reports for top-level themes ----
@@ -241,7 +265,7 @@ async function summarizeThemesV2(documentId: string, options: any) {
     const rows = subtreeStmt.all(code, code) as { comment_id: string; cluster_size: number }[];
     return { ids: rows.map(r => r.comment_id), units: rows.length, submissions: rows.reduce((n, r) => n + (r.cluster_size || 1), 0) };
   };
-  const groupItems: { theme: ThemeRow; prompt: string; knownIds: Set<string>; commentCount: number; subThemes: string[] }[] = [];
+  const groupItems: { theme: ThemeRow; prompt: string; knownIds: Set<string>; commentCount: number; submissions: number; subThemes: string[] }[] = [];
   for (const code of [...groupCodes].sort((a, b) => Number(a) - Number(b))) {
     const theme = allThemes.find(t => t.code === code)!;
     const children = allThemes.filter(c => c.parent_code === code).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
@@ -278,14 +302,16 @@ ${JSON.stringify(sections, null, 1)}`;
       theme,
       knownIds: new Set(all.ids),
       commentCount: all.units,
+      submissions: all.submissions,
       subThemes: children.map(c => c.code),
-      prompt: THEME_GROUP_SUMMARY_PROMPT
+      prompt: withScope(THEME_GROUP_SUMMARY_PROMPT
         .replace('{THEME_CODE}', code)
         .replace('{THEME_DESCRIPTION}', () => fullDescription(theme))
         .replace('{TOTAL_SUBMISSIONS}', String(all.submissions))
         .replace('{TOTAL_UNITS}', String(all.units))
         .replace('{SUBTHEME_REPORTS}', () => childBlocks.join('\n\n---\n\n'))
         .replace('{DIRECT_EXTRACTS}', () => directBlocks.length ? directBlocks.join('\n\n---\n\n') : '(none)'),
+        "## What You Are Given", scopeCtx?.(all.submissions, all.units)),
     });
   }
   if (groupItems.length > 0) {
@@ -297,6 +323,7 @@ ${JSON.stringify(sections, null, 1)}`;
       analysis: res.get(g.theme.code)!,
       knownIds: g.knownIds,
       commentCount: g.commentCount,
+      submissions: g.submissions,
       extraSections: { reportType: 'group', subThemes: g.subThemes },
     })), 'Phase 4');
     for (const g of groupItems) if (!res.has(g.theme.code)) console.error(`   ❌ ${g.theme.code}: group report failed; rerun to retry`);
@@ -322,6 +349,15 @@ async function runText(
   }, { db, task, mode, concurrency, label: `${task}:${requests.length}` });
   tally.addSummary(task, summary);
   return out;
+}
+
+function sumSize(extracts: ExtractRow[]): number {
+  return extracts.reduce((n, e) => n + (e.cluster_size || 1), 0);
+}
+
+// Insert the scope context before `anchor` (no-op for open-ended runs, so their prompts are unchanged)
+function withScope(prompt: string, anchor: string, scopeCtx: string | undefined): string {
+  return scopeCtx ? insertBefore(prompt, anchor, scopeCtx) : prompt;
 }
 
 function fullDescription(theme: ThemeRow): string {

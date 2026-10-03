@@ -55,6 +55,7 @@ export interface BatchConfigFile {
     extractThemeContent?: TaskConfig;
     discoverEntities?: EntityTaskConfig;
     tagCampaigns?: TaskConfig;
+    scopeRelevance?: TaskConfig;
     loadComments?: {
       rateLimiting?: {
         apiCallDelay?: number;

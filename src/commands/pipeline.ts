@@ -16,6 +16,8 @@ import { buildWebsiteCommand } from "../website-build-script";
 import { vacuumDbCommand } from "./vacuum-db";
 import { openDb } from "../lib/database";
 import { checkClusteringStatus } from "../lib/comment-processing";
+import { scopeRelevanceCommand } from "./scope";
+import { openScopeDb, getScope, hasClustering } from "../lib/scope-db";
 
 export const pipelineCommand = new Command("pipeline")
   .description("Run the complete analysis pipeline: load, cluster, triage, transcribe, match scanned copies, tag campaigns (optional), condense, discover themes, extract theme content, summarize themes, discover entities, build website, and vacuum database")
@@ -36,7 +38,9 @@ export const pipelineCommand = new Command("pipeline")
   .option("--cluster-method <method>", "Clustering method: form-letters (shared-template detection, default) or fast (whole-comment n-gram similarity)", "form-letters")
   .option("--tag-campaigns", "Run step 6, tag-campaigns: detect organized (incl. paraphrased) comment campaigns with embeddings + an LLM judge (~$3-4 at 43k comments). Off by default")
   .option("--similarity-threshold <N>", "Similarity threshold for clustering (default: 0.5 for form-letters, 0.8 for fast)", parseFloat)
+  .option("--scope <slug>", "Run a scoped analysis instead (scope-relevance, discover-themes, extract-theme-content, summarize-themes in the scope DB). Requires the docket's steps 1-7 to be done and the scope created with 'scope create'")
   .action(async (sourceArg: string, options: any) => {
+    if (options.scope) return runScopedPipeline(sourceArg, options);
     // Detect if first argument is a CSV path (contains '.' or '/' or ends with .csv)
     const isCsv = sourceArg.includes("/") || sourceArg.toLowerCase().endsWith(".csv");
     const loadSource = sourceArg; // Passed to load-comments
@@ -331,3 +335,46 @@ export const pipelineCommand = new Command("pipeline")
       }
     }
   }); 
+
+// Scoped pipeline: S1 relevance, S2 discovery, S3 extraction, S4 summaries, all in the scope DB.
+// Every step resumes, so rerunning after a failure continues where it stopped. (Website output for
+// scopes is not built here yet.)
+async function runScopedPipeline(documentId: string, options: any) {
+  const slug: string = options.scope;
+  const db = openScopeDb(documentId, slug);
+  const scope = getScope(db);
+  // The docket's shared steps must be done: units without a condensed row are invisible to scoped
+  // steps. Allow a small failure rate (condense errors on a handful of comments).
+  const repsOnly = hasClustering(db);
+  const r = db.prepare(`
+    SELECT COUNT(*) AS units, SUM(cc.comment_id IS NOT NULL) AS condensed
+    FROM comments c
+    ${repsOnly ? "JOIN comment_cluster_membership m ON m.comment_id = c.id AND m.is_representative = 1" : ""}
+    LEFT JOIN condensed_comments cc ON cc.comment_id = c.id AND cc.status = 'completed'
+    WHERE c.id NOT IN (SELECT comment_id FROM comment_triage WHERE label IN ('no_substance', 'stance_only'))`).get() as { units: number; condensed: number | null };
+  db.close();
+  const missing = r.units - (r.condensed || 0);
+  if (!r.condensed || missing > Math.max(5, r.units * 0.02)) {
+    console.error(`❌ The docket's shared steps aren't done: ${r.condensed || 0} of ${r.units} units condensed. Run them first:\n   bun run src/cli.ts pipeline ${documentId} --start-at 1   (or --start-at <step> to resume; steps 1-7 are needed)`);
+    process.exit(1);
+  }
+  if (missing > 0) console.warn(`⚠️  ${missing} units have no condensed row and won't be in the scoped analysis`);
+
+  console.log(`🔭 Scoped pipeline for ${documentId} / ${slug}: ${scope.name}`);
+  const common = [
+    ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
+    ...(options.model ? ['--model', options.model] : []),
+    ...(options.batch ? ['--batch'] : []),
+  ];
+  const steps: [string, () => Promise<unknown>][] = [
+    ["S1 scope-relevance", () => scopeRelevanceCommand.parseAsync(['bun', 'cli.ts', documentId, '--scope', slug, ...common])],
+    ["S2 discover-themes", () => discoverThemesCommand.parseAsync(['bun', 'cli.ts', documentId, '--scope', slug, ...common, ...(options.debug ? ['--debug'] : [])])],
+    ["S3 extract-theme-content", () => extractThemeContentCommand.parseAsync(['bun', 'cli.ts', documentId, '--scope', slug, ...common, ...(options.debug ? ['--debug'] : [])])],
+    ["S4 summarize-themes", () => summarizeThemesV2Command.parseAsync(['bun', 'cli.ts', documentId, '--scope', slug, ...common, ...(options.debug ? ['--debug'] : [])])],
+  ];
+  for (const [name, run] of steps) {
+    console.log(`\n▶️  ${name}`);
+    await run();
+  }
+  console.log(`\n✅ Scoped analysis "${slug}" complete (website output for scopes: not built yet)`);
+}

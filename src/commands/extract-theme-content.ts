@@ -9,6 +9,7 @@ import { parseJsonResponse } from "../lib/json-parser";
 import { getTaskConfig, getTaskRoleModel } from "../lib/batch-config";
 import { runLlmRequests, type LlmRequest, type RunSummary } from "../lib/step-runner";
 import { htmlToText, wordCount } from "../lib/text";
+import { openScopeForAnalysis, hasClustering } from "../lib/scope-db";
 
 // Two phases per unit (a cluster representative, or every comment without clustering):
 //   1. gate:    which top-level theme groups the unit discusses (Flash-Lite; short units batched)
@@ -28,6 +29,7 @@ export const extractThemeContentCommand = new Command("extract-theme-content")
   .option("-d, --debug", "Enable debug output")
   .option("-c, --concurrency <n>", "Number of parallel API calls", parseInt)
   .option("-m, --model <model>", "AI model to use for every role (overrides config)")
+  .option("--scope <slug>", "Scoped analysis: extract only units judged relevant to the scope (scope DB; prompts get the scope)")
   .action(extractThemeContent);
 
 const SECTIONS = ['positions', 'concerns', 'recommendations', 'experiences', 'key_quotes'];
@@ -148,6 +150,7 @@ function loadUnits(db: Database, options: any, shortMaxWords: number): Unit[] {
     LEFT JOIN condensed_comments cc ON cc.comment_id = c.id AND cc.status = 'completed'
     LEFT JOIN transcriptions t ON t.comment_id = c.id AND t.status = 'completed'
     LEFT JOIN comment_triage tr ON tr.comment_id = c.id
+    ${options.scope ? "JOIN main.scope_relevance sr ON sr.comment_id = c.id AND sr.relevant = 1" : ""}
     WHERE (tr.label IS NULL OR tr.label != 'no_substance')
       AND (cc.comment_id IS NOT NULL OR tr.label = 'stance_only')
       ${options.force ? "" : `AND NOT (
@@ -206,7 +209,17 @@ function formatPhase(name: string, s: RunSummary): string {
 async function extractThemeContent(documentId: string, options: any) {
   await initDebug(options.debug);
 
-  const db = openDb(documentId);
+  let db: Database;
+  let scopeMd: string | undefined;   // scoped runs: scope block in every gate / extraction prefix
+  if (options.scope) {
+    const opened = openScopeForAnalysis(documentId, options.scope);
+    db = opened.db;
+    scopeMd = opened.scope.prompt_md;
+    if (hasClustering(db)) options.useClustering = true;   // relevance was judged on representatives
+    console.log(`🔭 Scope: ${opened.scope.slug} (${opened.scope.name}); only units judged relevant`);
+  } else {
+    db = openDb(documentId);
+  }
 
   const models = {
     gate: getTaskRoleModel('extractThemeContent', 'gate', options.model),
@@ -289,7 +302,7 @@ async function extractThemeContent(documentId: string, options: any) {
         key,
         model: models.gate,
         // Short local ids: models copy "c17" more reliably than long docket-prefixed ids
-        parts: [{ text: buildThemeGatePrompt(ruleTitle, gateGroupsText, batch.map((u, j) => ({ id: `c${j + 1}`, text: u.gateText }))) }],
+        parts: [{ text: buildThemeGatePrompt(ruleTitle, gateGroupsText, batch.map((u, j) => ({ id: `c${j + 1}`, text: u.gateText })), scopeMd) }],
         config: { responseMimeType: "application/json" },
       }));
       if (options.debug) for (const r of requests.slice(0, 3)) await debugSave(`theme_${r.key}_prompt.txt`, r.parts[0].text!);
@@ -375,7 +388,7 @@ async function extractThemeContent(documentId: string, options: any) {
       else for (const u of w.long) batches.set(`g${code}-${pass}-l-${u.id}`, { group, units: [u] });
     }
     if (batches.size === 0) return;
-    const prefixes = new Map(themeGroups.map(g => [g.parentCode, buildThemeExtractPrefix(g.hierarchyText)]));
+    const prefixes = new Map(themeGroups.map(g => [g.parentCode, buildThemeExtractPrefix(g.hierarchyText, scopeMd)]));
     const requests: LlmRequest[] = [...batches].map(([key, b]) => ({
       key,
       model: models[role],
@@ -419,7 +432,7 @@ async function extractThemeContent(documentId: string, options: any) {
     console.log(`📚 Full-taxonomy extraction for ${fullUnits.length} long units`);
     for (const u of fullUnits) touched.add(u.id);
     const allCodes = new Set(themeGroups.flatMap(g => [...g.themeCodes]));
-    const prefix = buildThemeExtractPrefix(themeGroups.map(g => g.hierarchyText).join("\n\n"));
+    const prefix = buildThemeExtractPrefix(themeGroups.map(g => g.hierarchyText).join("\n\n"), scopeMd);
     const fullDone = new Set<string>();
     const runFullPass = async (items: Unit[], pass: string) => {
       const requests: LlmRequest[] = items.map(u => ({

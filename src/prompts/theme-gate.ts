@@ -1,3 +1,5 @@
+import { scopeBlock, insertBefore } from "./scope";
+
 // Gate before theme extraction: decides which top-level theme groups each comment discusses
 // (the model lists sub-theme codes, which it matches more reliably; callers map them to groups),
 // so extraction only runs for those groups. Recall-biased: a missed group means a lost extract,
@@ -18,6 +20,17 @@ export function formatGateGroups(groups: GateGroup[]): string {
 
 // Fixed content (instructions + groups) comes first so it forms a shared, cacheable prefix
 export function buildThemeGatePrompt(
+  ruleTitle: string | null,
+  groupsText: string,
+  comments: { id: string; text: string }[],
+  scopeMd?: string
+): string {
+  const prompt = buildThemeGatePromptBase(ruleTitle, groupsText, comments);
+  // Scoped runs: the scope goes before the topics (part of the shared prefix)
+  return scopeMd ? insertBefore(prompt, "## Topics", scopeBlock(scopeMd)) : prompt;
+}
+
+function buildThemeGatePromptBase(
   ruleTitle: string | null,
   groupsText: string,
   comments: { id: string; text: string }[]

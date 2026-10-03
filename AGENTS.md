@@ -213,3 +213,13 @@ Measured sizes (zip): PFS 1-in-20 sample (1,364 comments) slim 5.2 MB / full 7.5
 ### Gemini sampling settings
 
 No temperature/top_p/top_k is set anywhere: Gemini 3.x models are meant to run at their default (temperature 1.0), and the sampling parameters are deprecated on 3.6 Flash and 3.5 Flash-Lite. All quality trials above ran at the defaults. Re-runs are kept stable by `llm_cache`, not by low temperature.
+
+### Scoped analyses
+
+A *scope* is a markdown prompt that focuses the analytic half of the pipeline on one question about a docket — a topic ("interoperability and health IT…"), a combination of topics, or "the issues raised in comment X" (drafted from a seed letter). Design: `docs/design/scoped-analysis.md`.
+
+- Each scope lives in its own small DB, `<DB_DIR>/<documentId>.scope.<slug>.sqlite` (flat naming so the Drive download script keeps it next to the docket DB), holding only scope tables (`scope`, `scope_relevance`, theme tables, `llm_cache`, `batch_jobs`). The docket DB is ATTACHed read-only (`src/lib/scope-db.ts`, `openScopeDb`), so scoped runs can never modify shared data. Code that iterates `dbs/*.sqlite` as dockets must skip scope DBs (`isScopeDbFile()`).
+- `scope create <doc> <slug> --prompt-file scope.md | --from-comment <commentId> [--name ..] [--summary ..]` (name ≤ ~6 words and a one-sentence summary are drafted by Flash-Lite when omitted; the full prompt can be long), `scope show|edit|list`.
+- `pipeline <doc> --scope <slug> [--batch]` runs, in the scope DB: **scope-relevance** (every unit judged relevant or not with its in-scope excerpt; condensed summary for short units, full text for long ones; `gemini-3.8-flash-nothink` for all units — Flash-Lite over-included generic fee-cut letters on short units) → **discover-themes** (on the relevance excerpts) → **extract-theme-content** (relevant units; scope block in the cached prompt prefix) → **summarize-themes-v2** (summaries state "X of the Y in-scope submissions (out of Z in the docket)"). Requires docket steps 1–7. Editing a scope's prompt makes its results stale; the next scope-relevance clears them. Prompts without `--scope` are byte-identical to before, so open-ended caches stay valid.
+- Evidence (1-in-20 PFS sample): interoperability scope 18 of 942 units relevant, ~$1.75 live; Johns Hopkins Medicine seed-letter scope 56% of submissions relevant, 13 top-level themes mapping onto the letter's issues, ~$3.41 batch. Long-letter relevance recall ~90% (misses were single sentences in 8,000-word letters), precision ~100%. Relevance alone is ~$17 per scope at full PFS scale.
+- Website sub-sites, landing-page listing and CI support for scopes are not built yet.

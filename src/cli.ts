@@ -19,6 +19,7 @@ import { generateLandingPageCommand } from "./commands/generate-landing-page";
 import { cacheCommand } from "./commands/cache";
 import { vacuumDbCommand } from "./commands/vacuum-db";
 import { buildSkillCommand } from "./commands/build-skill";
+import { scopeCommand, scopeRelevanceCommand } from "./commands/scope";
 
 const program = new Command()
   .name("regulations-comment-analysis")
@@ -45,6 +46,8 @@ program.addCommand(generateLandingPageCommand);
 program.addCommand(cacheCommand);
 program.addCommand(vacuumDbCommand);
 program.addCommand(buildSkillCommand);
+program.addCommand(scopeCommand);
+program.addCommand(scopeRelevanceCommand);
 
 // Parse and execute
 program.parse();
