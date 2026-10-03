@@ -10,6 +10,24 @@ import { useCommentContent } from '../utils/commentData'
 import CampaignBadge from './CampaignBadge'
 import { SubmitterIcon, SubmitterName, SubmitterType } from './SubmitterInfo'
 import { useMemo } from 'react'
+
+// Transcripts use <br> for line breaks inside table cells. Turn just those tags into real breaks
+// (other inline HTML stays escaped), so cells read as lines instead of showing "<br>"
+function brPlugin() {
+  return (tree: any) => {
+    const walk = (node: any) => {
+      if (!node.children) return
+      node.children = node.children.map((c: any) => c.type === 'html' && /^<br\s*\/?>$/i.test(c.value.trim()) ? { type: 'break' } : c)
+      node.children.forEach(walk)
+    }
+    walk(tree)
+  }
+}
+
+// Wide tables scroll sideways inside their own box instead of running off small screens
+const markdownTable = ({ children }: { children?: React.ReactNode }) => (
+  <div className="overflow-x-auto -mx-1 px-1"><table className="min-w-full">{children}</table></div>
+)
 import { excerptPassages, countPassagesIn, remarkHighlightPassages } from '../utils/scopeHighlight'
 
 interface CommentDetailViewProps {
@@ -330,7 +348,8 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                 </h5>
                 <div className="text-sm pl-4 border-l-2 border-slate-200 prose prose-sm max-w-none">
                   <ReactMarkdown
-                    remarkPlugins={passages.length ? [remarkGfm, remarkBreaks, highlightPlugin] : [remarkGfm, remarkBreaks]}
+                    remarkPlugins={passages.length ? [remarkGfm, remarkBreaks, brPlugin, highlightPlugin] : [remarkGfm, remarkBreaks, brPlugin]}
+                    components={{ table: markdownTable }}
                   >
                     {displaySections.detailedContent}
                   </ReactMarkdown>
