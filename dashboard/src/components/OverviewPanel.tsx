@@ -5,7 +5,7 @@ import useStore from '../store/useStore'
 import { CompositionBar, SplitBar, ArrivalsChart } from './overview/OverviewCharts'
 import { DataDownloads } from './overview/DataDownloads'
 import { ScopedAnalysesList, AboutScope } from './scope/ScopeSections'
-import { deriveOverview, fmt, shareInWords, formatDay, PARTS, partLabel } from './overview/overviewData'
+import { deriveOverview, fmt, formatDay, PARTS, partLabel } from './overview/overviewData'
 
 const SUBMITTER_ROWS = 8
 const CAMPAIGN_ROWS = 5
@@ -19,27 +19,11 @@ function OverviewPanel() {
   const ov = useMemo(() => deriveOverview(pre, comments, themeSummaries), [pre, comments, themeSummaries])
   const c = ov.composition
   const total = c.campaignCopies + c.campaignReworded + c.typed + c.attached || meta?.stats.totalComments || 0
-  const campaignTotal = c.campaignCopies + c.campaignReworded
   const campaignsTagged = campaigns.length > 0
-  // Without campaign tags, form-letter clustering (when run) still tells how many comments were
-  // copies of another one
-  const clusterCopies = useMemo(() => campaignsTagged ? 0 : comments.filter(x => x.isClusterRepresentative === false).length, [campaignsTagged, comments])
-
-  // Headline, written from the data
-  const headline = useMemo(() => {
-    const lead = scope
-      ? `${fmt(total)} of ${fmt(scope.counts.docketSubmissions)} comments addressed this scope.`
-      : `${fmt(total)} comment${total === 1 ? '' : 's'}.`
-    if (campaigns.length && campaignTotal) {
-      const reworded = c.campaignReworded / campaignTotal
-      const tail = reworded < 0.2 ? ', mostly as identical copies' : reworded > 0.6 ? ', mostly reworded rather than copied' : ''
-      return `${lead} ${shareInWords(campaignTotal / total)} came from ${fmt(campaigns.length)} organized campaign${campaigns.length === 1 ? '' : 's'}${tail}.`
-    }
-    const copies = clusterCopies ? ` ${shareInWords(clusterCopies / total)} were copies or near-copies of another comment.` : ''
-    if (!c.attached) return `${lead} All were typed into the comment form.${copies}`
-    if (!c.typed) return `${lead} All were submitted as attached documents.${copies}`
-    return `${lead} ${shareInWords(c.attached / total)} were submitted as attached documents; the rest were typed into the comment form.${copies}`
-  }, [total, campaigns.length, campaignTotal, c, clusterCopies, scope])
+  // Headline: just the count. The composition bar below gives the breakdown with real numbers
+  const headline = scope
+    ? `${fmt(total)} of ${fmt(scope.counts.docketSubmissions)} comments addressed this scope`
+    : `${fmt(total)} comment${total === 1 ? '' : 's'}`
 
   // Top-level themes (issue areas), most-discussed first
   const issueAreas = useMemo(() =>

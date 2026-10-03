@@ -20,22 +20,6 @@ export const pct = (n: number, total: number) => {
   return p > 0 && p < 1 ? '<1%' : `${Math.round(p)}%`
 }
 
-// "About a third", "More than half", "Nearly two-thirds" — a share in words
-export function shareInWords(share: number): string {
-  if (share >= 0.97) return 'Nearly all'
-  if (share < 0.07) return `Only ${Math.max(1, Math.round(share * 100))}%`
-  const anchors: Array<[number, string]> = [
-    [1 / 10, 'a tenth'], [1 / 8, 'an eighth'], [1 / 5, 'a fifth'], [1 / 4, 'a quarter'], [1 / 3, 'a third'],
-    [2 / 5, 'two in five'], [1 / 2, 'half'], [3 / 5, 'three in five'], [2 / 3, 'two-thirds'],
-    [3 / 4, 'three-quarters'], [4 / 5, 'four in five'], [9 / 10, 'nine in ten'],
-  ]
-  let best = anchors[0]
-  for (const a of anchors) if (Math.abs(share - a[0]) < Math.abs(share - best[0])) best = a
-  const diff = share - best[0]
-  const lead = Math.abs(diff) < 0.012 ? 'About' : diff > 0 ? 'More than' : 'Nearly'
-  return `${lead} ${best[1]}`
-}
-
 // First sentence of a report, for builds without overview.json
 function firstSentence(text?: string): string | undefined {
   const m = text?.replace(/\s+/g, ' ').trim().match(/^.+?[.!?](?=\s+[A-Z]|$)/)
