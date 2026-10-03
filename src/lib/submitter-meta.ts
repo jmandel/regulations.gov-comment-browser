@@ -42,6 +42,17 @@ export function foldCategory(raw: string | null | undefined): string {
   return s || NOT_SPECIFIED;
 }
 
+// The individual role a filed category names explicitly, as a SUBMITTER_TYPES key, or null when it
+// names none ("Individual", blank, organizational and government categories). Used for campaign
+// copies, which the model doesn't read: a sender's own explicit role beats the template's voice.
+export function filedRole(raw: string | null | undefined): "physician" | "other_clinician" | "other_professional" | null {
+  const s = foldCategory(raw);
+  if (/^(Physician|Radiologist)$/.test(s)) return "physician";
+  if (/^(Nurse|Nurse Practitioner|Physician Assistant|Physical Therapist|Occupational Therapis(t)?|Speech-Language Therapist|Chiropractor|Social Worker|Dietitian\/Nutritionist|Dietician\/Nutritionist|Other Practitione(r)?|Pharmacist|Psychologist)$/.test(s)) return "other_clinician";
+  if (/^(Other Health Care Professional|Other Technician|Health Care Industry)$/.test(s)) return "other_professional";
+  return null;
+}
+
 // How the submission was filed, from the name and organization fields alone
 export type FiledAs = "organization" | "person" | "anonymous";
 export const FILED_AS_LABELS: Record<FiledAs, string> = {

@@ -392,7 +392,7 @@ function schema(kind: PackKind, docketId: string): string[] {
     ["ai_speaks_for TEXT", "LLM (classify-submitters): who the submission speaks for, 'individual' | 'organization', judged from the form fields and the start and end of the text; NULL when not classified"],
     ["ai_type TEXT", "LLM: commenter type, a submitter_types.key (e.g. 'physician', 'hospital'); NULL when not classified"],
     ["ai_organization TEXT", "LLM: the organization it speaks for, when ai_speaks_for = 'organization'"],
-    ["ai_method TEXT", "'llm' = classified from its own text; 'representative' = form-letter copy with its representative's organization, given the representative's classification; 'form-letter-member' = other form-letter copies: an individual, with the representative's type when that is an individual type"],
+    ["ai_method TEXT", "'llm' = classified from its own text; 'representative' = form-letter copy with its representative's organization, given the representative's classification; 'filed-category' = other form-letter copy whose own filed category names a role (physician, clinician, health care worker), typed by that role; 'template' = other form-letter copy typed by its template's voice (the representative's type when that is an individual type, else other_individual). Older databases may say 'form-letter-member' for either"],
     ["city TEXT", "as entered; often NULL"],
     ["state TEXT", "state/province as entered; often NULL (US state names are given as postal codes)"],
     ["country TEXT", "as entered"],

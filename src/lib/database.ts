@@ -348,7 +348,7 @@ export function initSchema(db: Database) {
       speaks_for TEXT NOT NULL CHECK(speaks_for IN ('individual', 'organization')),
       type TEXT NOT NULL,              -- SUBMITTER_TYPES key (src/lib/submitter-meta.ts)
       organization TEXT,               -- name of the organization it speaks for; NULL for individuals
-      method TEXT NOT NULL,            -- 'llm' | 'representative' (member with the rep's organization) | 'form-letter-member'
+      method TEXT NOT NULL,            -- 'llm' | 'representative' (member with the rep's organization) | 'filed-category' | 'template'
       model TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (comment_id) REFERENCES comments(id)

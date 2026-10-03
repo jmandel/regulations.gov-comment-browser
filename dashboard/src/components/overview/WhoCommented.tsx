@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import type { OverviewData } from '../../types'
+import type { CompositionCounts } from '../../types'
 import { SplitBar } from './OverviewCharts'
-import { fmt, pct, FILED_AS_LABELS } from './overviewData'
+import { fmt, pct, FILED_AS_LABELS, PARTS, partLabel } from './overviewData'
 
 const linkClass = 'text-[var(--ov-link)] underline decoration-1 underline-offset-2 decoration-[var(--ov-link)]/40 hover:decoration-[var(--ov-link)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ov-link)] rounded-sm'
 const rowLinkClass = 'group block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ov-link)] focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 rounded-sm'
@@ -11,14 +12,14 @@ const STATE_ROWS = 8
 
 type Row = OverviewData['submitters'][number]
 
-function BarRow({ label, count, max, to, note }: { label: string; count: number; max: number; to?: string; note?: string }) {
+function BarRow({ label, count, max, to, note, split }: { label: string; count: number; max: number; to?: string; note?: string; split?: CompositionCounts }) {
   const body = (
     <>
       <span className="flex items-baseline justify-between gap-4 text-sm">
         <span className={to ? 'group-hover:underline underline-offset-2' : 'text-[var(--ov-ink-2)]'}>{label}</span>
         <span className="tnum font-medium">{fmt(count)}</span>
       </span>
-      <span className="mt-1 block"><SplitBar value={count} max={max} /></span>
+      <span className="mt-1 block"><SplitBar value={count} max={max} split={split} label={split ? PARTS.filter(p => split[p.key]).map(p => `${partLabel(p, true)} ${fmt(split[p.key])}`).join(', ') : undefined} /></span>
       {note && <span className="mt-1 block text-xs text-[var(--ov-ink-3)] truncate">{note}</span>}
     </>
   )
@@ -31,7 +32,6 @@ const typeLink = (label: string) => `/comments?submitterType=${encodeURIComponen
 // builds and dockets without classify-submitters) how people filed and the category they chose.
 export function WhoCommented({ ov }: { ov: OverviewData }) {
   const ai = ov.typeSource === 'ai'
-  const max = Math.max(...ov.submitters.map(r => r.count), 1)
   const orgNote = (r: Row) => r.organizations?.length
     ? `${r.organizations.map(o => o.name).join(', ')}${(r.organizationCount || 0) > r.organizations.length ? ` and ${fmt(r.organizationCount! - r.organizations.length)} more` : ''}`
     : undefined
@@ -43,6 +43,8 @@ export function WhoCommented({ ov }: { ov: OverviewData }) {
       }).filter(x => x.rows.length)
     : []
   const unclassified = ai ? ov.submitters.filter(r => !r.group) : []
+  const grand = ov.submitters.reduce((n, r) => n + r.count, 0)
+  const hasSplit = ov.submitters.some(r => r.split && (r.split.campaignCopies + r.split.campaignReworded) > 0)
 
   const rows = ov.submitters.slice(0, TYPE_ROWS)
   const rest = ov.submitters.slice(TYPE_ROWS)
@@ -59,18 +61,26 @@ export function WhoCommented({ ov }: { ov: OverviewData }) {
       </div>
       {ai ? (
         <>
-          <p className="mt-1 text-sm text-[var(--ov-ink-2)]">Commenter types assigned by AI from each comment's form fields and text, including letterheads and signatures.</p>
-          {groups.map(({ g, rows, total }) => (
-            <div key={g} className="mt-5">
-              <h3 className="flex items-baseline justify-between gap-4 text-sm font-semibold">
-                <span>{g === 'individual' ? 'Individuals' : 'Organizations'}</span>
-                <span className="tnum">{fmt(total)}</span>
-              </h3>
-              <ul className="mt-3 space-y-3">
-                {rows.map(r => <BarRow key={r.label} label={r.label} count={r.count} max={max} to={typeLink(r.label)} note={orgNote(r)} />)}
-              </ul>
-            </div>
-          ))}
+          <p className="mt-1 text-sm text-[var(--ov-ink-2)] max-w-[72ch]">
+            Each comment's author type was assigned by AI from its form fields and text, including letterheads and signatures; copies of a campaign letter take the role the sender filed, or else the letter's.
+            {hasSplit && ' Bar colors follow the breakdown above.'}
+          </p>
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-x-14 gap-y-10">
+            {groups.map(({ g, rows, total }) => {
+              const groupMax = Math.max(...rows.map(r => r.count), 1)
+              return (
+                <div key={g}>
+                  <h3 className="flex items-baseline justify-between gap-4 font-semibold">
+                    <span>{g === 'individual' ? 'People' : 'Organizations'}</span>
+                    <span className="tnum">{fmt(total)} <span className="text-sm font-normal text-[var(--ov-ink-3)]">{pct(total, grand)}</span></span>
+                  </h3>
+                  <ul className="mt-3 space-y-3">
+                    {rows.map(r => <BarRow key={r.label} label={r.label} count={r.count} max={groupMax} to={typeLink(r.label)} note={orgNote(r)} split={r.split} />)}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
           {unclassified.length > 0 && (
             <p className="mt-4 text-xs text-[var(--ov-ink-3)]">
               Not classified: {unclassified.map(r => <Link key={r.label} to={typeLink(r.label)} className={linkClass}>{fmt(r.count)}</Link>)}

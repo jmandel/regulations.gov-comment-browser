@@ -324,7 +324,7 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
   // ran, else the folded category each submitter chose. Plus how they filed and where they are.
   const classifications = loadClassifications(db);
   const classified = classifications.size > 0;
-  const byType = new Map<string, { count: number; group: string | null; key: string | null; orgs: Map<string, number> }>();
+  const byType = new Map<string, { count: number; group: string | null; key: string | null; orgs: Map<string, number>; split: Record<Part, number> }>();
   const filedAsCounts: Record<FiledAs, number> = { organization: 0, person: 0, anonymous: 0 };
   const byState = new Map<string, number>(), byCountry = new Map<string, number>();
   let withState = 0, withCountry = 0;
@@ -340,8 +340,9 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
 
     // Same labels as comments-index.json, so the browser filters match these counts
     const v = submitterView(r, classifications.get(r.id), classified);
-    let t = byType.get(v.type); if (!t) byType.set(v.type, t = { count: 0, group: v.typeGroup, key: v.typeKey, orgs: new Map() });
+    let t = byType.get(v.type); if (!t) byType.set(v.type, t = { count: 0, group: v.typeGroup, key: v.typeKey, orgs: new Map(), split: { campaignCopies: 0, campaignReworded: 0, typed: 0, attached: 0 } });
     t.count++;
+    t.split[part]++;
     if (v.organization) t.orgs.set(v.organization, (t.orgs.get(v.organization) || 0) + 1);
     filedAsCounts[v.filedAs]++;
     if (v.state) { withState++; byState.set(v.state, (byState.get(v.state) || 0) + 1); }
@@ -366,7 +367,7 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
   const sortedCounts = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const submitters = [...byType.entries()]
     .map(([label, t]) => ({
-      label, count: t.count,
+      label, count: t.count, split: t.split,
       ...(t.group ? { group: t.group } : {}),
       // A few of the organizations behind an organization type, by submissions
       ...(t.orgs.size ? { organizations: sortedCounts(t.orgs).slice(0, 3).map(([name, count]) => ({ name, count })), organizationCount: t.orgs.size } : {}),

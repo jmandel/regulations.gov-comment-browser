@@ -62,6 +62,8 @@ function OverviewPanel() {
 
       {!scope && meta?.scopes && meta.scopes.length > 0 && <ScopedAnalysesList scopes={meta.scopes} />}
 
+      {ov.submitters.length > 0 && <div className="mt-12 sm:mt-16"><WhoCommented ov={ov} /></div>}
+
       <div className="mt-12 sm:mt-16 grid grid-cols-1 lg:grid-cols-12 gap-x-16 gap-y-14">
         {/* What commenters raised */}
         <section className="lg:col-span-7" aria-labelledby="ov-issues">
@@ -116,8 +118,6 @@ function OverviewPanel() {
               </div>
             </section>
           )}
-
-          {ov.submitters.length > 0 && <WhoCommented ov={ov} />}
 
           {ov.geography && <WhereCommenters geo={ov.geography} />}
 

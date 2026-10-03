@@ -77,7 +77,7 @@ export interface OverviewData {
   composition: CompositionCounts
   // Commenter types, from one source: AI-assigned (typeSource 'ai') or the folded filed category
   // ('filed'; older builds have no typeSource). Labels match comments-index.json submitterTypes.
-  submitters: Array<{ label: string; count: number; group?: 'individual' | 'organization'; organizations?: Array<{ name: string; count: number }>; organizationCount?: number }>
+  submitters: Array<{ label: string; count: number; split?: CompositionCounts; group?: 'individual' | 'organization'; organizations?: Array<{ name: string; count: number }>; organizationCount?: number }>
   typeSource?: 'ai' | 'filed'
   filedAs?: Record<FiledAs, number>
   geography?: { total: number; withState: number; withCountry: number; states: Array<{ state: string; count: number }>; countries: Array<{ country: string; count: number }> }

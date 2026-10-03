@@ -9,7 +9,7 @@ export type Part = keyof CompositionCounts
 export const PARTS: Array<{ key: Part; label: string; description: string; plainLabel?: string; plainDescription?: string; color: string; to: string }> = [
   { key: 'campaignCopies', label: 'Campaign copies', description: 'Identical letters sent as part of an organized campaign', color: 'var(--ov-copies)', to: '/comments?part=campaignCopies' },
   { key: 'campaignReworded', label: 'Reworded campaign letters', description: 'Campaign letters the sender rewrote in their own words', color: 'var(--ov-reworded)', to: '/comments?part=campaignReworded' },
-  { key: 'typed', label: 'Individual comments', plainLabel: 'Typed comments', description: 'Typed into the comment form, not part of a campaign', plainDescription: 'Typed into the comment form', color: 'var(--ov-typed)', to: '/comments?part=typed' },
+  { key: 'typed', label: 'Typed comments', plainLabel: 'Typed comments', description: 'Typed into the comment form, not part of a campaign', plainDescription: 'Typed into the comment form', color: 'var(--ov-typed)', to: '/comments?part=typed' },
   { key: 'attached', label: 'Attached letters', description: 'Uploaded as a document, not part of a campaign', plainDescription: 'Uploaded as a document', color: 'var(--ov-attached)', to: '/comments?part=attached' },
 ]
 

@@ -4,7 +4,7 @@ import { getTaskConfig, getTaskModel } from "../lib/batch-config";
 import { runLlmRequests, type LlmRequest, type RunSummary } from "../lib/step-runner";
 import { htmlToText } from "../lib/text";
 import { buildClassifyPrompt, type ClassifyItem } from "../prompts/classify-submitters";
-import { personName, titleSubmitter, SUBMITTER_TYPE_BY_KEY } from "../lib/submitter-meta";
+import { personName, titleSubmitter, SUBMITTER_TYPE_BY_KEY, filedRole } from "../lib/submitter-meta";
 
 // Who each submission speaks for (an individual or an organization), the organization's name and a
 // commenter type from a fixed taxonomy (SUBMITTER_TYPES), assigned by a cheap model from the filed
@@ -16,9 +16,11 @@ import { personName, titleSubmitter, SUBMITTER_TYPE_BY_KEY } from "../lib/submit
 //   - form-letter members that name an organization different from their representative's, or added
 //     at least MEMBER_ADDED_WORDS of their own words (classified from their metadata and added text)
 // Other form-letter members (their text is the group's template) are derived without a call:
-//   - same organization field as the representative → the representative's classification
-//   - otherwise → an individual campaign participant: the representative's type when the
-//     representative is an individual (the letter speaks in that voice), else other_individual
+//   - the same non-empty organization field as the representative → the representative's
+//     classification (the organization sent its own letter more than once)
+//   - otherwise an individual campaign participant, typed by the role their own filed category
+//     names when it names one (filedRole), else by the template's type when the template speaks
+//     as an individual, else other_individual
 export const classifySubmittersCommand = new Command("classify-submitters")
   .description("Classify who each submission speaks for (individual or organization), the organization's name and a commenter type")
   .argument("<document-id>", "Document ID (e.g., CMS-2025-0050-0031)")
@@ -95,7 +97,7 @@ export function prepareClassification(db: any) {
       additions.set(r.comment_id, { words: r.added_word_count || 0, text: r.added_text || "" });
     }
   }
-  const sameOrg = (a: Row, b: Row | undefined) => !!b && clean(a.attrs.organization).toLowerCase() === clean(b.attrs.organization).toLowerCase();
+  const sameOrg = (a: Row, b: Row | undefined) => !!b && !!clean(a.attrs.organization) && clean(a.attrs.organization).toLowerCase() === clean(b.attrs.organization).toLowerCase();
   const needsLlm = (r: Row) => !r.isMember
     || (!!clean(r.attrs.organization) && !sameOrg(r, byId.get(r.rep!)))
     || (additions.get(r.id)?.words || 0) >= MEMBER_ADDED_WORDS;
@@ -123,10 +125,12 @@ export function prepareClassification(db: any) {
     };
   };
   // A form-letter member without its own call, from its representative's classification
-  const derive = (r: Row, rep: Classification): Classification & { method: string } =>
-    sameOrg(r, byId.get(r.rep!))
-      ? { ...rep, method: "representative" }
-      : { speaksFor: "individual", type: rep.speaksFor === "individual" ? rep.type : "other_individual", organization: null, method: "form-letter-member" };
+  const derive = (r: Row, rep: Classification): Classification & { method: string } => {
+    if (sameOrg(r, byId.get(r.rep!))) return { ...rep, method: "representative" };
+    const role = filedRole(r.attrs.category);
+    if (role) return { speaksFor: "individual", type: role, organization: null, method: "filed-category" };
+    return { speaksFor: "individual", type: rep.speaksFor === "individual" ? rep.type : "other_individual", organization: null, method: "template" };
+  };
   return { rows, byId, needsLlm, item, derive };
 }
 
