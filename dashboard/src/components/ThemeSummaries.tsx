@@ -159,10 +159,8 @@ function ThemeSummaries() {
                   </h3>
                   <div className="flex items-center space-x-3 text-sm">
                     <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-medium whitespace-nowrap">
-                      {theme.direct_count.toLocaleString()} comments
-                      {theme.direct_count > theme.summary.commentCount && (
-                        <> ({theme.summary.commentCount.toLocaleString()} clusters)</>
-                      )}
+                      {/* Rolled up over sub-themes (a group report covers its whole subtree), in submissions */}
+                      {Math.max(theme.comment_count, theme.summary.commentCount).toLocaleString()} comments
                     </span>
                   </div>
                 </div>

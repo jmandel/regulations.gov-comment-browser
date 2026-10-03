@@ -15,6 +15,7 @@ import type { Comment } from '../types'
 import type { SearchToken } from './searchParser'
 import { buildSearchText, matchesSearchText } from './searchParser'
 import { forEachCommentContent, type LoadProgress } from './commentData'
+import { sharedData } from './dataPaths'
 
 const WORD_RE = /[\p{L}\p{N}]+/gu
 const SINGLE_WORD_RE = /^[\p{L}\p{N}]+$/u
@@ -35,11 +36,11 @@ export function loadSearchIndex(): Promise<SearchIndex> {
   if (!indexPromise) {
     indexPromise = (async () => {
       const [meta, buf] = await Promise.all([
-        fetch('./data/search/index.json').then(r => {
+        fetch(sharedData('search/index.json')).then(r => {
           if (!r.ok) throw new Error(`search index: HTTP ${r.status}`)
           return r.json()
         }),
-        fetch('./data/search/postings.bin').then(r => {
+        fetch(sharedData('search/postings.bin')).then(r => {
           if (!r.ok) throw new Error(`search postings: HTTP ${r.status}`)
           return r.arrayBuffer()
         }),

@@ -21,9 +21,9 @@ export function getScopeDbPath(documentId: string, slug: string): string {
 }
 
 // Every scope DB of a document, by slug
-export function listScopeSlugs(documentId: string): string[] {
+export function listScopeSlugs(documentId: string, dbDir: string = DB_DIR): string[] {
   const prefix = `${documentId}.scope.`;
-  return readdirSync(DB_DIR)
+  return readdirSync(dbDir)
     .filter(f => f.startsWith(prefix) && f.endsWith(".sqlite"))
     .map(f => f.slice(prefix.length, -".sqlite".length))
     .filter(s => SLUG_RE.test(s))
@@ -269,4 +269,56 @@ export function analysisUnitSql(repsOnly: boolean): string {
 export function denominatorText(c: ScopeCounts): string {
   const pct = c.docketSubmissions ? ` (${(c.inScopeSubmissions / c.docketSubmissions * 100).toFixed(1)}%)` : "";
   return `This is a scoped analysis. Of the docket's ${c.docketSubmissions.toLocaleString("en-US")} submissions (${c.docketUnits.toLocaleString("en-US")} distinct comments or form-letter groups), ${c.inScopeSubmissions.toLocaleString("en-US")} submissions${pct} (${c.inScopeUnits.toLocaleString("en-US")} distinct comments or form-letter groups) were judged to address this scope. Counts you state are counts of in-scope submissions; when you give a share, say whether it is a share of in-scope submissions or of the whole docket.`;
+}
+
+// Open an existing scope DB read-only (website build, landing page, skill export): no schema
+// creation or pragmas, so it works on published files and never writes
+export function openScopeDbReadOnly(documentId: string, slug: string, dbDir: string = DB_DIR): Database {
+  if (!SLUG_RE.test(slug)) throw new Error(`Invalid scope slug "${slug}"`);
+  const basePath = join(dbDir, `${documentId}.sqlite`);
+  const path = join(dbDir, `${documentId}.scope.${slug}.sqlite`);
+  if (!existsSync(basePath)) throw new Error(`Docket DB not found: ${basePath}`);
+  if (!existsSync(path)) throw new Error(`Scope "${slug}" not found (${path})`);
+  const toUri = (p: string) => "file:" + resolve(p).split("/").map(encodeURIComponent).join("/") + "?mode=ro";
+  const db = new Database(toUri(path), constants.SQLITE_OPEN_READONLY | constants.SQLITE_OPEN_URI);
+  db.exec(`ATTACH DATABASE ${sqlString(toUri(basePath))} AS base`);
+  return db;
+}
+
+export interface PublishedScopeInfo {
+  slug: string;
+  name: string;
+  summary: string | null;
+  seedCommentId: string | null;
+  updatedAt: string;
+  counts: ScopeCounts;
+  themes: number;
+  summaries: number;
+}
+
+// Scopes of a document that are ready to publish (relevance current with the prompt), with their
+// name, summary and denominators. Stale or unreadable scope DBs are skipped with a warning.
+export function listPublishableScopes(documentId: string, dbDir: string = DB_DIR): PublishedScopeInfo[] {
+  const out: PublishedScopeInfo[] = [];
+  for (const slug of listScopeSlugs(documentId, dbDir)) {
+    let db: Database | null = null;
+    try {
+      db = openScopeDbReadOnly(documentId, slug, dbDir);
+      const scope = getScope(db);
+      if (!relevanceIsCurrent(db, scope)) {
+        console.warn(`  ⚠️  Scope "${slug}": relevance missing or stale with its prompt; not published`);
+        continue;
+      }
+      const n = (t: string) => (db!.prepare(`SELECT COUNT(*) AS n FROM main.${t}`).get() as { n: number }).n;
+      out.push({
+        slug, name: scope.name, summary: scope.summary, seedCommentId: scope.seed_comment_id,
+        updatedAt: scope.updated_at, counts: scopeCounts(db), themes: n("theme_hierarchy"), summaries: n("theme_summaries"),
+      });
+    } catch (e) {
+      console.warn(`  ⚠️  Scope "${slug}": ${(e as Error).message}; not published`);
+    } finally {
+      db?.close();
+    }
+  }
+  return out;
 }

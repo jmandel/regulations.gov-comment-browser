@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react'
 import useStore from '../store/useStore'
 import { CompositionBar, SplitBar, ArrivalsChart } from './overview/OverviewCharts'
 import { DataDownloads } from './overview/DataDownloads'
+import { ScopedAnalysesList, AboutScope } from './scope/ScopeSections'
 import { deriveOverview, fmt, shareInWords, formatDay, PARTS, partLabel } from './overview/overviewData'
 
 const SUBMITTER_ROWS = 8
@@ -13,7 +14,7 @@ const linkClass = 'text-[var(--ov-link)] underline decoration-1 underline-offset
 const rowLinkClass = 'group block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ov-link)] focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 rounded-sm'
 
 function OverviewPanel() {
-  const { meta, themes, themeSummaries, comments, campaigns, overview: pre } = useStore()
+  const { meta, themes, themeSummaries, comments, campaigns, overview: pre, scope } = useStore()
 
   const ov = useMemo(() => deriveOverview(pre, comments, themeSummaries), [pre, comments, themeSummaries])
   const c = ov.composition
@@ -26,7 +27,9 @@ function OverviewPanel() {
 
   // Headline, written from the data
   const headline = useMemo(() => {
-    const lead = `${fmt(total)} comment${total === 1 ? '' : 's'}.`
+    const lead = scope
+      ? `${fmt(total)} of ${fmt(scope.counts.docketSubmissions)} comments addressed this scope.`
+      : `${fmt(total)} comment${total === 1 ? '' : 's'}.`
     if (campaigns.length && campaignTotal) {
       const reworded = c.campaignReworded / campaignTotal
       const tail = reworded < 0.2 ? ', mostly as identical copies' : reworded > 0.6 ? ', mostly reworded rather than copied' : ''
@@ -36,7 +39,7 @@ function OverviewPanel() {
     if (!c.attached) return `${lead} All were typed into the comment form.${copies}`
     if (!c.typed) return `${lead} All were submitted as attached documents.${copies}`
     return `${lead} ${shareInWords(c.attached / total)} were submitted as attached documents; the rest were typed into the comment form.${copies}`
-  }, [total, campaigns.length, campaignTotal, c, clusterCopies])
+  }, [total, campaigns.length, campaignTotal, c, clusterCopies, scope])
 
   // Top-level themes (issue areas), most-discussed first
   const issueAreas = useMemo(() =>
@@ -81,11 +84,13 @@ function OverviewPanel() {
 
       {total > 0 && <CompositionBar composition={c} total={total} campaignsTagged={campaignsTagged} />}
 
+      {!scope && meta?.scopes && meta.scopes.length > 0 && <ScopedAnalysesList scopes={meta.scopes} />}
+
       <div className="mt-12 sm:mt-16 grid grid-cols-1 lg:grid-cols-12 gap-x-16 gap-y-14">
         {/* What commenters raised */}
         <section className="lg:col-span-7" aria-labelledby="ov-issues">
           <div className="flex items-baseline justify-between gap-4">
-            <h2 id="ov-issues" className="text-xl sm:text-2xl font-semibold">What commenters raised</h2>
+            <h2 id="ov-issues" className="text-xl sm:text-2xl font-semibold">{scope ? 'What commenters raised on this scope' : 'What commenters raised'}</h2>
             <Link to="/themes" className={`${linkClass} text-sm whitespace-nowrap`}>All themes</Link>
           </div>
           <p className="mt-2 text-sm text-[var(--ov-ink-2)] max-w-[62ch]">
@@ -125,6 +130,8 @@ function OverviewPanel() {
         </section>
 
         <aside className="lg:col-span-5 space-y-14">
+          {scope && <AboutScope scope={scope} />}
+
           {ov.arrivals.length > 1 && (
             <section aria-labelledby="ov-arrivals">
               <h2 id="ov-arrivals" className="text-lg font-semibold">When comments arrived</h2>

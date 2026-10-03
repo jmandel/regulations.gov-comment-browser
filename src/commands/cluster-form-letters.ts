@@ -20,7 +20,7 @@ import { htmlToText } from "../lib/text";
 // clusters so they get full processing; their additions row keeps the link to the template.
 //
 // Writes the same comment_clusters / comment_cluster_membership / clustering_status tables
-// as cluster-comments-fast, so downstream steps work unchanged. Every comment gets a
+// as the clustering step always has, so downstream steps work unchanged. Every comment gets a
 // membership row (ungrouped comments are singleton clusters).
 
 export const SHINGLE = 5;              // words per phrase

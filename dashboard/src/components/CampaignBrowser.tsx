@@ -7,7 +7,7 @@ type SortKey = 'total' | 'paraphrased' | 'name'
 
 // List of organized campaigns (tag-campaigns): exact copies + reworded letters per campaign
 function CampaignBrowser() {
-  const { campaigns, meta } = useStore()
+  const { campaigns, meta, scope } = useStore()
   const [query, setQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortKey>('total')
   const [kind, setKind] = useState<'all' | 'paraphrase' | 'form-letter'>('all')
@@ -29,7 +29,7 @@ function CampaignBrowser() {
   if (campaigns.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-        No organized campaigns have been identified for this docket.
+        {scope ? 'None of the comments in this scope belong to an organized campaign.' : 'No organized campaigns have been identified for this docket.'}
       </div>
     )
   }

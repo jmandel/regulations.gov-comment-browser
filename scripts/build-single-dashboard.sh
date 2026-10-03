@@ -19,15 +19,17 @@ if [ -z "$1" ]; then
 fi
 
 REGULATION_ID="$1"
-DB_FILE="dbs/${REGULATION_ID}.sqlite"
+DB_DIR="${DB_DIR:-dbs}"
+export DB_DIR
+DB_FILE="$DB_DIR/${REGULATION_ID}.sqlite"
 
 # Check if database exists
 if [ ! -f "$DB_FILE" ]; then
   echo -e "${RED}Error: Database file not found: $DB_FILE${NC}"
   echo "Available databases:"
-  for db in dbs/*.sqlite; do
+  for db in "$DB_DIR"/*.sqlite; do
     [ -e "$db" ] || continue
-    if [[ "$db" != *.sqlite-* ]] && [[ "$db" != *.sqlite.sqlite ]]; then
+    if [[ "$db" != *.sqlite-* ]] && [[ "$db" != *.sqlite.sqlite ]] && [[ "$db" != *.scope.*.sqlite ]]; then
       echo "  - $(basename "$db" .sqlite)"
     fi
   done
@@ -57,6 +59,16 @@ cd ..
 # Copy built dashboard to dist directory
 echo "  - Copying to dist/${REGULATION_ID}..."
 cp -r dashboard/dist/* "dist/${REGULATION_ID}/"
+
+# Scoped analyses: one sub-site per published scope at dist/<id>/scopes/<slug>/, sharing the
+# docket's assets and data (see build-all-dashboards.sh)
+rm -rf "dist/${REGULATION_ID}/scopes"
+SLUGS=$(bun -e "const m = JSON.parse(await Bun.file('temp-data/meta.json').text()); console.log((m.scopes || []).map(s => s.slug).join(' '))")
+for slug in $SLUGS; do
+  echo "  - Building scoped analysis $slug..."
+  bun run src/cli.ts build-website "$REGULATION_ID" --scope "$slug" --output "dist/${REGULATION_ID}/scopes/$slug/data"
+  sed 's#"\./assets/#"../../assets/#g' "dist/${REGULATION_ID}/index.html" > "dist/${REGULATION_ID}/scopes/$slug/index.html"
+done
 
 # Clean up temp data
 rm -rf temp-data

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile, Campaign, OverviewData } from '../types'
+import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile, Campaign, OverviewData, ScopeInfo, ScopeUnitsFile } from '../types'
+import { ownData, sharedData, setSharedDataBase } from '../utils/dataPaths'
 import { parseThemeDescription } from '../utils/helpers'
 import { parseSearchQuery, matchesSearchQuery } from '../utils/searchParser'
 import { loadSearchIndex, searchWithIndex, verifyCandidates } from '../utils/fullTextSearch'
@@ -34,7 +35,12 @@ interface StoreState {
   entities: Record<string, Entity[]>
   comments: Comment[]
   commentsById: Map<string, Comment>
-  units: Comment[] // comments with their own content: representatives, or all without clustering
+  units: Comment[] // comments with their own content: representatives, or all without clustering (in a scope sub-site: in-scope units only)
+  // Scope sub-site: the scope (null on a docket site), every unit of the docket, and whether the
+  // comment browser searches in-scope units (default) or the whole docket
+  scope: ScopeInfo | null
+  docketUnits: Comment[]
+  commentScope: 'scope' | 'docket'
   campaigns: Campaign[]
   campaignsById: Map<number, Campaign>
   overview: OverviewData | null
@@ -57,6 +63,7 @@ interface StoreState {
   loadThemeExtracts: (themeCode: string) => Promise<void>
   setFilters: (filters: FilterOptions | ((prev: FilterOptions) => FilterOptions)) => void
   setSearchQuery: (query: string) => void
+  setCommentScope: (which: 'scope' | 'docket') => void
   setData: (data: any) => void
   setSelectedView: (view: string) => void
   setSelectedTheme: (theme: Theme | null) => void
@@ -82,7 +89,7 @@ const useStore = create<StoreState>((set, get) => {
       set({ search: { query, ids: null, phase: 'idle' } })
       return
     }
-    const units = get().units
+    const units = browsedUnits(get())
     const leanIds = new Set(units.filter(c => matchesSearchQuery(c, tokens)).map(c => c.id))
     set({ search: { query, ids: leanIds, phase: 'index' } })
 
@@ -147,6 +154,9 @@ const useStore = create<StoreState>((set, get) => {
     comments: [],
     commentsById: new Map(),
     units: [],
+    scope: null,
+    docketUnits: [],
+    commentScope: 'scope',
     campaigns: [],
     campaignsById: new Map(),
     overview: null,
@@ -180,6 +190,12 @@ const useStore = create<StoreState>((set, get) => {
     setSelectedTheme: (theme: Theme | null) => set({ selectedTheme: theme }),
     setSelectedEntity: (entity: { category: string; label: string } | null) => set({ selectedEntity: entity }),
     setSearchQuery: (query: string) => set({ searchQuery: query }),
+    setCommentScope: (which: 'scope' | 'docket') => {
+      if (which === get().commentScope) return
+      set({ commentScope: which })
+      const q = get().filters.searchQuery
+      if (q) runSearch(q)
+    },
     setFilters: (filters: FilterOptions | ((prev: FilterOptions) => FilterOptions)) => {
       const prev = get().filters
       const next = typeof filters === 'function' ? filters(prev) : filters
@@ -196,7 +212,7 @@ const useStore = create<StoreState>((set, get) => {
       }
       let p = themeExtractRequests.get(themeCode)
       if (!p) {
-        p = fetch(`./data/theme-extracts/${encodeURIComponent(themeCode)}.json`)
+        p = fetch(ownData(`theme-extracts/${encodeURIComponent(themeCode)}.json`))
           .then(r => (r.ok ? r.json() : {}))
           .catch(() => ({}))
           .then(map => set(state => ({ themeExtracts: { ...state.themeExtracts, [themeCode]: map } })))
@@ -215,16 +231,21 @@ const useStore = create<StoreState>((set, get) => {
           if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`)
           return r.json()
         })
-        const [meta, themes, themeSummaries, entities, index, campaigns, overview] = await Promise.all([
-          getJson('./data/meta.json'),
-          getJson('./data/themes.json'),
-          getJson('./data/theme-summaries.json'),
-          getJson('./data/entities.json'),
-          getJson('./data/comments-index.json') as Promise<CommentsIndexFile>,
+        // A scope sub-site's meta.json says where the docket's shared files are
+        const meta: Meta = await getJson(ownData('meta.json'))
+        setSharedDataBase(meta.sharedData)
+        const scoped = !!meta.scope
+        const [themes, themeSummaries, entities, index, campaigns, overview, scope, scopeUnits] = await Promise.all([
+          getJson(ownData('themes.json')),
+          getJson(ownData('theme-summaries.json')),
+          getJson(sharedData('entities.json')),
+          getJson(sharedData('comments-index.json')) as Promise<CommentsIndexFile>,
           // Optional: only present when tag-campaigns ran
-          (getJson('./data/campaigns.json') as Promise<Campaign[]>).catch(() => [] as Campaign[]),
+          (getJson(sharedData('campaigns.json')) as Promise<Campaign[]>).catch(() => [] as Campaign[]),
           // Optional: older builds lack it; the Overview falls back to the index
-          (getJson('./data/overview.json') as Promise<OverviewData>).catch(() => null),
+          (getJson(ownData('overview.json')) as Promise<OverviewData>).catch(() => null),
+          scoped ? getJson(ownData('scope.json')) as Promise<ScopeInfo> : Promise.resolve(null),
+          scoped ? getJson(ownData('scope-units.json')) as Promise<ScopeUnitsFile> : Promise.resolve(null),
         ])
         const t0 = performance.now()
 
@@ -240,7 +261,17 @@ const useStore = create<StoreState>((set, get) => {
         })
 
         const orgCategory = determineOrganizationCategory(themeSummaries, entities)
-        const { comments, commentsById, units } = expandCommentsIndex(index)
+        const expanded = expandCommentsIndex(index)
+        const { commentsById } = expanded
+        let { comments, units } = expanded
+        const docketUnits = units
+        let scopedEntities = entities
+        let scopedCampaigns = campaigns
+        if (scope && scopeUnits) {
+          ;({ comments, units } = applyScope(expanded.comments, commentsById, scopeUnits))
+          scopedEntities = scopeEntities(entities, units)
+          scopedCampaigns = scopeCampaigns(campaigns, comments)
+        }
 
         // Theme and entity -> comment indexes (units only, as before)
         const themeIndex: ThemeIndex = {}
@@ -259,12 +290,14 @@ const useStore = create<StoreState>((set, get) => {
           meta,
           themes: parsedThemes,
           themeSummaries,
-          entities,
+          entities: scopedEntities,
           comments,
           commentsById,
           units,
-          campaigns,
-          campaignsById: new Map(campaigns.map(c => [c.id, c])),
+          scope,
+          docketUnits,
+          campaigns: scopedCampaigns,
+          campaignsById: new Map(scopedCampaigns.map(c => [c.id, c])),
           overview,
           hasClustering: index.clustered,
           themeIndex,
@@ -284,8 +317,9 @@ const useStore = create<StoreState>((set, get) => {
       const startTime = performance.now()
       const state = get()
 
-      // Start with only representative comments (or all if no clustering)
-      let filtered = state.units
+      // Start with only representative comments (or all if no clustering); in a scope sub-site,
+      // in-scope units unless the browser is set to the whole docket
+      let filtered = browsedUnits(state)
 
       // Apply search with boolean query parsing (results come from runSearch)
       if (state.filters.searchQuery) {
@@ -332,7 +366,7 @@ const useStore = create<StoreState>((set, get) => {
         )
       }
 
-      console.log(`Total filtering time: ${(performance.now() - startTime).toFixed(2)}ms (${state.units.length} → ${filtered.length} comments)`)
+      console.log(`Total filtering time: ${(performance.now() - startTime).toFixed(2)}ms (${browsedUnits(state).length} → ${filtered.length} comments)`)
       return filtered
     },
 
@@ -357,6 +391,70 @@ const useStore = create<StoreState>((set, get) => {
 })
 
 export default useStore
+
+// The units the comment browser and search work over
+function browsedUnits(state: { scope: ScopeInfo | null; commentScope: 'scope' | 'docket'; units: Comment[]; docketUnits: Comment[] }): Comment[] {
+  return state.scope && state.commentScope === 'docket' ? state.docketUnits : state.units
+}
+
+// Scope sub-site: mark in-scope comments, attach the relevance excerpt, and replace the docket's
+// theme codes with the scope's (the two taxonomies share codes like "1.2" but mean different things).
+// A form-letter group's relevance, judged on its representative, applies to its members.
+function applyScope(all: Comment[], byId: Map<string, Comment>, scopeUnits: ScopeUnitsFile) {
+  for (const c of all) {
+    const isMember = c.isClusterRepresentative === false
+    const u = scopeUnits.units[isMember ? c.clusterRepresentativeId! : c.id]
+    delete c.themeScores
+    c.inScope = !!u
+    if (!u || isMember) continue
+    if (u.excerpt) c.scopeExcerpt = u.excerpt
+    if (u.note) c.scopeNote = u.note
+    if (u.seed) c.scopeSeed = true
+    if (u.themes?.length) {
+      c.themeScores = {}
+      for (const code of u.themes) c.themeScores[code] = 1
+    }
+  }
+  // Units missing from the index (shouldn't happen) are ignored
+  for (const id of Object.keys(scopeUnits.units)) if (!byId.has(id)) console.warn(`Scope unit ${id} not in the comment index`)
+  const comments = all.filter(c => c.inScope)
+  const units = comments.filter(c => c.isClusterRepresentative !== false)
+  return { comments, units }
+}
+
+// The docket's topics, counted over in-scope units (by submissions); topics with none are dropped
+function scopeEntities(entities: Record<string, Entity[]>, units: Comment[]): Record<string, Entity[]> {
+  const counts = new Map<string, number>()
+  for (const c of units) for (const e of c.entities || []) {
+    const k = `${e.category}|${e.label}`
+    counts.set(k, (counts.get(k) || 0) + (c.clusterSize || 1))
+  }
+  const out: Record<string, Entity[]> = {}
+  for (const [category, list] of Object.entries(entities)) {
+    const kept = list
+      .map(e => ({ ...e, mentionCount: counts.get(`${category}|${e.label}`) || 0 }))
+      .filter(e => e.mentionCount > 0)
+      .sort((a, b) => b.mentionCount - a.mentionCount)
+    if (kept.length) out[category] = kept
+  }
+  return out
+}
+
+// The docket's campaigns, counted over in-scope comments; campaigns with none are dropped
+function scopeCampaigns(campaigns: Campaign[], comments: Comment[]): Campaign[] {
+  const n = new Map<number, { total: number; para: number; units: number }>()
+  for (const c of comments) {
+    if (c.campaignId === undefined) continue
+    let x = n.get(c.campaignId); if (!x) n.set(c.campaignId, x = { total: 0, para: 0, units: 0 })
+    x.total++
+    if (c.campaignParaphrase) x.para++
+    if (c.isClusterRepresentative !== false) x.units++
+  }
+  return campaigns
+    .filter(k => n.has(k.id))
+    .map(k => { const x = n.get(k.id)!; return { ...k, total: x.total, paraphrased: x.para, exact: x.total - x.para, units: x.units } })
+    .sort((a, b) => b.total - a.total || a.id - b.id)
+}
 
 // Turn comments-index.json into in-memory comments. Form-letter members share their
 // representative's summary, themes and content shards rather than carrying copies.

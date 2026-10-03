@@ -2,7 +2,7 @@ import { FileText } from 'lucide-react'
 import useStore from '../store/useStore'
 
 function Header() {
-  const { meta } = useStore()
+  const { meta, scope } = useStore()
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -14,7 +14,9 @@ function Header() {
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Comment Analysis Dashboard</h1>
               <p className="text-sm text-gray-500 truncate">
                 Docket {meta?.documentId || 'Loading...'}
-                {meta?.stats && (
+                {scope ? (
+                  <span className="ml-2">• {scope.counts.docketSubmissions.toLocaleString()} comments</span>
+                ) : meta?.stats && (
                   <span className="ml-2">
                     • {meta.stats.totalComments.toLocaleString()} comments
                   </span>

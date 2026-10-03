@@ -3,6 +3,7 @@ import { Database } from "bun:sqlite";
 import { mkdir, writeFile, readdir } from "fs/promises";
 import { join } from "path";
 import { readDocumentInfo } from "../lib/document-meta";
+import { isScopeDbFile, listPublishableScopes } from "../lib/scope-db";
 
 export const generateLandingPageCommand = new Command("generate-landing-page")
   .description("Generate static landing page listing all regulations")
@@ -19,6 +20,8 @@ interface RegulationInfo {
   lastUpdated: string;
   agency: string;
   status: string;
+  // Scoped analyses published as sub-sites at <docket>/scopes/<slug>/
+  scopes: { slug: string; name: string; summary: string | null; inScope: number; total: number }[];
 }
 
 async function generateLandingPage(options: any) {
@@ -42,6 +45,8 @@ async function generateLandingPage(options: any) {
     if (f.endsWith('.sqlite.sqlite')) return false;
     // Exclude other sqlite variants
     if (f.includes('.sqlite.')) return false;
+    // Scope DBs are listed under their docket
+    if (isScopeDbFile(f)) return false;
     return true;
   });
   
@@ -108,7 +113,10 @@ async function generateLandingPage(options: any) {
       themeCount: stats.themeCount,
       lastUpdated: commentEndDate || new Date().toISOString(),
       agency,
-      status
+      status,
+      scopes: listPublishableScopes(documentId, dbDir).map(sc => ({
+        slug: sc.slug, name: sc.name, summary: sc.summary, inScope: sc.counts.inScopeSubmissions, total: sc.counts.docketSubmissions,
+      })),
     });
 
     db.close();
@@ -306,6 +314,58 @@ function generateHTML(regulations: RegulationInfo[]): string {
     .meta-item strong {
       color: #4a5568;
     }
+
+    .scope-list {
+      border-top: 1px solid #e2e8f0;
+      padding: 0.75rem 1.5rem 1rem;
+    }
+
+    .scope-list-label {
+      font-size: 0.8125rem;
+      color: #718096;
+      margin-bottom: 0.25rem;
+    }
+
+    .scope-item a {
+      display: block;
+      padding: 0.5rem 0 0.5rem 0.875rem;
+      border-left: 2px solid #cbd5e0;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .scope-item + .scope-item a {
+      margin-top: 0.25rem;
+    }
+
+    .scope-item a:hover,
+    .scope-item a:focus-visible {
+      border-left-color: #2b6cb0;
+      outline: none;
+    }
+
+    .scope-name {
+      font-weight: 600;
+      color: #2b6cb0;
+    }
+
+    .scope-item a:hover .scope-name {
+      text-decoration: underline;
+    }
+
+    .scope-summary {
+      display: block;
+      font-size: 0.875rem;
+      color: #4a5568;
+    }
+
+    .scope-count {
+      font-size: 0.8125rem;
+      color: #718096;
+      font-variant-numeric: tabular-nums;
+      margin-left: 0.5rem;
+      white-space: nowrap;
+    }
     
     .about-section {
       background: white;
@@ -500,6 +560,19 @@ function generateHTML(regulations: RegulationInfo[]): string {
             ` : ''}
           </div>
         </a>
+        ${reg.scopes.length ? `
+        <div class="scope-list">
+          <p class="scope-list-label" id="scopes-${reg.id}">Scoped analyses</p>
+          <ul aria-labelledby="scopes-${reg.id}" style="list-style:none">
+          ${reg.scopes.map(sc => `
+          <li class="scope-item">
+            <a href="./${reg.id}/scopes/${sc.slug}/">
+              <span class="scope-name">${escapeHtml(sc.name)}</span><span class="scope-count">${sc.inScope.toLocaleString()} of ${sc.total.toLocaleString()} comments</span>
+              ${sc.summary ? `<span class="scope-summary">${escapeHtml(sc.summary)}</span>` : ''}
+            </a>
+          </li>`).join('')}
+          </ul>
+        </div>` : ''}
       </div>
       `).join('')}
     </div>

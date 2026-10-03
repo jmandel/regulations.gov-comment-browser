@@ -1,9 +1,11 @@
 import { Command } from "commander";
 import { openDb } from "./lib/database";
 import { mkdir, writeFile, rm } from "fs/promises";
+import { readdirSync, statSync } from "fs";
 import { join } from "path";
 import { readDocumentInfo } from "./lib/document-meta";
 import { buildDatasetPacks, submitterCategoryLabel, DEFAULT_SITE_URL } from "./lib/dataset-pack";
+import { openScopeDbReadOnly, getScope, relevanceIsCurrent, scopeCounts, listPublishableScopes } from "./lib/scope-db";
 
 export const buildWebsiteCommand = new Command("build-website")
   .description("Generate static data files for web dashboard")
@@ -11,7 +13,14 @@ export const buildWebsiteCommand = new Command("build-website")
   .option("-o, --output <dir>", "Output directory", "dist/data")
   .option("--no-packs", "Skip the downloadable slim/full SQLite databases")
   .option("--site-url <url>", "Published site base URL (recorded in the downloadable databases)", DEFAULT_SITE_URL)
-  .action(buildWebsite);
+  .option("--scope <slug>", "Build a scoped analysis's sub-site data instead (published at <docket>/scopes/<slug>/data, reusing the docket's comment shards and search index)")
+  .action((documentId: string, options: any) => options.scope ? buildScopeWebsite(documentId, options.scope, options) : buildWebsite(documentId, options));
+
+// Where a scope sub-site lives relative to its docket site, and the way back. The dashboard reads
+// these from the scope's meta.json (sharedData / docketUrl), so only this layout is hard-coded.
+export const SCOPE_SITE_DIR = (slug: string) => `scopes/${slug}`;
+const SCOPE_SHARED_DATA = "../../data/";
+const SCOPE_DOCKET_URL = "../../";
 
 async function buildWebsite(documentId: string, options: any) {
   const db = openDb(documentId);
@@ -76,9 +85,138 @@ async function buildWebsite(documentId: string, options: any) {
     const packs = await buildDatasetPacks(db, { documentId, outputDir, siteUrl: options.siteUrl });
     if (packs.length) meta.downloads = packs.map(p => ({ kind: p.kind, file: p.file, bytes: p.bytes, sqliteBytes: p.sqliteBytes }));
   }
+  // 12. Scoped analyses of this docket, listed on the Overview; each is built as its own sub-site
+  // (build-website --scope <slug>) at <docket>/scopes/<slug>/
+  const scopes = listPublishableScopes(documentId);
+  if (scopes.length) {
+    meta.scopes = scopes.map(s => ({
+      slug: s.slug, name: s.name, summary: s.summary, path: `${SCOPE_SITE_DIR(s.slug)}/`,
+      inScopeSubmissions: s.counts.inScopeSubmissions, docketSubmissions: s.counts.docketSubmissions,
+      inScopeUnits: s.counts.inScopeUnits, themes: s.themes, seedCommentId: s.seedCommentId,
+    }));
+    console.log(`  🔎 ${scopes.length} scoped analys${scopes.length === 1 ? "is" : "es"}: ${scopes.map(s => s.slug).join(", ")}`);
+  }
   await writeJson(join(outputDir, "meta.json"), meta);
 
   console.log(`✅ Website data built in ${outputDir}`);
+  db.close();
+}
+
+// Data for one scope's sub-site. Only scope-specific files are written; the comment index,
+// detail/text shards, search index, entities and campaigns come from the docket's data directory
+// (meta.sharedData) and the dashboard narrows them to the in-scope units listed in scope-units.json.
+//   meta.json            docket metadata + scope stats, sharedData / docketUrl
+//   scope.json           slug, name, summary, prompt (markdown), seed comment, denominators
+//   scope-units.json     { [unitId]: { excerpt, note, themes, seed? } } for in-scope units
+//   themes.json, theme-summaries.json, theme-extracts/<code>.json, overview.json (scoped)
+async function buildScopeWebsite(documentId: string, slug: string, options: any) {
+  const db = openScopeDbReadOnly(documentId, slug);
+  const outputDir = options.output;
+  const scope = getScope(db);
+  if (!relevanceIsCurrent(db, scope)) {
+    db.close();
+    throw new Error(`Scope "${slug}": relevance judgments are missing or stale with the prompt; run scope-relevance first`);
+  }
+  console.log(`🏗️  Building scoped website data for ${documentId} / ${slug}`);
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const info = readDocumentInfo(db, documentId);
+  const counts = scopeCounts(db);
+
+  // In-scope units, and every comment they stand for (a form-letter group's relevance, judged on
+  // its representative, applies to all members; promoted members are their own units)
+  const relevant = db.prepare(`SELECT comment_id, excerpt, note, is_seed, cluster_size FROM main.scope_relevance WHERE relevant = 1 ORDER BY comment_id`).all() as any[];
+  const clustered = hasTable(db, "comment_cluster_membership") && ((db.prepare(`SELECT COUNT(*) AS n FROM comment_cluster_membership`).get() as any).n > 0);
+  const inScope = new Set<string>(relevant.map(r => r.comment_id));
+  if (clustered) {
+    const membersOf = db.prepare(`SELECT m2.comment_id FROM comment_cluster_membership m1
+      JOIN comment_cluster_membership m2 ON m2.cluster_id = m1.cluster_id WHERE m1.comment_id = ?`);
+    for (const r of relevant) for (const m of membersOf.all(r.comment_id) as any[]) inScope.add(m.comment_id);
+  }
+  const themesOf = new Map<string, string[]>();
+  for (const r of db.prepare(`SELECT comment_id, theme_code FROM main.comment_theme_extracts ORDER BY theme_code`).all() as any[]) {
+    let a = themesOf.get(r.comment_id); if (!a) themesOf.set(r.comment_id, a = []); a.push(r.theme_code);
+  }
+  const units: Record<string, any> = {};
+  for (const r of relevant) {
+    const u: any = {};
+    if (r.excerpt) u.excerpt = r.excerpt;
+    if (r.note) u.note = r.note;
+    const t = themesOf.get(r.comment_id);
+    if (t) u.themes = t;
+    if (r.is_seed) u.seed = true;
+    units[r.comment_id] = u;
+  }
+  await writeFile(join(outputDir, "scope-units.json"), JSON.stringify({ version: 1, units }));
+
+  // Organizations and form-letter groups in scope, for the denominators
+  const orgStmt = db.prepare(`SELECT json_extract(attributes_json, '$.organization') AS org FROM comments WHERE id = ?`);
+  const orgNames = new Set<string>();
+  for (const id of inScope) { const o = (orgStmt.get(id) as any)?.org; if (o && String(o).trim()) orgNames.add(String(o).trim().toLowerCase()); }
+  const orgs = orgNames.size;
+  const groups = relevant.filter(r => (r.cluster_size || 1) > 1).length;
+
+  const scopeJson = {
+    version: 1,
+    slug: scope.slug,
+    name: scope.name,
+    summary: scope.summary,
+    promptMarkdown: scope.prompt_md,
+    seedCommentId: scope.seed_comment_id,
+    updatedAt: scope.updated_at,
+    counts: { ...counts, inScopeComments: inScope.size, inScopeFormLetterGroups: groups, inScopeOrganizations: orgs },
+  };
+  await writeJson(join(outputDir, "scope.json"), scopeJson);
+
+  const themes = getThemeHierarchy(db);
+  await writeJson(join(outputDir, "themes.json"), themes);
+  const themeSummaries = getThemeSummaries(db);
+  await writeJson(join(outputDir, "theme-summaries.json"), themeSummaries);
+  await exportThemeExtracts(db, outputDir);
+  await writeJson(join(outputDir, "overview.json"), getOverview(db, themes, themeSummaries, inScope));
+
+  // Campaign figures within the scope (each comment is in at most one campaign)
+  const campaignStats: Record<string, number> = {};
+  if (hasTable(db, "comment_campaigns")) {
+    const ids = new Set<number>(); let total = 0, para = 0;
+    const paraIds = new Set<number>();
+    for (const r of db.prepare(`SELECT comment_id, campaign_id, how FROM comment_campaigns`).all() as any[]) {
+      if (!inScope.has(r.comment_id)) continue;
+      ids.add(r.campaign_id); total++;
+      if (r.how === "paraphrase") { para++; paraIds.add(r.campaign_id); }
+    }
+    if (ids.size) Object.assign(campaignStats, { campaigns: ids.size, campaignComments: total, paraphrasedCampaignComments: para, paraphraseCampaigns: paraIds.size });
+  }
+
+  const meta = {
+    documentId: info.docketId,
+    sourceDocumentId: documentId,
+    title: info.title,
+    documentType: info.documentType,
+    agencyId: info.agencyId,
+    commentStartDate: info.commentStartDate,
+    commentEndDate: info.commentEndDate,
+    generatedAt: new Date().toISOString(),
+    sharedData: SCOPE_SHARED_DATA,
+    docketUrl: SCOPE_DOCKET_URL,
+    scope: { slug: scope.slug, name: scope.name, summary: scope.summary, inScopeSubmissions: counts.inScopeSubmissions, docketSubmissions: counts.docketSubmissions, inScopeUnits: counts.inScopeUnits, docketUnits: counts.docketUnits },
+    stats: {
+      totalComments: inScope.size,
+      condensedComments: relevant.length,
+      totalThemes: themes.length,
+      totalEntities: 0,
+      scoredComments: relevant.reduce((s, r) => s + (themesOf.has(r.comment_id) ? r.cluster_size || 1 : 0), 0),
+      themeSummaries: Object.keys(themeSummaries).length,
+      ...campaignStats,
+    },
+  };
+  await writeJson(join(outputDir, "meta.json"), meta);
+
+  let bytes = 0;
+  const walk = (d: string) => { for (const f of readdirSync(d, { withFileTypes: true })) { const p = join(d, f.name); if (f.isDirectory()) walk(p); else bytes += statSync(p).size; } };
+  walk(outputDir);
+  console.log(`✅ Scope "${slug}" data built in ${outputDir}: ${relevant.length} in-scope units (${inScope.size} submissions of ${counts.docketSubmissions}), ${themes.length} themes, ${Object.keys(themeSummaries).length} summaries, ${(bytes / 1e3).toFixed(0)} KB`);
   db.close();
 }
 
@@ -138,8 +276,9 @@ function getStats(db: any) {
   };
 }
 
+// Any attached schema counts (a scope DB reads the docket's tables from the attached `base`)
 function hasTable(db: any, name: string): boolean {
-  return !!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(name);
+  return !!db.prepare(`SELECT name FROM pragma_table_list WHERE type='table' AND name=?`).get(name);
 }
 
 // Campaigns from tag-campaigns, largest first. Members are found through comments-index.json
@@ -164,7 +303,8 @@ function getCampaigns(db: any) {
 // Figures for the Overview page that the up-front data can't give: how submissions split between
 // campaigns and independent comments, submitter categories, daily arrivals (by received date), and
 // a one-sentence gist per top-level theme. Every count is in submissions (form-letter copies included).
-function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>) {
+// With `inScope` (a scoped build), only those comments are counted.
+function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>, inScope?: Set<string>) {
   const campaignOf = new Map<string, boolean>(); // comment -> reworded?
   if (hasTable(db, "comment_campaigns")) {
     for (const r of db.prepare(`SELECT comment_id, how FROM comment_campaigns`).all() as any[]) campaignOf.set(r.comment_id, r.how === "paraphrase");
@@ -178,6 +318,7 @@ function getOverview(db: any, themes: any[], themeSummaries: Record<string, any>
   const byDay = new Map<string, number>();
   for (const r of db.prepare(`SELECT id, json_extract(attributes_json, '$.category') AS category, json_extract(attributes_json, '$.organization') AS org,
       COALESCE(json_extract(attributes_json, '$.receiveDate'), json_extract(attributes_json, '$.postedDate')) AS received FROM comments`).all() as any[]) {
+    if (inScope && !inScope.has(r.id)) continue;
     const reworded = campaignOf.get(r.id);
     const part: Part = reworded === true ? "campaignReworded" : reworded === false ? "campaignCopies" : withAttachments.has(r.id) ? "attached" : "typed";
     composition[part]++;

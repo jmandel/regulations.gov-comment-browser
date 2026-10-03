@@ -95,6 +95,11 @@ function CommentCard({
             <span className="text-sm text-gray-600 flex-shrink-0 hidden sm:inline">• {comment.submitterType}</span>
           </div>
           <CampaignBadge comment={comment} />
+          {comment.inScope === false && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs text-gray-600 bg-gray-100 border border-gray-200 flex-shrink-0" title="The relevance check found nothing in this comment that addresses the scope">
+              Outside scope
+            </span>
+          )}
           {/* Cluster Badge */}
           {comment.clusterSize && comment.clusterSize > 1 && comment.isClusterRepresentative && (
             <span 
@@ -291,6 +296,11 @@ function CommentCard({
                     <div className="mb-4">
                       <p className="text-base font-medium text-gray-900 italic">{oneLineSummary}</p>
                     </div>
+                  )}
+                  {comment.scopeNote && (
+                    <p className="-mt-2 mb-4 text-sm text-[#46546b]">
+                      <span className="font-medium text-[#14233c]">On this scope:</span> {comment.scopeNote}
+                    </p>
                   )}
 
                   {detailLoading && (

@@ -52,3 +52,20 @@
 @media (prefers-reduced-motion: reduce) {
   .ov-grow { animation: none; }
 }
+
+/* Scoped analyses: the banner and in-scope passages share the Overview's ink tokens */
+.scope-ui {
+  --ov-ink: #14233c;
+  --ov-ink-2: #46546b;
+  --ov-ink-3: #5f6c82;
+  --ov-rule: #dde2ea;
+  --ov-link: #1b4f9c;
+  color: var(--ov-ink);
+}
+.scope-ui .tnum { font-variant-numeric: tabular-nums; }
+mark.scope-mark {
+  background: #fbefb4;
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px #fbefb4;
+}

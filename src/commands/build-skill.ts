@@ -4,6 +4,7 @@ import { mkdir, writeFile, readdir } from "fs/promises";
 import { join } from "path";
 import { $ } from "bun";
 import { readDocumentInfo } from "../lib/document-meta";
+import { isScopeDbFile, listPublishableScopes, type PublishedScopeInfo } from "../lib/scope-db";
 
 export const buildSkillCommand = new Command("build-skill")
   .description("Generate AI skill package from regulation databases")
@@ -21,6 +22,7 @@ interface DocketInfo {
   entityCount: number;
   lastCommentDate: string;
   generatedAt: string;
+  scopes: PublishedScopeInfo[];
 }
 
 async function buildSkill(options: { dbDir: string; output: string; baseUrl: string }) {
@@ -39,6 +41,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
     if (f.includes('.sqlite-')) return false;
     if (f.endsWith('.sqlite.sqlite')) return false;
     if (f.includes('.sqlite.')) return false;
+    if (isScopeDbFile(f)) return false; // scoped analyses are listed under their docket
     return true;
   });
 
@@ -96,6 +99,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
         entityCount,
         lastCommentDate,
         generatedAt: new Date().toISOString(),
+        scopes: listPublishableScopes(documentId, dbDir),
       });
 
       db.close();
@@ -135,6 +139,38 @@ function generateSkillMd(dockets: DocketInfo[], baseUrl: string): string {
 
   const generatedDate = new Date().toISOString().split('T')[0];
 
+  const withScopes = dockets.filter(d => d.scopes.length);
+  const scopeList = withScopes.map(d => d.scopes.map(sc => {
+    const c = sc.counts;
+    const url = `${baseUrl}/${d.id}/scopes/${sc.slug}/`;
+    return `- **${sc.name}** (${d.id}, \`${sc.slug}\`): ${sc.summary || ""} ${c.inScopeSubmissions.toLocaleString("en-US")} of ${c.docketSubmissions.toLocaleString("en-US")} submissions in scope${sc.seedCommentId ? `; drafted from comment ${sc.seedCommentId}` : ""}. Dashboard ${url} · data ${url}data/`;
+  }).join("\n")).join("\n");
+  const scopeSection = withScopes.length ? `
+## Scoped Analyses
+
+A scoped analysis re-runs the theme analysis on only the comments that address one question
+about a docket, written as a prompt (a topic, or "the issues raised in comment X"). An LLM judged
+every comment in the docket against the prompt; the in-scope ones got their own theme taxonomy,
+per-theme extracts and reports. Use a scope when the user's question matches it: its reports
+are focused and state in-scope counts ("X of the Y in-scope submissions"), which the docket-wide
+reports can't.
+
+${scopeList}
+
+Each scope's \`data/\` holds only scope-specific files; comment metadata, text shards and entities
+come from the docket's \`data/\` (\`meta.json\` → \`sharedData\` is the relative path):
+- \`scope.json\`: \`name\`, \`summary\`, \`promptMarkdown\` (the full scope prompt, verbatim), \`seedCommentId\`, and
+  \`counts\` (\`inScopeSubmissions\`, \`inScopeUnits\`, \`docketSubmissions\`, \`docketUnits\`, organizations, form-letter groups)
+- \`scope-units.json\`: \`{ "units": { "<unit id>": { "excerpt", "note", "themes", "seed"? } } }\` — the in-scope
+  units (form-letter members follow their representative's \`rep\` in the docket's \`comments-index.json\`), the
+  passages that address the scope, a one-line note, and the unit's scoped theme codes
+- \`themes.json\`, \`theme-summaries.json\`, \`theme-extracts/{CODE}.json\`, \`overview.json\`: as for a docket, but
+  for the scope's own taxonomy. Scope theme codes ("1", "1.2") are unrelated to the docket's codes.
+
+The downloadable analysis databases cover the docket-wide analysis only; scoped themes and reports
+are in these JSON files.
+` : "";
+
   return `---
 name: regulations-comment-browser
 description: |
@@ -172,7 +208,7 @@ sub-themes. Entities (organizations, standards, programs) are tagged.
 | Docket ID | Title | Agency | Closed | Comments | Themes | Analysis DBs |
 |-----------|-------|--------|--------|----------|--------|--------------|
 ${docketTable}
-
+${scopeSection}
 ## Downloadable Databases (best for serious analysis)
 
 If you can run code (a sandbox with Python or \`sqlite3\`), download a docket's analysis database

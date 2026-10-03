@@ -8,6 +8,8 @@ import useStore from '../store/useStore'
 import type { Comment } from '../types'
 import { useCommentContent } from '../utils/commentData'
 import CampaignBadge from './CampaignBadge'
+import { useMemo } from 'react'
+import { excerptPassages, countPassagesIn, remarkHighlightPassages } from '../utils/scopeHighlight'
 
 interface CommentDetailViewProps {
   comment: Comment
@@ -15,7 +17,7 @@ interface CommentDetailViewProps {
 
 function CommentDetailView({ comment }: CommentDetailViewProps) {
   const regulationsUrl = getRegulationsGovUrl(comment.documentId || '', comment.id)
-  const { themes, getCommentById } = useStore()
+  const { themes, getCommentById, scope } = useStore()
   
   // If this comment is part of a cluster but not the representative, get the representative's summary
   const representativeComment = comment.clusterRepresentativeId && !comment.isClusterRepresentative
@@ -25,6 +27,13 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
   // Full sections and text (the representative's for form-letter members) load from shards
   const { content, loading, error } = useCommentContent(comment, true)
   const displaySections = content?.sections || comment.structuredSections
+
+  // Scope sub-site: the in-scope passages (a form-letter member's come from its representative)
+  const scopeSource = scope ? (representativeComment || comment) : null
+  const excerpt = scopeSource?.scopeExcerpt
+  const passages = useMemo(() => excerptPassages(excerpt), [excerpt])
+  const highlightPlugin = useMemo(() => remarkHighlightPassages(passages), [passages])
+  const marked = countPassagesIn(displaySections?.detailedContent, passages)
   
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -89,6 +98,33 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
       
       {/* Main Content Area */}
       <div className="p-6">
+        {scope && comment.inScope === false && (
+          <p className="mb-4 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+            Outside this scope: the relevance check found nothing in this comment that addresses it.
+          </p>
+        )}
+        {scopeSource && (scopeSource.scopeExcerpt || scopeSource.scopeNote) && (
+          <section className="mb-6 rounded-md border border-[#cfd8e6] bg-[#f3f6fa] px-4 py-3" aria-labelledby="scope-excerpt-h">
+            <h5 id="scope-excerpt-h" className="text-sm font-semibold text-[#14233c]">
+              What this comment says on the scope
+              {scopeSource.scopeSeed && <span className="ml-2 font-normal text-[#46546b]">(the letter this scope was drafted from)</span>}
+            </h5>
+            {scopeSource.scopeNote && <p className="mt-0.5 text-sm text-[#46546b]">{scopeSource.scopeNote}</p>}
+            {scopeSource.scopeExcerpt && (
+              <div className="mt-2 max-h-72 overflow-y-auto border-l-[3px] border-[#e8c547] pl-3 text-sm leading-relaxed text-gray-800 whitespace-pre-line">
+                {scopeSource.scopeExcerpt}
+              </div>
+            )}
+            {marked > 0 && (
+              <p className="mt-2 text-xs text-[#5f6c82]">
+                <mark className="scope-mark scope-key">Highlighted</mark> in the full text below.{' '}
+                <button type="button" className="underline hover:text-[#14233c]" onClick={() => document.querySelector('mark.scope-mark:not(.scope-key)')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+                  Jump to the first passage
+                </button>
+              </p>
+            )}
+          </section>
+        )}
         {/* Show note if using aligned content from representative */}
         {(representativeComment || comment.isAlignedSummary) && (
           <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
@@ -288,7 +324,7 @@ function CommentDetailView({ comment }: CommentDetailViewProps) {
                 </h5>
                 <div className="text-sm pl-4 border-l-2 border-slate-200 prose prose-sm max-w-none">
                   <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    remarkPlugins={passages.length ? [remarkGfm, remarkBreaks, highlightPlugin] : [remarkGfm, remarkBreaks]}
                   >
                     {displaySections.detailedContent}
                   </ReactMarkdown>

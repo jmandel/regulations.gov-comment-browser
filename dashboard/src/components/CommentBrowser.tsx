@@ -44,7 +44,9 @@ function detectPrefix(query: string, cursorPos: number): PrefixDetection | null 
 }
 
 function CommentBrowser() {
-  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering, campaigns = [] } = useStore()
+  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering, campaigns = [], scope, commentScope, setCommentScope, meta } = useStore()
+  const wholeDocket = !!scope && commentScope === 'docket'
+  const docketTotal = scope?.counts.docketSubmissions ?? 0
   const [searchParams] = useSearchParams()
   const [page, setPage] = useState(0)
   const [showCopyModal, setShowCopyModal] = useState(false)
@@ -133,7 +135,7 @@ function CommentBrowser() {
   const filteredComments = useMemo(() => {
     if (!getFilteredComments) return []
     return getFilteredComments()
-  }, [getFilteredComments, filters, search])
+  }, [getFilteredComments, filters, search, commentScope])
 
   // Available submitter types (with 5+ comments)
   const availableSubmitterTypes = useMemo(() => {
@@ -398,9 +400,13 @@ function CommentBrowser() {
           <div className="flex items-center space-x-3 min-w-0">
             <MessageSquare className="h-6 w-6 text-blue-600 flex-shrink-0" />
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Browse Comments</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{scope ? (wholeDocket ? 'All comments in the docket' : 'Comments in this scope') : 'Browse Comments'}</h1>
               <p className="text-sm text-gray-500 mt-1 truncate sm:whitespace-normal">
-                {hasClustering ? (
+                {scope ? (
+                  wholeDocket
+                    ? <>Showing {filteredComments.length.toLocaleString()} {hasClustering ? 'clusters' : 'comments'} from all {docketTotal.toLocaleString()} submissions, in or out of scope</>
+                    : <>Showing {filteredComments.length.toLocaleString()} {hasClustering ? 'clusters' : 'comments'} representing the {comments.length.toLocaleString()} of {docketTotal.toLocaleString()} submissions that address this scope</>
+                ) : hasClustering ? (
                   <>Showing {filteredComments.length} clusters representing {comments.length} comments</>
                 ) : (
                   <>Showing {filteredComments.length} of {comments.length} comments</>
@@ -417,6 +423,29 @@ function CommentBrowser() {
             <span className="hidden sm:inline">Copy for LLM</span>
           </button>
         </div>
+        {scope && (
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+            <span className="text-gray-600" id="comment-scope-label">Search in</span>
+            <div role="radiogroup" aria-labelledby="comment-scope-label" className="inline-flex rounded-md border border-gray-300 p-0.5 bg-gray-50">
+              {([['scope', 'This scope'], ['docket', 'Whole docket']] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  role="radio"
+                  aria-checked={commentScope === value}
+                  onClick={() => { setCommentScope(value); setPage(0) }}
+                  className={`px-3 py-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${commentScope === value ? 'bg-white shadow-sm text-[#14233c] font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {wholeDocket && (
+              <span className="text-xs text-gray-500">
+                Out-of-scope comments carry no scope themes. <a href={meta?.docketUrl ? `${meta.docketUrl}#/comments` : '#'} className="underline hover:text-gray-700">Open the docket's comment browser</a>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Search + Filters */}

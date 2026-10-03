@@ -8,6 +8,12 @@ export interface Meta {
   generatedAt: string
   // Downloadable analysis databases (zipped SQLite + README), in data/; absent in older builds
   downloads?: Array<{ kind: 'slim' | 'full'; file: string; bytes: number; sqliteBytes?: number }>
+  // Docket site: its scoped analyses, each a sub-site at `path` (relative to the docket site)
+  scopes?: ScopeListing[]
+  // Scope sub-site: the scope, where the docket's shared data lives and the way back to the docket
+  scope?: Omit<ScopeListing, 'path' | 'themes' | 'seedCommentId'> & { docketUnits?: number }
+  sharedData?: string
+  docketUrl?: string
   stats: {
     totalComments: number
     condensedComments: number
@@ -20,6 +26,43 @@ export interface Meta {
     paraphrasedCampaignComments?: number
     paraphraseCampaigns?: number
   }
+}
+
+export interface ScopeListing {
+  slug: string
+  name: string
+  summary?: string | null
+  path: string
+  inScopeSubmissions: number
+  docketSubmissions: number
+  inScopeUnits: number
+  themes?: number
+  seedCommentId?: string | null
+}
+
+// scope.json in a scope sub-site
+export interface ScopeInfo {
+  slug: string
+  name: string
+  summary?: string | null
+  promptMarkdown: string
+  seedCommentId?: string | null
+  updatedAt?: string
+  counts: {
+    docketSubmissions: number
+    docketUnits: number
+    inScopeSubmissions: number
+    inScopeUnits: number
+    inScopeComments?: number
+    inScopeFormLetterGroups?: number
+    inScopeOrganizations?: number
+  }
+}
+
+// scope-units.json: the in-scope units with what the relevance judge kept
+export interface ScopeUnitsFile {
+  version: number
+  units: Record<string, { excerpt?: string; note?: string; themes?: string[]; seed?: boolean }>
 }
 
 // overview.json: precomputed figures for the Overview page. Counts are submissions (copies included).
@@ -193,6 +236,12 @@ export interface Comment {
   // Shards holding this comment's content (for members: the representative's)
   detailShard?: number
   textShard?: number
+  // Scope sub-site: whether the comment addresses the scope (members follow their representative),
+  // and the in-scope passages and one-line note from the relevance judgment (units only)
+  inScope?: boolean
+  scopeExcerpt?: string
+  scopeNote?: string
+  scopeSeed?: boolean
 }
 
 // Shape of comments-index.json

@@ -373,5 +373,5 @@ async function runScopedPipeline(documentId: string, options: any) {
     console.log(`\n▶️  ${name}`);
     await run();
   }
-  console.log(`\n✅ Scoped analysis "${slug}" complete (website output for scopes: not built yet)`);
+  console.log(`\n✅ Scoped analysis "${slug}" complete; build-website <doc> --scope ${slug} builds its sub-site`);
 }

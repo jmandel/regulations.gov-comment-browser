@@ -4,6 +4,7 @@
 // Shards are cached in memory (LRU by size; the browser's HTTP cache backs evicted ones).
 import { useEffect, useState } from 'react'
 import type { Comment, StructuredSections } from '../types'
+import { sharedData } from './dataPaths'
 
 type DetailShard = Record<string, { sections?: StructuredSections; addedText?: string }>
 type TextShard = Record<string, string>
@@ -27,7 +28,7 @@ class ShardCache<T> {
     if (hit) return Promise.resolve(hit)
     let p = this.inflight.get(n)
     if (!p) {
-      p = fetch(`./data/${this.dir}/${String(n).padStart(4, '0')}.json`)
+      p = fetch(sharedData(`${this.dir}/${String(n).padStart(4, '0')}.json`))
         .then(r => {
           if (!r.ok) throw new Error(`${this.dir}/${n}: HTTP ${r.status}`)
           return r.text()
