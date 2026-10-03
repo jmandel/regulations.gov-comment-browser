@@ -54,7 +54,9 @@ const CHUNK_PAGES = 20;
 
 // Length check: a part whose transcript has under MIN_LENGTH_RATIO of its source's words (PDF text
 // layer via pdftotext, or the DOCX/TXT text) is retried once on the fallback model, keeping the
-// longer result. Below MIN_SOURCE_WORDS (scans have no text layer) the check is skipped. In PFS,
+// longer result. A part that still has no transcript (Gemini refuses with RECITATION on attached
+// journal articles and published reports, often on retry too) gets its text layer instead, marked
+// as such. Below MIN_SOURCE_WORDS (scans have no text layer) the check is skipped. In PFS,
 // 2% of single-attachment PDFs up to 30 pages fell under half, against 40% of multi-attachment ones.
 const MIN_LENGTH_RATIO = 0.5;
 const MIN_SOURCE_WORDS = 150;
@@ -71,6 +73,7 @@ const CHUNK_MAX_COMMENTS = 500;
 // One LLM request: an attachment, or a page range of a long PDF
 interface TranscriptionPart extends LlmRequest {
   sourceWords: number;             // words in the source's text layer; 0 = unknown (scan, image)
+  sourceText: string;              // that text layer, used as-is if the model won't transcribe the part
 }
 
 // How a comment's transcript is put together once its parts are back
@@ -107,10 +110,12 @@ async function attachmentParts(
     const path = join(dir, "in.pdf");
     await writeFile(path, blob);
     const pages = parseInt((await tool($`qpdf --show-npages ${path}`)) || "") || 0;
-    const words = async (from: number, to: number) =>
-      wordCount((await tool($`pdftotext -q -f ${from} -l ${to} ${path} -`)) || "");
+    const layer = async (from: number, to: number) => {
+      const t = ((await tool($`pdftotext -q -f ${from} -l ${to} ${path} -`)) || "").trim();
+      return { sourceWords: wordCount(t), sourceText: t };
+    };
     if (pages <= SPLIT_OVER_PAGES) {
-      return [{ key, model, sourceWords: await words(1, pages || 1), parts: [intro(""), pdfPart(blob)] }];
+      return [{ key, model, ...(await layer(1, pages || 1)), parts: [intro(""), pdfPart(blob)] }];
     }
     const n = Math.ceil(pages / CHUNK_PAGES);
     const size = Math.ceil(pages / n);
@@ -122,10 +127,10 @@ async function attachmentParts(
       const ok = await tool($`qpdf --deterministic-id --empty --pages ${path} ${from}-${to} -- ${chunk}`);
       if (ok === null) {
         console.warn(`    qpdf could not split ${att.id}.pdf; sending all ${pages} pages in one call`);
-        return [{ key, model, sourceWords: await words(1, pages), parts: [intro(""), pdfPart(blob)] }];
+        return [{ key, model, ...(await layer(1, pages)), parts: [intro(""), pdfPart(blob)] }];
       }
       out.push({
-        key: `${key}#p${from}-${to}`, model, sourceWords: await words(from, to),
+        key: `${key}#p${from}-${to}`, model, ...(await layer(from, to)),
         parts: [intro(`These are pages ${from}-${to} of ${pages}: transcribe these pages only, even if they begin or end mid-sentence.`), pdfPart(await readFile(chunk))],
       });
     }
@@ -133,7 +138,7 @@ async function attachmentParts(
   }
 
   if (NATIVE_MIME[format]) {
-    return [{ key, model, sourceWords: 0, parts: [intro(""), createPartFromBase64(blob.toString("base64"), NATIVE_MIME[format])] }];
+    return [{ key, model, sourceWords: 0, sourceText: "", parts: [intro(""), createPartFromBase64(blob.toString("base64"), NATIVE_MIME[format])] }];
   }
 
   let text = "";
@@ -145,7 +150,7 @@ async function attachmentParts(
     text = blob.toString("utf-8").trim();
   }
   if (!text) return [];
-  return [{ key, model, sourceWords: wordCount(text), parts: [intro(""), { text: `=== DOCUMENT (converted from ${format.toUpperCase()}) ===\n${text}` }] }];
+  return [{ key, model, sourceWords: wordCount(text), sourceText: text, parts: [intro(""), { text: `=== DOCUMENT (converted from ${format.toUpperCase()}) ===\n${text}` }] }];
 }
 
 // Plan a comment: its comment-box text plus one or more requests per readable attachment
@@ -385,9 +390,10 @@ async function transcribeComments(documentId: string, options: any) {
   // The fallback model (tasks.transcribe.models.fallback) retries failed, empty, blocked and short
   // parts, unless the model was forced with -m
   const fallbackModel = getTaskRoleModel('transcribe', 'fallback');
-  const useFallback = !options.model && fallbackModel !== effectiveModel;
+  const retryModel = options.model ? effectiveModel : fallbackModel;
   let costUsd = 0;
   let shortRetries = 0;
+  let textLayerParts = 0;
 
   const chunks: RawComment[][] = [];
   let cur: RawComment[] = [];
@@ -444,12 +450,20 @@ async function transcribeComments(documentId: string, options: any) {
       shortRetries++;
       return true;
     });
-    if (retry.length > 0 && useFallback) {
-      console.log(`   🔁 Retrying ${retry.length} part(s) with ${fallbackModel}`);
-      const fallback = await runLlmRequests(retry.map(r => ({ ...r, model: fallbackModel })), (req, res) => accept(req, res.text), {
+    if (retry.length > 0) {
+      console.log(`   🔁 Retrying ${retry.length} part(s) with ${retryModel}`);
+      const fallback = await runLlmRequests(retry.map(r => ({ ...r, model: retryModel })), (req, res) => accept(req, res.text), {
         db, task: "transcribe", mode, concurrency, label: `transcribe-fallback:${label}`,
       });
       costUsd += fallback.costUsd;
+    }
+    // Still nothing (usually a RECITATION refusal on an attached article or report): use the
+    // part's own text layer, so its content isn't lost
+    for (const r of requests) {
+      if (out.has(r.key) || r.sourceWords < MIN_SOURCE_WORDS) continue;
+      console.log(`  [${r.key}] 📄 Model declined; using the document's text layer (${r.sourceWords} words)`);
+      out.set(r.key, `_The model declined to transcribe this part, likely because it reproduces published material; below is the document's own text, extracted directly._\n\n${r.sourceText}`);
+      textLayerParts++;
     }
 
     withTransaction(db, () => {
@@ -476,6 +490,7 @@ async function transcribeComments(documentId: string, options: any) {
   console.log(`  📝 Typed-only (no LLM): ${direct}`);
   console.log(`  ✅ Transcribed by LLM: ${successful}`);
   if (shortRetries > 0) console.log(`  📏 Parts retried for a short transcript: ${shortRetries}`);
+  if (textLayerParts > 0) console.log(`  📄 Parts filled from their text layer after the model declined: ${textLayerParts}`);
   console.log(`  ❌ Failed: ${failed}`);
   console.log(`  📄 Total processed: ${comments.length}`);
   if (withAttachments.length > 0) console.log(`  💰 ~$${costUsd.toFixed(3)}${mode === "batch" ? " (batch price)" : ""}`);
