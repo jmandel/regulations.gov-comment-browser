@@ -15,10 +15,10 @@
   "tasks": {
     "transcribe": {
       "concurrency": 5,
-      "model": "gemini-3.5-flash-lite",
-      "description": "Transcribes comments with attachments into clean markdown; typed-only comments are stored as-is without an LLM call",
+      "model": "gemini-3.8-flash-nothink-hires",
+      "description": "Transcribes each attachment in its own call (PDFs over 30 pages in page ranges of up to 20) and joins them into one markdown transcript per comment; comment-box text is stored as typed. 3.8 Flash without thinking at high PDF media resolution described charts, shaded tables and screenshots far better than Flash-Lite (4.7 vs 3.5/5). The fallback model retries parts that fail, come back empty or blocked (3.8 Flash sometimes refuses with RECITATION), or come back under half the length of their text layer",
       "models": {
-        "fallback": "gemini-3.8-flash"
+        "fallback": "gemini-3.5-flash-lite"
       }
     },
     "triage": {
