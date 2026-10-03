@@ -4,7 +4,7 @@ import { mkdir, writeFile, rm } from "fs/promises";
 import { readdirSync, statSync } from "fs";
 import { join } from "path";
 import { readDocumentInfo } from "./lib/document-meta";
-import { buildDatasetPacks, submitterCategoryLabel, DEFAULT_SITE_URL } from "./lib/dataset-pack";
+import { buildDatasetPacks, submitterCategoryLabel, DEFAULT_SITE_URL, packDownloadsBaseUrl } from "./lib/dataset-pack";
 import { openScopeDbReadOnly, getScope, relevanceIsCurrent, scopeCounts, listPublishableScopes } from "./lib/scope-db";
 
 export const buildWebsiteCommand = new Command("build-website")
@@ -83,7 +83,11 @@ async function buildWebsite(documentId: string, options: any) {
   for (const stale of [`${docketId}-slim.sqlite.zip`, `${docketId}-full.sqlite.zip`]) await rm(join(outputDir, stale), { force: true });
   if (options.packs !== false) {
     const packs = await buildDatasetPacks(db, { documentId, outputDir, siteUrl: options.siteUrl });
-    if (packs.length) meta.downloads = packs.map(p => ({ kind: p.kind, file: p.file, bytes: p.bytes, sqliteBytes: p.sqliteBytes }));
+    const base = packDownloadsBaseUrl();
+    if (packs.length) meta.downloads = packs.map(p => ({
+      kind: p.kind, file: p.file, bytes: p.bytes, sqliteBytes: p.sqliteBytes, sha256: p.sha256,
+      ...(base ? { url: `${base}/${p.file}` } : {}),
+    }));
   }
   // 12. Scoped analyses of this docket, listed on the Overview; each is built as its own sub-site
   // (build-website --scope <slug>) at <docket>/scopes/<slug>/

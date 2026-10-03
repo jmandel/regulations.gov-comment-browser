@@ -7,7 +7,7 @@ export interface Meta {
   commentEndDate?: string
   generatedAt: string
   // Downloadable analysis databases (zipped SQLite + README), in data/; absent in older builds
-  downloads?: Array<{ kind: 'slim' | 'full'; file: string; bytes: number; sqliteBytes?: number }>
+  downloads?: Array<{ kind: 'slim' | 'full'; file: string; bytes: number; sqliteBytes?: number; sha256?: string; url?: string }>  // url: absolute (release asset); else ./data/<file>
   // Docket site: its scoped analyses, each a sub-site at `path` (relative to the docket site)
   scopes?: ScopeListing[]
   // Scope sub-site: the scope, where the docket's shared data lives and the way back to the docket

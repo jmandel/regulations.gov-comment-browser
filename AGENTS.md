@@ -121,7 +121,7 @@ Evidence (292-unit PFS fixture, blind-judged by 3.8 Flash at high thinking): ver
    cd dashboard && bunx vite --port 3002
    ```
 
-2. **Deploy**: Upload the DB file to the Google Drive `regulations-dbs` folder, then push to trigger the GitHub Actions build (`scripts/build-all-dashboards.sh`).
+2. **Deploy**: Upload the DB file to the Google Drive `regulations-dbs` folder, then push to trigger the GitHub Actions build (`scripts/build-all-dashboards.sh`; on `main` it also publishes changed downloadable databases to the `analysis-databases` release, see "Dataset downloads").
 
 ### Resuming after failure
 
@@ -199,7 +199,7 @@ Dashboard: a Campaigns tab (list with exact vs reworded counts, detail page with
 
 ### Dataset downloads
 
-`build-website` exports two zipped SQLite databases per docket (`src/lib/dataset-pack.ts`; examples in `src/lib/dataset-pack-examples.ts`, theme-report rendering in `src/lib/theme-report-markdown.ts`), served from `<site>/<docket>/data/`, linked from the Overview and described in the AI skill:
+`build-website` exports two zipped SQLite databases per docket (`src/lib/dataset-pack.ts`; examples in `src/lib/dataset-pack-examples.ts`, theme-report rendering in `src/lib/theme-report-markdown.ts`), linked from the Overview and described in the AI skill. Local builds put them in the site's `data/`; the published site serves them from a GitHub release (see "Hosting" below):
 
 - `<docket>-slim.sqlite.zip`: `docket`, `submissions` (one row per comment as filed, without text), `units` (one row per analyzed text: form-letter group, promoted member or individual comment, with its weight `submissions` and condensed-summary columns), `themes` (rolled-up submissions/units), `unit_themes`, `extract_items` (each position/concern/recommendation/experience/quote per unit and theme), `theme_reports` (markdown with cited IDs annotated by submitter) and `theme_report_items`, `campaigns`, `entities`/`unit_entities`, `attachments` (metadata and URLs), views `v_submissions` and `v_extract_points`.
 - `<docket>-full.sqlite.zip`: the same plus `units.text`/`text_source` (`typed` = verbatim comment box, `llm_transcript` = transcription of comment + attachments), `submissions.typed_text` (comment box, only when the unit text is a transcript) and `added_text` (form-letter members' own words). Template text is never repeated per member.
@@ -208,7 +208,9 @@ It is a purpose-built schema written at export (the pipeline DB is only read): e
 
 FTS5 indexes (`extract_items_fts`, `summaries_fts`, `theme_reports_fts`, full: `units_text_fts`; porter stemming, external content) add ~60–70% to a zip, so they're included only while the zip stays under 50 MB (slim) / 95 MB (full); otherwise `docket.search_index = 'not_included'` and the `enable_search` section has the statements to build them. Output is deterministic: sorted inserts, no export timestamp (`docket.generated_at` is the newest analysis result), fixed zip mtimes, `zip -X` (the `zip` CLI is required; on ubuntu-latest it is preinstalled, without it the step is skipped with a warning).
 
-Measured sizes (zip): PFS 1-in-20 sample (1,364 comments) slim 5.2 MB / full 7.5 MB, with search; synthetic full-scale PFS (43k comments, 20k units) with search would be slim 48 MB / full 112 MB, so it ships without: slim 46 MB / full 80 MB (building the indexes from `enable_search` then takes ~40 s). Previously published dockets: 2.4–18.8 MB slim, 3.2–26 MB full, all with search. Build time at PFS scale is ~3 min on a heavily loaded 12-core machine (less on an idle runner). Older databases (no clustering, transcripts, campaigns, triage, group reports) export with empty tables/NULL columns and a "Not available for this docket" README section.
+Measured sizes (zip): real full PFS run slim 75 MB / full 124 MB without search; PFS 1-in-20 sample (1,364 comments) slim 5.2 MB / full 7.5 MB, with search; synthetic full-scale PFS (43k comments, 20k units) with search would be slim 48 MB / full 112 MB, so it ships without: slim 46 MB / full 80 MB (building the indexes from `enable_search` then takes ~40 s). Previously published dockets: 2.4–18.8 MB slim, 3.2–26 MB full, all with search. Build time at PFS scale is ~3 min on a heavily loaded 12-core machine (less on an idle runner). Older databases (no clustering, transcripts, campaigns, triage, group reports) export with empty tables/NULL columns and a "Not available for this docket" README section.
+
+Hosting: CI builds with `DATA_DOWNLOADS_URL=https://github.com/<repo>/releases/download/analysis-databases`, so `meta.json` → `downloads[].url` (and the skill's links) point at release assets; then `scripts/publish-data-packs.sh dist` uploads each zip to the `analysis-databases` release (created on first run) only when its SHA-256 differs from the asset's digest, and the zips are deleted from `dist/` before the Pages deploy. Every push rebuilds the site, so zips inside it would be redeployed and stored as a new workflow artifact each time (and the full PFS zip is over 100 MB); release assets keep one copy per file name at a stable URL. This relies on deterministic output: the `docket.export_code_hash` column hashes the export code instead of recording the git commit, which would change every zip on every push. `--dry-run` shows what would upload. Each `downloads` entry also has `sha256`.
 
 ### Gemini sampling settings
 

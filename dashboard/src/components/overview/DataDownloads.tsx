@@ -18,7 +18,7 @@ export function formatBytes(n: number): string {
   return `${Math.max(1, Math.round(n / 1e3))} KB`
 }
 
-// "Download the data": the zipped SQLite databases build-website writes next to the site data
+// "Download the data": the zipped SQLite databases, hosted next to the site data or (CI) as GitHub release assets
 export function DataDownloads({ downloads }: { downloads: NonNullable<Meta['downloads']> }) {
   const linkClass = 'text-[var(--ov-link)] underline decoration-1 underline-offset-2 decoration-[var(--ov-link)]/40 hover:decoration-[var(--ov-link)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ov-link)] rounded-sm'
   const order = ['slim', 'full']
@@ -34,7 +34,7 @@ export function DataDownloads({ downloads }: { downloads: NonNullable<Meta['down
           const info = DESCRIPTIONS[d.kind] || { title: d.file, text: '' }
           return (
             <li key={d.file}>
-              <a href={`./data/${d.file}`} download className={`${linkClass} inline-flex items-center gap-1.5 text-sm font-medium`}>
+              <a href={d.url || `./data/${d.file}`} download className={`${linkClass} inline-flex items-center gap-1.5 text-sm font-medium`}>
                 <Download className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
                 {info.title}
               </a>

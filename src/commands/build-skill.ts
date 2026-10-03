@@ -4,6 +4,7 @@ import { mkdir, writeFile, readdir } from "fs/promises";
 import { join } from "path";
 import { $ } from "bun";
 import { readDocumentInfo } from "../lib/document-meta";
+import { packDownloadsBaseUrl } from "../lib/dataset-pack";
 import { isScopeDbFile, listPublishableScopes, type PublishedScopeInfo } from "../lib/scope-db";
 
 export const buildSkillCommand = new Command("build-skill")
@@ -131,9 +132,12 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
 }
 
 function generateSkillMd(dockets: DocketInfo[], baseUrl: string): string {
+  // Zips live in a GitHub release when CI sets DATA_DOWNLOADS_URL, else next to each docket's data
+  const releaseBase = packDownloadsBaseUrl();
+  const packUrl = (docket: string, kind: string) => releaseBase ? `${releaseBase}/${docket}-${kind}.sqlite.zip` : `${baseUrl}/${docket}/data/${docket}-${kind}.sqlite.zip`;
   const docketTable = dockets.map(d => {
     const date = d.lastCommentDate ? d.lastCommentDate.split('T')[0] : "—";
-    const db = (kind: string) => `[${kind}](${baseUrl}/${d.id}/data/${d.id}-${kind}.sqlite.zip)`;
+    const db = (kind: string) => `[${kind}](${packUrl(d.id, kind)})`;
     return `| ${d.id} | ${d.title} | ${d.agency} | ${date} | ${d.commentCount.toLocaleString()} | ${d.themeCount} | ${db("slim")} · ${db("full")} |`;
   }).join('\n');
 
@@ -215,11 +219,11 @@ If you can run code (a sandbox with Python or \`sqlite3\`), download a docket's 
 instead of paging through JSON. Each docket publishes two zipped SQLite files, each with a README.md:
 
 \`\`\`
-${baseUrl}/{DOCKET_ID}/data/{DOCKET_ID}-slim.sqlite.zip   # metadata, groups, campaigns, summaries, themes, reports, extracted points
-${baseUrl}/{DOCKET_ID}/data/{DOCKET_ID}-full.sqlite.zip   # all of that + full comment text and attachment transcripts
+${packUrl("{DOCKET_ID}", "slim")}   # metadata, groups, campaigns, summaries, themes, reports, extracted points
+${packUrl("{DOCKET_ID}", "full")}   # all of that + full comment text and attachment transcripts
 \`\`\`
 
-Exact file names and sizes are in \`meta.json\` → \`downloads\` (absent for dockets built before
+Exact file names, sizes, SHA-256 and URLs are in \`meta.json\` → \`downloads\` (absent for dockets built before
 this feature). Start with the slim file (a few MB to tens of MB); fetch the full one when you need
 verbatim text or full-text search. The schema documents itself: \`.schema\` (or
 \`SELECT sql FROM sqlite_master\`) shows every table with a comment on each column, and
@@ -237,7 +241,7 @@ if \`SELECT search_index FROM docket\` says \`not_included\`, run the SQL in
 \`\`\`python
 import io, sqlite3, urllib.request, zipfile
 docket = "${dockets[0]?.id || "HHS-ONC-2025-0005"}"
-z = zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(f"${baseUrl}/{docket}/data/{docket}-slim.sqlite.zip").read()))
+z = zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(f"${packUrl("{docket}", "slim")}").read()))
 z.extractall("."); db = sqlite3.connect(f"{docket}-slim.sqlite")
 print(db.execute("SELECT body FROM _readme WHERE section = 'counting'").fetchone()[0])
 \`\`\`

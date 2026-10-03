@@ -12,6 +12,7 @@ import { Database } from "bun:sqlite";
 import { mkdtemp, mkdir, rm, stat, utimes, chmod, writeFile, copyFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
+import { readFileSync } from "fs";
 import { readDocumentInfo, type DocumentInfo } from "./document-meta";
 import { htmlToText, wordCount } from "./text";
 import { reportItems, reportMarkdown } from "./theme-report-markdown";
@@ -23,6 +24,14 @@ export interface PackFile {
   file: string;        // file name inside the site's data/ directory
   bytes: number;       // zip size
   sqliteBytes: number; // uncompressed database size
+  sha256: string;      // of the zip; publish-data-packs.sh compares it with the release asset's digest
+}
+
+// Where the zips are downloaded from. Unset (local builds): next to the site data, ./data/<file>.
+// CI sets it to the GitHub release that holds the zips (see scripts/publish-data-packs.sh), since
+// shipping them inside every Pages deploy stores a new copy of every docket's zips on each push.
+export function packDownloadsBaseUrl(): string | undefined {
+  return process.env.DATA_DOWNLOADS_URL?.replace(/\/$/, "") || undefined;
 }
 
 export const DEFAULT_SITE_URL = "https://joshuamandel.com/regulations.gov-comment-browser";
@@ -372,7 +381,7 @@ function schema(kind: PackKind, docketId: string): string[] {
     ["form_letter_groups INTEGER", "units standing for 2+ identical/near-identical submissions"],
     ["campaign_count INTEGER", "organized campaigns tagged (0 when campaign tagging was not run)"],
     ["generated_at TEXT", "when the newest analysis result was produced (not the export time)"],
-    ["pipeline_version TEXT", "git commit of the exporting code, when known"],
+    ["export_code_hash TEXT", "hash of the export code; changes only when the export logic changes (not on every commit), so an unchanged docket re-exports byte-identically"],
     ["pack TEXT", "'slim' (no full text) or 'full'"],
     ["search_index TEXT", "'included' = the *_fts full-text tables exist; 'not_included' = run the statements in _readme section 'enable_search' first"],
   ]));
@@ -879,15 +888,13 @@ function exampleParams(src: Source, rollUnits: Map<string, Set<string>>, labels:
   };
 }
 
-function gitVersion(): string | null {
-  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 12);
-  try {
-    const r = Bun.spawnSync(["git", "rev-parse", "--short=12", "HEAD"], { cwd: import.meta.dir, stdout: "pipe", stderr: "ignore" });
-    const v = r.stdout.toString().trim();
-    return r.exitCode === 0 && v ? v : null;
-  } catch {
-    return null;
-  }
+// Hash of the code that shapes the export, recorded instead of a git commit: a commit id would
+// change every zip on every push, and publish-data-packs.sh re-uploads only zips whose bytes change
+function exportCodeHash(): string {
+  const files = ["dataset-pack.ts", "dataset-pack-examples.ts", "theme-report-markdown.ts", "document-meta.ts", "text.ts"];
+  const h = new Bun.CryptoHasher("sha256");
+  for (const f of files) h.update(readFileSync(join(import.meta.dir, f)));
+  return h.digest("hex").slice(0, 12);
 }
 
 function writeDatabase(path: string, src: Source, kind: PackKind, siteUrl: string): void {
@@ -1053,7 +1060,7 @@ function writeDatabase(path: string, src: Source, kind: PackKind, siteUrl: strin
     };
     out.prepare(`INSERT INTO docket VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`).run(
       info.docketId, info.title, info.agency, info.documentType ?? null, info.commentStartDate ?? null, info.commentEndDate ?? null,
-      docketUrl, dashboardUrl, counts.submissions, counts.units, counts.groups, counts.campaigns, src.generatedAt, gitVersion(), kind);
+      docketUrl, dashboardUrl, counts.submissions, counts.units, counts.groups, counts.campaigns, src.generatedAt, exportCodeHash(), kind);
     const insReadme = out.prepare(`INSERT INTO _readme VALUES (?, ?, ?)`);
     readmeSections(src, kind, docketUrl, dashboardUrl, counts, exampleParams(src, rollUnits, labels, entUnits, weightOf)).forEach(([section, body], i) => insReadme.run(i + 1, section, body));
   });
@@ -1139,9 +1146,10 @@ export async function buildDatasetPacks(db: Database, opts: { documentId: string
       await rm(outPath, { force: true });
       await copyFile(zipPath, outPath);
       const sqliteBytes = (await stat(join(dir, dbName))).size;
-      files.push({ kind, file: zipName, bytes, sqliteBytes });
+      const sha256 = new Bun.CryptoHasher("sha256").update(await Bun.file(outPath).arrayBuffer()).digest("hex");
+      files.push({ kind, file: zipName, bytes, sqliteBytes, sha256 });
       console.log(`  📦 ${zipName}: ${(bytes / 1e6).toFixed(1)} MB (database ${(sqliteBytes / 1e6).toFixed(1)} MB, search index ${dir === searchDir ? "included" : "not included"})`);
-      if (bytes > MAX_PUBLISHED_BYTES) console.warn(`  ⚠️  ${zipName} is over 100 MB; GitHub Pages hosting may reject or throttle it`);
+      if (bytes > MAX_PUBLISHED_BYTES && !packDownloadsBaseUrl()) console.warn(`  ⚠️  ${zipName} is over 100 MB; publish it as a release asset (DATA_DOWNLOADS_URL, scripts/publish-data-packs.sh) rather than inside the site`);
       await rm(plainDir, { recursive: true, force: true });
       await rm(searchDir, { recursive: true, force: true });
     }
