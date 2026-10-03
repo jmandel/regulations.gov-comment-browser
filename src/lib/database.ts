@@ -2,7 +2,8 @@ import { Database } from "bun:sqlite";
 import { mkdir } from "fs/promises";
 import { join } from "path";
 
-export const DB_DIR = "dbs";
+// DB_DIR lets scripts (e.g. build-all-dashboards.sh --db-dir) point every command at another folder
+export const DB_DIR = process.env.DB_DIR || "dbs";
 
 // Ensure dbs directory exists
 await mkdir(DB_DIR, { recursive: true });
@@ -191,6 +192,71 @@ export function initSchema(db: Database) {
     -- Index for efficient theme-based queries
     CREATE INDEX IF NOT EXISTS idx_theme_extracts_theme ON comment_theme_extracts(theme_code);
     
+    -- Plain text extracted locally (pdftotext/pandoc) from attachments, cached for clustering
+    CREATE TABLE IF NOT EXISTS attachment_text (
+      attachment_id TEXT NOT NULL,
+      format TEXT NOT NULL,
+      comment_id TEXT NOT NULL,
+      text TEXT NOT NULL,
+      PRIMARY KEY (attachment_id, format)
+    );
+    CREATE INDEX IF NOT EXISTS idx_attachment_text_comment ON attachment_text(comment_id);
+
+    -- Text a form-letter cluster member adds beyond the cluster's shared template
+    CREATE TABLE IF NOT EXISTS form_letter_additions (
+      comment_id TEXT PRIMARY KEY,
+      cluster_id INTEGER NOT NULL,
+      added_word_count INTEGER NOT NULL,
+      added_text TEXT NOT NULL,
+      promoted INTEGER NOT NULL DEFAULT 0, -- 1 = added so much it was split out as its own singleton cluster
+      FOREIGN KEY (comment_id) REFERENCES comments(id)
+    );
+
+    -- Triage of short ungrouped comments: which ones carry content worth LLM processing
+    CREATE TABLE IF NOT EXISTS comment_triage (
+      comment_id TEXT PRIMARY KEY,
+      label TEXT NOT NULL CHECK(label IN ('no_substance', 'stance_only', 'substantive')),
+      topic TEXT,   -- for stance_only: what the comment is about, in a few words
+      stance TEXT,  -- for stance_only: support / oppose / mixed / other
+      model TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (comment_id) REFERENCES comments(id)
+    );
+
+    -- Which top-level theme groups each unit addresses (gate before theme extraction)
+    CREATE TABLE IF NOT EXISTS comment_theme_groups (
+      comment_id TEXT NOT NULL,
+      group_code TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (comment_id, group_code),
+      FOREIGN KEY (comment_id) REFERENCES comments(id)
+    );
+    -- Units whose gate call has completed (including ones that address no group)
+    CREATE TABLE IF NOT EXISTS comment_theme_group_status (
+      comment_id TEXT PRIMARY KEY,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Which (unit, group) theme extractions are done, including ones that yielded no extracts
+    CREATE TABLE IF NOT EXISTS comment_theme_extract_status (
+      comment_id TEXT NOT NULL,
+      group_code TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (comment_id, group_code)
+    );
+
+    -- Gemini Batch API jobs, so a step can resume polling after a restart
+    CREATE TABLE IF NOT EXISTS batch_jobs (
+      job_name TEXT PRIMARY KEY,      -- Gemini batch resource name (batches/...)
+      task TEXT NOT NULL,             -- pipeline step, e.g. 'condense'
+      label TEXT NOT NULL,            -- caller-chosen identifier for this submission
+      model TEXT NOT NULL,
+      request_keys TEXT NOT NULL,     -- JSON array of request keys, in submission order
+      state TEXT NOT NULL,            -- last seen job state
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Comment clusters based on similarity analysis
     CREATE TABLE IF NOT EXISTS comment_clusters (
       cluster_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -232,6 +298,47 @@ export function initSchema(db: Database) {
     CREATE INDEX IF NOT EXISTS idx_cluster_membership_cluster ON comment_cluster_membership(cluster_id);
     CREATE INDEX IF NOT EXISTS idx_cluster_membership_representative ON comment_cluster_membership(is_representative);
     CREATE INDEX IF NOT EXISTS idx_cluster_representative ON comment_clusters(representative_comment_id);
+
+    -- Cached text embeddings (tag-campaigns); vector = L2-normalized Float32 array
+    CREATE TABLE IF NOT EXISTS comment_embeddings (
+      comment_id TEXT NOT NULL,
+      model TEXT NOT NULL,
+      dims INTEGER NOT NULL,
+      text_hash TEXT NOT NULL,
+      vector BLOB NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (comment_id, model, dims)
+    );
+
+    -- Organized comment campaigns (tag-campaigns). Tags only: clusters/units are not changed.
+    -- method: 'paraphrase' (LLM-verified group of reworded letters, may include exact-copy groups)
+    --         or 'form-letter' (a large exact-copy group on its own)
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      method TEXT NOT NULL,
+      evidence TEXT,               -- judge's stated shared features (paraphrase campaigns)
+      level REAL,                  -- cosine cut level the group was accepted at
+      unit_count INTEGER NOT NULL, -- distinct analysis units (form-letter groups count once)
+      exact_count INTEGER NOT NULL,
+      paraphrase_count INTEGER NOT NULL,
+      total_count INTEGER NOT NULL,
+      model TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- A comment belongs to at most one campaign; how = 'exact' (member of a form-letter group in
+    -- the campaign) or 'paraphrase'; similarity = cosine of its unit to the campaign centroid
+    CREATE TABLE IF NOT EXISTS comment_campaigns (
+      comment_id TEXT PRIMARY KEY,
+      campaign_id INTEGER NOT NULL,
+      how TEXT NOT NULL CHECK(how IN ('exact', 'paraphrase')),
+      similarity REAL,
+      FOREIGN KEY (comment_id) REFERENCES comments(id),
+      FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_comment_campaigns_campaign ON comment_campaigns(campaign_id);
   `);
 }
 

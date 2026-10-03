@@ -1,4 +1,11 @@
-import type { Theme } from '../types'
+import type { Comment, CompositionCounts, Theme } from '../types'
+
+// Which segment of the Overview's composition bar a comment counts in (same rule as getOverview
+// in src/website-build-script.ts)
+export function commentPart(c: Comment): keyof CompositionCounts {
+  if (c.campaignId !== undefined) return c.campaignParaphrase ? 'campaignReworded' : 'campaignCopies'
+  return c.hasAttachments ? 'attached' : 'typed'
+}
 
 // Generate regulations.gov URL for a comment
 export function getRegulationsGovUrl(_documentId: string, commentId: string): string {

@@ -2,8 +2,56 @@ import { debugSave } from "./debug";
 import { parseJsonResponse } from "./json-parser";
 import { createHash } from "crypto";
 import { Database } from "bun:sqlite";
-import { getGenerationFunction, getMultimodalGenerationFunction } from "./llm-providers";
+import { getGenerationFunction, getMultimodalGenerationFunction, generateGeminiContent, GEMINI_MODELS, DEFAULT_MODEL, type UsageMetadata } from "./llm-providers";
+import { estimateCost, type RunSummary } from "./step-runner";
 import type { Part } from "@google/genai";
+
+// Token/cost totals per label (a step phase or task type), printed at the end of a step.
+export interface UsageRow { calls: number; cached: number; failed: number; input: number; cachedInput: number; output: number; thoughts: number; costUsd: number }
+
+export class UsageTally {
+  rows = new Map<string, UsageRow>();
+  private started = Date.now();
+
+  private row(label: string): UsageRow {
+    if (!this.rows.has(label)) this.rows.set(label, { calls: 0, cached: 0, failed: 0, input: 0, cachedInput: 0, output: 0, thoughts: 0, costUsd: 0 });
+    return this.rows.get(label)!;
+  }
+
+  // One runLlmRequests summary
+  addSummary(label: string, s: RunSummary) {
+    const r = this.row(label);
+    r.calls += s.ok + s.failed - s.cached; r.cached += s.cached; r.failed += s.failed;
+    r.input += s.usage.input; r.cachedInput += s.usage.cachedInput; r.output += s.usage.output; r.thoughts += s.usage.thoughts;
+    r.costUsd += s.costUsd;
+  }
+
+  // One live call
+  addUsage(label: string, model: string, u: UsageMetadata | undefined, batch = false) {
+    const r = this.row(label);
+    r.calls++;
+    if (!u) return;
+    r.input += u.promptTokenCount; r.cachedInput += u.cachedContentTokenCount; r.output += u.candidatesTokenCount; r.thoughts += u.thoughtsTokenCount || 0;
+    r.costUsd += estimateCost(model, u, batch);
+  }
+
+  addCached(label: string) { this.row(label).cached++; }
+
+  total(): UsageRow {
+    const t: UsageRow = { calls: 0, cached: 0, failed: 0, input: 0, cachedInput: 0, output: 0, thoughts: 0, costUsd: 0 };
+    for (const r of this.rows.values()) for (const k of Object.keys(t) as (keyof UsageRow)[]) t[k] += r[k];
+    return t;
+  }
+
+  print(title: string) {
+    if (this.rows.size === 0) return;
+    const fmt = (label: string, r: UsageRow) =>
+      `  ${label.padEnd(22)} calls=${r.calls} (cached ${r.cached}, failed ${r.failed}) | in=${r.input.toLocaleString()} (cached ${r.cachedInput.toLocaleString()}) out=${r.output.toLocaleString()} thoughts=${r.thoughts.toLocaleString()} | ~$${r.costUsd.toFixed(3)}`;
+    console.log(`\n💰 ${title} — ${((Date.now() - this.started) / 60000).toFixed(1)} min`);
+    for (const [label, r] of this.rows) console.log(fmt(label, r));
+    if (this.rows.size > 1) console.log(fmt("total", this.total()));
+  }
+}
 
 export interface CacheMetadata {
   taskType: string;
@@ -17,6 +65,8 @@ export class AIClient {
   private static activeJobs = new Set<string>();
   private db?: Database;
   private modelKey?: string;
+  // Tokens and estimated cost of the live calls this client made, by metadata.taskType
+  readonly usage = new UsageTally();
   
   constructor(modelKey?: string, db?: Database) {
     this.modelKey = modelKey;
@@ -32,10 +82,12 @@ export class AIClient {
     timeout?: number
   ): Promise<T> {
     const workerId = jobId || debugPrefix || `worker_${Date.now()}`;
+    const modelName = this.modelKey || DEFAULT_MODEL;
+    // The model is part of the key, so switching models doesn't return another model's answer
+    const promptHash = createHash('sha256').update(`${modelName}\n${prompt}`).digest('hex');
     
     // Check cache if database is available
     if (this.db && metadata) {
-      const promptHash = createHash('sha256').update(prompt).digest('hex');
       
       try {
         const cached = this.db.prepare(`
@@ -45,6 +97,7 @@ export class AIClient {
         
         if (cached) {
           console.log(`   ✅ [${workerId}] Using cached result [${promptHash.substring(0, 8)}...]`);
+          this.usage.addCached(metadata.taskType);
           // Apply postprocessing to cached result if provided
           if (postProcess) {
             try {
@@ -67,7 +120,6 @@ export class AIClient {
     const activeCount = AIClient.activeJobs.size;
     const activeList = Array.from(AIClient.activeJobs).join(', ');
     
-    const modelName = this.modelKey || "gemini-3-flash";
     console.log(`🤖 [${workerId}] Starting ${modelName} call (${activeCount} active: ${activeList})`);
     
     try {
@@ -75,32 +127,31 @@ export class AIClient {
         await debugSave(`${debugPrefix}_prompt.txt`, prompt);
       }
       
-      // Get the appropriate generation function
-      const generateFn = getGenerationFunction(this.modelKey);
-      
-      // Set up streaming options if debug is enabled
-      const streamingOptions = debugPrefix ? { 
-        debugFilename: `${debugPrefix}_response.txt` 
-      } : undefined;
+      // Gemini: non-streaming call that reports token usage. Other providers: plain text.
+      const isGemini = !!GEMINI_MODELS[modelName];
+      const call: Promise<string> = isGemini
+        ? generateGeminiContent(modelName, [{ text: prompt }]).then(r => {
+            this.usage.addUsage(metadata?.taskType || 'llm', modelName, r.usageMetadata);
+            return r.text;
+          })
+        : getGenerationFunction(this.modelKey)(prompt);
       
       let rawResult: string;
       if (timeout) {
-        // Create a timeout promise
+        let timer: ReturnType<typeof setTimeout> | undefined;
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error(`AI generation timed out after ${timeout}ms`)), timeout);
+          timer = setTimeout(() => reject(new Error(`AI generation timed out after ${timeout}ms`)), timeout);
         });
-        
-        // Race between the actual call and timeout
-        rawResult = await Promise.race([
-          generateFn(prompt, streamingOptions),
-          timeoutPromise
-        ]);
+        try {
+          rawResult = await Promise.race([call, timeoutPromise]);
+        } finally {
+          clearTimeout(timer);
+        }
       } else {
-        rawResult = await generateFn(prompt, streamingOptions);
+        rawResult = await call;
       }
       
-      // No need to save response again if we streamed it
-      if (debugPrefix && !streamingOptions) {
+      if (debugPrefix) {
         await debugSave(`${debugPrefix}_response.txt`, rawResult);
       }
       
@@ -122,8 +173,6 @@ export class AIClient {
       
       // Cache the raw result if database is available
       if (this.db && metadata) {
-        const promptHash = createHash('sha256').update(prompt).digest('hex');
-        
         try {
           // Check if this entry already exists
           const existing = this.db.prepare(`
@@ -203,7 +252,7 @@ export class AIClient {
     AIClient.activeJobs.add(workerId);
     const activeCount = AIClient.activeJobs.size;
     const activeList = Array.from(AIClient.activeJobs).join(', ');
-    const modelName = this.modelKey || "gemini-3-flash";
+    const modelName = this.modelKey || DEFAULT_MODEL;
     console.log(`🤖 [${workerId}] Starting ${modelName} multimodal call (${activeCount} active: ${activeList})`);
 
     try {

@@ -1,475 +1,445 @@
 import { Command } from "commander";
 import { openDb, withTransaction } from "../lib/database";
 import type { Database } from "bun:sqlite";
-import { initDebug } from "../lib/debug";
-import { AIClient } from "../lib/ai-client";
+import { initDebug, debugSave } from "../lib/debug";
+import { UsageTally } from "../lib/ai-client";
 import { THEME_SUMMARY_FROM_EXTRACTS_PROMPT, EXTRACT_MERGE_PROMPT } from "../prompts/theme-extract";
 import { THEME_SUMMARY_STRUCTURE_PROMPT } from "../prompts/theme-summary";
+import { THEME_GROUP_SUMMARY_PROMPT } from "../prompts/theme-group";
 import { parseJsonResponse } from "../lib/json-parser";
-import { runPool } from "../lib/worker-pool";
-import { getTaskConfig, getTaskModel, getBatchOptions } from "../lib/batch-config";
-import { createEvenBatches } from "../lib/batch-processor";
-import { checkClusteringStatus, getStoredRepresentativeIds } from "../lib/comment-processing";
+import { getTaskConfig, getTaskRoleModel, getBatchOptions } from "../lib/batch-config";
+import { createEvenBatches, countWords } from "../lib/batch-processor";
+import { checkClusteringStatus, extractMetadata } from "../lib/comment-processing";
+import { runLlmRequests, type LlmRequest } from "../lib/step-runner";
+import { openScopeForAnalysis, scopeCounts, denominatorText, hasClustering, type ScopeCounts } from "../lib/scope-db";
+import { scopeBlock, insertBefore } from "../prompts/scope";
+
+// Summaries run in phases across all themes at once, so independent calls run in parallel and
+// each phase can use the Batch API:
+//   1. summarize each batch of a theme's extracts (one batch for most themes)
+//   2. for themes with several batches, merge the analyses mergeWidth at a time, level by level
+//   3. convert each theme's final analysis to the structured JSON stored in theme_summaries
+// Every call goes through runLlmRequests, so a rerun reuses finished calls from llm_cache.
 
 export const summarizeThemesV2Command = new Command("summarize-themes-v2")
   .description("Generate theme summaries from pre-extracted theme-specific content")
   .argument("<document-id>", "Document ID (e.g., CMS-2025-0050-0031)")
   .option("--themes <codes>", "Comma-separated list of theme codes to analyze (default: all)")
   .option("--min-comments <n>", "Minimum comments required for a theme (default: 5)", parseInt)
-  .option("--batch-limit <n>", "Word limit to trigger batching (default: 150000)", parseInt)
-  .option("--batch-size <n>", "Target words per batch (default: 75000)", parseInt)
+  .option("--batch-limit <n>", "Word limit to trigger batching (default: from config)", parseInt)
+  .option("--batch-size <n>", "Target words per batch (default: from config)", parseInt)
+  .option("--merge-width <n>", "Batch analyses merged per call (default: from config)", parseInt)
   .option("-d, --debug", "Enable debug output")
-  .option("-c, --concurrency <n>", "Number of parallel API calls (default: 3)", parseInt)
-  .option("-m, --model <model>", "AI model to use (overrides config)")
-  .option("--use-clustering", "Use clustering data and weight by cluster sizes")
+  .option("-c, --concurrency <n>", "Number of parallel API calls", parseInt)
+  .option("-m, --model <model>", "AI model to use for every call (overrides config)")
+  .option("--use-clustering", "Use only cluster representatives' extracts (weighted by cluster size)")
+  .option("--batch", "Run calls through the Gemini Batch API (half price, minutes-to-hours per phase)")
+  .option("--force", "Rebuild top-level group reports even if they are up to date")
+  .option("--scope <slug>", "Summarize a scoped analysis (scope DB; prompts get the scope and its denominators)")
   .action(summarizeThemesV2);
+
+interface ExtractRow {
+  comment_id: string;
+  extract_json: string;
+  cluster_size: number;
+  structured_sections: string | null;
+  attributes_json: string;
+}
+
+interface ThemeRow { code: string; description: string; detailed_guidelines?: string; extract_count?: number }
+
+interface StructureItem {
+  theme: ThemeRow;
+  analysis: string;
+  knownIds: Set<string>;
+  commentCount: number;
+  submissions: number;   // sum of cluster sizes (scoped runs record it with the summary)
+  extraSections?: Record<string, unknown>;
+}
+
+interface ThemeWork {
+  theme: ThemeRow;
+  extracts: ExtractRow[];
+  analyses: string[];   // current level's analyses; one left = final
+}
 
 async function summarizeThemesV2(documentId: string, options: any) {
   await initDebug(options.debug);
-  
-  const db = openDb(documentId);
-  
-  // Get the effective model from config
-  const effectiveModel = getTaskModel('summarizeThemes', options.model);
-  const ai = new AIClient(effectiveModel, db);
-  
-  console.log(`📝 Summarizing themes (v2) for document ${documentId}`);
-  console.log(`   Using model: ${effectiveModel}`);
-  
-  // Check for clustering if requested
-  let representativeIds: Set<string> | undefined;
-  if (options.useClustering) {
-    const clusteringExists = checkClusteringStatus(db);
-    if (!clusteringExists) {
-      console.error("❌ No clustering data found. Run 'cluster-comments-fast' first.");
-      process.exit(1);
-    }
-    representativeIds = getStoredRepresentativeIds(db) || undefined;
-    console.log(`🔗 Using stored clustering (${representativeIds?.size || 0} representative comments)`);
+
+  let db: Database;
+  // Scoped runs: scope + denominators go in every summary / merge / group-report prompt
+  // scopeCtx(themeSubmissions, themeUnits) is undefined for open-ended runs
+  let scopeCtx: ((subs: number, units: number) => string) | undefined;
+  let counts: ScopeCounts | undefined;
+  if (options.scope) {
+    const opened = openScopeForAnalysis(documentId, options.scope);
+    db = opened.db;
+    const c = counts = scopeCounts(db);
+    scopeCtx = (subs, units) => `${scopeBlock(opened.scope.prompt_md)}
+### How much of the docket is in scope
+${denominatorText(c)}
+This theme covers ${subs.toLocaleString("en-US")} in-scope submissions (${units.toLocaleString("en-US")} distinct comments or form-letter groups). Open the executive summary by stating that figure against the in-scope total and the docket total, e.g. "${subs.toLocaleString("en-US")} of the ${c.inScopeSubmissions.toLocaleString("en-US")} in-scope submissions (out of ${c.docketSubmissions.toLocaleString("en-US")} in the docket) ...".
+`;
+    if (hasClustering(db)) options.useClustering = true;
+    console.log(`🔭 Scope: ${opened.scope.slug} (${opened.scope.name})`);
+  } else {
+    db = openDb(documentId);
   }
-  
-  // Load task configuration  
-  const taskConfig = getTaskConfig('summarizeThemes', effectiveModel);
+  const models = {
+    summary: getTaskRoleModel('summarizeThemes', 'summary', options.model),
+    merge: getTaskRoleModel('summarizeThemes', 'merge', options.model),
+    structure: getTaskRoleModel('summarizeThemes', 'structure', options.model),
+  };
+  console.log(`📝 Summarizing themes (v2) for document ${documentId}`);
+  console.log(`   Models: summary=${models.summary} merge=${models.merge} structure=${models.structure}`);
+
+  const repsOnly = !!options.useClustering;
+  if (repsOnly && !checkClusteringStatus(db)) {
+    console.error("❌ No clustering data found. Run the cluster step first.");
+    process.exit(1);
+  }
+  const repFilter = repsOnly
+    ? ` AND cte.comment_id IN (SELECT comment_id FROM comment_cluster_membership WHERE is_representative = 1)`
+    : '';
+
+  const taskConfig = getTaskConfig('summarizeThemes', options.model);
   const minComments = options.minComments || taskConfig.thresholds?.minCommentsPerTheme || 5;
-  
-  // Get themes with sufficient extracts (optionally filtered to representative comments)
+
   let themeQuery = `
-    SELECT 
-      th.code,
-      th.description,
-      th.detailed_guidelines,
-      COUNT(DISTINCT cte.comment_id) as extract_count
+    SELECT th.code, th.description, th.detailed_guidelines, COUNT(DISTINCT cte.comment_id) as extract_count
     FROM theme_hierarchy th
     INNER JOIN comment_theme_extracts cte ON th.code = cte.theme_code
-  `;
+    WHERE 1 = 1 ${repFilter}`;
   const queryParams: any[] = [];
-  
-  // Add filter for representative comments if requested
-  if (representativeIds && representativeIds.size > 0) {
-    const placeholders = Array.from(representativeIds).map(() => '?').join(',');
-    themeQuery += ` WHERE cte.comment_id IN (${placeholders})`;
-    queryParams.push(...Array.from(representativeIds));
-  }
-  
-  themeQuery += `
-    GROUP BY th.code
-    HAVING extract_count >= ?
-  `;
-  queryParams.push(minComments);
-  
   if (options.themes) {
     const themeCodes = options.themes.split(',').map((t: string) => t.trim());
-    const placeholders = themeCodes.map(() => '?').join(',');
-    themeQuery += ` AND th.code IN (${placeholders})`;
+    themeQuery += ` AND th.code IN (${themeCodes.map(() => '?').join(',')})`;
     queryParams.push(...themeCodes);
   }
-  
-  themeQuery += ` ORDER BY extract_count DESC`;
-  
-  const themes = db.prepare(themeQuery).all(...queryParams) as {
-    code: string;
-    description: string;
-    detailed_guidelines?: string;
-    extract_count: number;
-  }[];
-  
-  if (themes.length === 0) {
-    console.log("❌ No themes found with sufficient extracts");
-    return;
-  }
-  
-  console.log(`📊 Found ${themes.length} themes to analyze`);
-  
-  // Check for existing summaries
-  const existingSummaries = db.prepare("SELECT theme_code FROM theme_summaries").all() as { theme_code: string }[];
-  const existingCodes = new Set(existingSummaries.map(s => s.theme_code));
-  
+  themeQuery += ` GROUP BY th.code HAVING extract_count >= ? ORDER BY extract_count DESC`;
+  queryParams.push(minComments);
+
+  // Themes with sub-themes get a group report (Phase 4) built from their sub-themes' reports instead
+  // of a report from their own few direct extracts
+  const allThemes = db.prepare("SELECT code, description, detailed_guidelines, parent_code FROM theme_hierarchy").all() as (ThemeRow & { parent_code: string | null })[];
+  const groupCodes = new Set(allThemes.filter(t => !t.parent_code && allThemes.some(c => c.parent_code === t.code)).map(t => t.code));
+
+  const themes = (db.prepare(themeQuery).all(...queryParams) as ThemeRow[]).filter(t => !groupCodes.has(t.code));
+  console.log(`📊 Found ${themes.length} themes with ≥${minComments} extracts (plus ${groupCodes.size} top-level themes that get group reports)`);
+
+  const existingCodes = new Set((db.prepare("SELECT theme_code FROM theme_summaries").all() as { theme_code: string }[]).map(s => s.theme_code));
   const themesToProcess = themes.filter(t => !existingCodes.has(t.code));
-  
-  if (themesToProcess.length === 0) {
-    console.log("✅ All themes already summarized");
-    return;
-  }
-  
   console.log(`🆕 ${themesToProcess.length} themes need summarization`);
-  
-  const concurrency = options.concurrency || taskConfig.concurrency || 3;
+
+  const concurrency = options.concurrency || taskConfig.concurrency || 4;
+  const mode: "live" | "batch" = options.batch ? "batch" : "live";
+  const mergeWidth = Math.max(2, options.mergeWidth || taskConfig.mergeWidth || 4);
   const batchConfig = getBatchOptions('summarizeThemes');
-  const batchOptions = {
-    totalWordLimit: options.batchLimit || batchConfig?.triggerWordLimit || 200000,
-    batchWordLimit: options.batchSize || batchConfig?.batchWordLimit || 125000
-  };
+  const triggerWords = options.batchLimit || batchConfig?.triggerWordLimit || 50000;
+  const batchWords = options.batchSize || batchConfig?.batchWordLimit || 40000;
+  const tally = new UsageTally();
+
+  const extractStmt = db.prepare(`
+    SELECT cte.comment_id, cte.extract_json, cte.cluster_size, cc.structured_sections, c.attributes_json
+    FROM comment_theme_extracts cte
+    JOIN comments c ON c.id = cte.comment_id
+    -- LEFT JOIN: stance_only triaged comments have extracts but no condensed row
+    LEFT JOIN condensed_comments cc ON cte.comment_id = cc.comment_id
+    WHERE cte.theme_code = ? ${repFilter}
+    ORDER BY cte.cluster_size DESC, cte.comment_id`);
+
+  // ---- Phase 1: per-batch analyses ----
+  const work: ThemeWork[] = [];
+  const phase1: LlmRequest[] = [];
+  const batchCount = new Map<string, number>();
+  for (const theme of themesToProcess) {
+    const extracts = extractStmt.all(theme.code) as ExtractRow[];
+    const items = extracts.map(e => {
+      const block = formatExtractBlock(e);
+      return { ...e, block, wordCount: countWords(block) };
+    });
+    const totalWords = items.reduce((s, i) => s + i.wordCount, 0);
+    const batches = totalWords <= triggerWords
+      ? [{ items, wordCount: totalWords, number: 1 }]
+      : createEvenBatches(items, { batchWordLimit: batchWords, totalWordLimit: 0 });
+    batchCount.set(theme.code, batches.length);
+    if (batches.length > 1) console.log(`   ${theme.code}: ${extracts.length} extracts, ${totalWords.toLocaleString()} words → ${batches.length} batches`);
+    work.push({ theme, extracts, analyses: [] });
+    batches.forEach((b, i) => phase1.push({
+      key: `${theme.code}|b${i}`,
+      model: models.summary,
+      parts: [{ text: withScope(buildSummaryPrompt(theme, b.items), "## Your Task", scopeCtx?.(sumSize(extracts), extracts.length)) }],
+    }));
+  }
+  if (phase1.length > 0) console.log(`📋 Phase 1: ${phase1.length} summary calls for ${work.length} themes (largest theme: ${Math.max(...batchCount.values())} batches)`);
+  const byCode = new Map(work.map(w => [w.theme.code, w]));
+  const p1 = await runText(db, phase1, 'theme-summary', mode, concurrency, tally, options.debug);
+  for (const w of work) {
+    const texts = Array.from({ length: batchCount.get(w.theme.code)! }, (_, i) => p1.get(`${w.theme.code}|b${i}`));
+    // A theme with a failed batch is skipped; a rerun retries just those calls (the rest are cached)
+    if (texts.some(t => t === undefined)) console.error(`   ❌ ${w.theme.code}: summary batch failed; rerun to retry`);
+    else w.analyses = texts as string[];
+  }
+  let active = work.filter(w => w.analyses.length > 0);
   
-  await runPool(
-    themesToProcess,
-    concurrency,
-    async (theme, index, total) => {
-      console.log(`\n[${index}/${total}] Processing theme ${theme.code}: ${theme.description}`);
-      console.log(`   Extracts: ${theme.extract_count}`);
-      
-      try {
-        // Get extracts for this theme with commenter metadata (optionally filtered to representatives)
-        let extractQuery = `
-          SELECT 
-            cte.comment_id,
-            cte.extract_json,
-            cte.cluster_size,
-            cc.structured_sections
-          FROM comment_theme_extracts cte
-          JOIN condensed_comments cc ON cte.comment_id = cc.comment_id
-          WHERE cte.theme_code = ?
-        `;
-        const extractParams: any[] = [theme.code];
-        
-        // Add filter for representative comments if requested
-        if (representativeIds && representativeIds.size > 0) {
-          const placeholders = Array.from(representativeIds).map(() => '?').join(',');
-          extractQuery += ` AND cte.comment_id IN (${placeholders})`;
-          extractParams.push(...Array.from(representativeIds));
-        }
-        
-        extractQuery += ` ORDER BY cte.cluster_size DESC, cte.comment_id`;
-        
-        const extracts = db.prepare(extractQuery).all(...extractParams) as {
-          comment_id: string;
-          extract_json: string;
-          cluster_size: number;
-          structured_sections: string;
-        }[];
-        
-        // Calculate total word count from extracts and structured sections
-        const totalWords = extracts.reduce((sum, e) => {
-          const extract = JSON.parse(e.extract_json);
-          const sections = JSON.parse(e.structured_sections || '{}');
-          
-          // Count words in extract content
-          const extractText = [
-            ...(extract.extract.positions || []),
-            ...(extract.extract.concerns || []),
-            ...(extract.extract.recommendations || []),
-            ...(extract.extract.experiences || []),
-            ...(extract.extract.key_quotes || [])
-          ].join(' ');
-          
-          // Count words in commenter profile
-          const profileText = sections.commenterProfile || '';
-          
-          const totalText = extractText + ' ' + profileText;
-          return sum + totalText.split(/\s+/).filter(w => w.length > 0).length;
-        }, 0);
-        
-        console.log(`   Total word count: ${totalWords}`);
-        
-        let finalAnalysis: string;
-        
-        if (totalWords <= batchOptions.totalWordLimit) {
-          // Process in single batch
-          console.log(`   Processing as single batch`);
-          finalAnalysis = await analyzeThemeExtracts(ai, theme, extracts, options.debug, 1, 1);
-        } else {
-          // Process in batches and merge
-          console.log(`   Large theme - using batching`);
-          finalAnalysis = await processThemeInBatches(ai, theme, extracts, batchOptions, options.debug);
-        }
-        
-        // Structure the final summary into JSON
-        console.log(`   Structuring final summary...`);
-        const fullThemeDescription = theme.detailed_guidelines 
-          ? `${theme.description}. ${theme.detailed_guidelines}`
-          : theme.description;
-          
-        const structurePrompt = THEME_SUMMARY_STRUCTURE_PROMPT
-          .replace('{THEME_ANALYSIS}', finalAnalysis)
-          .replace('{THEME_CODE}', theme.code)
-          .replace('{THEME_DESCRIPTION}', fullThemeDescription);
-        
-        const finalSections = await ai.generateContent<any>(
-          structurePrompt,
-          options.debug ? `theme_summary_v2_structured_${theme.code}` : undefined,
-          undefined,
-          {
-            taskType: 'theme_summary_structure',
-            taskLevel: 0,
-            params: {
-              themeCode: theme.code,
-              extractCount: extracts.length
-            }
-          },
-          parseJsonResponse
-        );
-
-        // Post-process: fix partial/abbreviated comment IDs
-        const knownIds = new Set(extracts.map(e => e.comment_id));
-        const fixedCount = fixPartialCommentIds(finalSections, knownIds);
-        if (fixedCount > 0) {
-          console.log(`   🔧 Fixed ${fixedCount} partial comment IDs`);
-        }
-
-        // Save summary
-        withTransaction(db, () => {
-          db.prepare(`
-            INSERT INTO theme_summaries (
-              theme_code, structured_sections, 
-              comment_count, word_count
-            )
-            VALUES (?, ?, ?, ?)
-          `).run(
-            theme.code,
-            JSON.stringify(finalSections),
-            extracts.length,
-            0 // We don't track word count in v2
-          );
+  // ---- Phase 2: hierarchical merges ----
+  for (let level = 1; active.some(w => w.analyses.length > 1); level++) {
+    const requests: LlmRequest[] = [];
+    for (const w of active) {
+      if (w.analyses.length <= 1) continue;
+      splitEvenly(w.analyses, mergeWidth).forEach((group, i) => {
+        if (group.length > 1) requests.push({
+          key: `${w.theme.code}|L${level}|P${i}`,
+          model: models.merge,
+          parts: [{ text: withScope(buildMergePrompt(w.theme, group), "## Analyses to Merge", scopeCtx?.(sumSize(w.extracts), w.extracts.length)) }],
         });
-        
-        console.log(`   ✅ Summary generated successfully`);
-        
-      } catch (error) {
-        console.error(`   ❌ Error:`, error);
+      });
+    }
+    console.log(`🔀 Phase 2, merge level ${level}: ${requests.length} merge calls`);
+    const res = await runText(db, requests, 'theme-summary-merge', mode, concurrency, tally, options.debug);
+    for (const w of active) {
+      if (w.analyses.length <= 1) continue;
+      const groups = splitEvenly(w.analyses, mergeWidth);
+      const next = groups.map((g, i) => g.length === 1 ? g[0] : res.get(`${w.theme.code}|L${level}|P${i}`));
+      if (next.some(x => x === undefined)) {
+        console.error(`   ❌ ${w.theme.code}: merge failed at level ${level}; rerun to retry`);
+        w.analyses = [];
+      } else {
+        w.analyses = next as string[];
       }
     }
-  );
-  
-  // Summary
+    active = active.filter(w => w.analyses.length > 0);
+  }
+
+  // ---- Phase 3: structure to JSON and save (parse failures are retried once) ----
+  const insert = db.prepare(`INSERT OR REPLACE INTO theme_summaries (theme_code, structured_sections, comment_count, word_count) VALUES (?, ?, ?, ?)`);
+  const structureAndSave = async (items: StructureItem[], phase: string) => {
+    const byKey = new Map(items.map(i => [i.theme.code, i]));
+    let pending = items;
+    for (let attempt = 1; attempt <= 2 && pending.length > 0; attempt++) {
+      const requests: LlmRequest[] = pending.map(i => ({
+        key: i.theme.code,
+        model: models.structure,
+        parts: [{ text: THEME_SUMMARY_STRUCTURE_PROMPT
+          .replace('{THEME_ANALYSIS}', () => i.analysis)
+          .replace('{THEME_CODE}', i.theme.code)
+          .replace('{THEME_DESCRIPTION}', () => fullDescription(i.theme)) }],
+        // the retry differs from the first attempt so it isn't served from a stale cache
+        config: attempt > 1 ? { responseMimeType: "application/json" } : undefined,
+      }));
+      console.log(`🧱 ${phase}: structuring ${requests.length} summaries${attempt > 1 ? ' (retry)' : ''}`);
+      const saved = new Set<string>();
+      const summary = await runLlmRequests(requests, async (req, res) => {
+        const item = byKey.get(req.key)!;
+        const sections = parseJsonResponse(res.text);
+        if (!sections || typeof sections !== 'object') throw new Error('structured summary is not a JSON object');
+        const fixed = fixPartialCommentIds(sections, item.knownIds);
+        if (fixed > 0) console.log(`   🔧 ${req.key}: fixed ${fixed} partial comment IDs`);
+        Object.assign(sections, item.extraSections || {});
+        if (counts) sections.scopeCounts = { themeSubmissions: item.submissions, themeUnits: item.commentCount, ...counts };
+        withTransaction(db, () => insert.run(req.key, JSON.stringify(sections), item.commentCount, 0));
+        saved.add(req.key);
+        if (options.debug) await debugSave(`theme_summary_v2_structured_${req.key}.json`, sections);
+      }, { db, task: 'theme-summary-structure', mode, concurrency, label: `theme-summary-structure:${phase}:${attempt}` });
+      tally.addSummary('theme-summary-structure', summary);
+      pending = pending.filter(i => !saved.has(i.theme.code));
+    }
+    for (const i of pending) console.error(`   ❌ ${i.theme.code}: could not structure summary`);
+  };
+  await structureAndSave(active.map(w => ({
+    theme: w.theme,
+    analysis: w.analyses[0],
+    knownIds: new Set(w.extracts.map(e => e.comment_id)),
+    commentCount: w.extracts.length,
+    submissions: sumSize(w.extracts),
+  })), 'Phase 3');
+
+  // ---- Phase 4: group reports for top-level themes ----
+  const summarizedNow = new Set(active.map(w => w.theme.code));
+  const reports = new Map((db.prepare("SELECT theme_code, structured_sections FROM theme_summaries").all() as { theme_code: string; structured_sections: string }[]).map(r => [r.theme_code, r.structured_sections]));
+  const subtreeStmt = db.prepare(`
+    SELECT cte.comment_id, MAX(cte.cluster_size) AS cluster_size FROM comment_theme_extracts cte
+    WHERE (cte.theme_code = ? OR cte.theme_code LIKE ? || '.%') ${repFilter}
+    GROUP BY cte.comment_id`);
+  const subtree = (code: string) => {
+    const rows = subtreeStmt.all(code, code) as { comment_id: string; cluster_size: number }[];
+    return { ids: rows.map(r => r.comment_id), units: rows.length, submissions: rows.reduce((n, r) => n + (r.cluster_size || 1), 0) };
+  };
+  const groupItems: { theme: ThemeRow; prompt: string; knownIds: Set<string>; commentCount: number; submissions: number; subThemes: string[] }[] = [];
+  for (const code of [...groupCodes].sort((a, b) => Number(a) - Number(b))) {
+    const theme = allThemes.find(t => t.code === code)!;
+    const children = allThemes.filter(c => c.parent_code === code).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    const existing = reports.get(code);
+    const isGroupReport = existing ? JSON.parse(existing).reportType === 'group' : false;
+    const stale = !isGroupReport || children.some(c => summarizedNow.has(c.code)) || options.force;
+    if (!stale || (options.themes && !options.themes.split(',').map((t: string) => t.trim()).includes(code) && !children.some(c => summarizedNow.has(c.code)))) continue;
+
+    const direct = extractStmt.all(code) as ExtractRow[];
+    const withReports = children.filter(c => reports.has(c.code));
+    if (withReports.length === 0 && direct.length < minComments) continue;
+
+    const childBlocks = children.map(c => {
+      const t = subtree(c.code);
+      const header = `### Sub-theme ${c.code}: ${fullDescription(c)}
+${t.submissions} submissions from ${t.units} distinct comments or form-letter groups`;
+      const report = reports.get(c.code);
+      if (!report) return `${header}
+(No report: too few comments for a synthesized analysis.)`;
+      const { analyticalNotes, ...sections } = JSON.parse(report);
+      return `${header}
+${JSON.stringify(sections, null, 1)}`;
+    });
+    let directWords = 0;
+    const directBlocks: string[] = [];
+    for (const e of direct) {
+      const block = formatExtractBlock(e);
+      directWords += countWords(block);
+      if (directWords > 15000) break;
+      directBlocks.push(block);
+    }
+    const all = subtree(code);
+    groupItems.push({
+      theme,
+      knownIds: new Set(all.ids),
+      commentCount: all.units,
+      submissions: all.submissions,
+      subThemes: children.map(c => c.code),
+      prompt: withScope(THEME_GROUP_SUMMARY_PROMPT
+        .replace('{THEME_CODE}', code)
+        .replace('{THEME_DESCRIPTION}', () => fullDescription(theme))
+        .replace('{TOTAL_SUBMISSIONS}', String(all.submissions))
+        .replace('{TOTAL_UNITS}', String(all.units))
+        .replace('{SUBTHEME_REPORTS}', () => childBlocks.join('\n\n---\n\n'))
+        .replace('{DIRECT_EXTRACTS}', () => directBlocks.length ? directBlocks.join('\n\n---\n\n') : '(none)'),
+        "## What You Are Given", scopeCtx?.(all.submissions, all.units)),
+    });
+  }
+  if (groupItems.length > 0) {
+    console.log(`🗂️  Phase 4: ${groupItems.length} group reports for top-level themes`);
+    const res = await runText(db, groupItems.map(g => ({ key: g.theme.code, model: models.merge, parts: [{ text: g.prompt }] })),
+      'theme-group-summary', mode, concurrency, tally, options.debug);
+    await structureAndSave(groupItems.filter(g => res.has(g.theme.code)).map(g => ({
+      theme: g.theme,
+      analysis: res.get(g.theme.code)!,
+      knownIds: g.knownIds,
+      commentCount: g.commentCount,
+      submissions: g.submissions,
+      extraSections: { reportType: 'group', subThemes: g.subThemes },
+    })), 'Phase 4');
+    for (const g of groupItems) if (!res.has(g.theme.code)) console.error(`   ❌ ${g.theme.code}: group report failed; rerun to retry`);
+  }
+
   const summaryCount = db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get() as { count: number };
-  
   console.log("\n✅ Theme summarization complete!");
   console.log(`   Total summaries: ${summaryCount.count}`);
-  
+  tally.print(`summarize-themes-v2 (${work.length} themes${mode === 'batch' ? ', batch price' : ''})`);
   db.close();
 }
 
-async function analyzeThemeExtracts(
-  ai: AIClient,
-  theme: { code: string; description: string; detailed_guidelines?: string },
-  extracts: { comment_id: string; extract_json: string; cluster_size: number; structured_sections: string }[],
-  debug: boolean,
-  batchNum?: number,
-  totalBatches?: number
-): Promise<string> {
-  // Calculate total comments represented
-  const totalComments = extracts.reduce((sum, e) => sum + e.cluster_size, 0);
-  const uniquePerspectives = extracts.length;
-  
-  // Build extract blocks with commenter metadata and formatted content
-  const extractBlocks = extracts.map(e => {
-    const extract = JSON.parse(e.extract_json);
-    const sections = JSON.parse(e.structured_sections || '{}');
-    
-    // Determine cluster type label
-    let clusterLabel = '';
-    if (e.cluster_size >= 100) {
-      clusterLabel = `[FORM LETTER - ${e.cluster_size} identical submissions]`;
-    } else if (e.cluster_size >= 10) {
-      clusterLabel = `[CLUSTER - ${e.cluster_size} similar submissions]`;
-    } else if (e.cluster_size > 1) {
-      clusterLabel = `[SMALL CLUSTER - ${e.cluster_size} similar comments]`;
-    } else {
-      clusterLabel = '[INDIVIDUAL]';
-    }
-    
-    // Format the extract data as readable markdown
-    let formattedExtract = '';
-    
-    if (extract.extract.positions?.length > 0) {
-      formattedExtract += '**Positions:**\n';
-      extract.extract.positions.forEach((pos: string) => {
-        formattedExtract += `- ${pos}\n`;
-      });
-      formattedExtract += '\n';
-    }
-    
-    if (extract.extract.concerns?.length > 0) {
-      formattedExtract += '**Concerns:**\n';
-      extract.extract.concerns.forEach((concern: string) => {
-        formattedExtract += `- ${concern}\n`;
-      });
-      formattedExtract += '\n';
-    }
-    
-    if (extract.extract.recommendations?.length > 0) {
-      formattedExtract += '**Recommendations:**\n';
-      extract.extract.recommendations.forEach((rec: string) => {
-        formattedExtract += `- ${rec}\n`;
-      });
-      formattedExtract += '\n';
-    }
-    
-    if (extract.extract.experiences?.length > 0) {
-      formattedExtract += '**Experiences/Examples:**\n';
-      extract.extract.experiences.forEach((exp: string) => {
-        formattedExtract += `- ${exp}\n`;
-      });
-      formattedExtract += '\n';
-    }
-    
-    if (extract.extract.key_quotes?.length > 0) {
-      formattedExtract += '**Key Quotes:**\n';
-      extract.extract.key_quotes.forEach((quote: string) => {
-        formattedExtract += `- ${quote}\n`;
-      });
-    }
-    
-    return `<comment id="${e.comment_id}">
+async function runText(
+  db: Database, requests: LlmRequest[], task: string, mode: "live" | "batch",
+  concurrency: number, tally: UsageTally, debug: boolean
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (requests.length === 0) return out;
+  const summary = await runLlmRequests(requests, async (req, res) => {
+    if (!res.text.trim()) throw new Error('empty response');
+    out.set(req.key, res.text);
+    if (debug) await debugSave(`${task}_${req.key.replace(/\|/g, '_')}_response.txt`, res.text);
+  }, { db, task, mode, concurrency, label: `${task}:${requests.length}` });
+  tally.addSummary(task, summary);
+  return out;
+}
+
+function sumSize(extracts: ExtractRow[]): number {
+  return extracts.reduce((n, e) => n + (e.cluster_size || 1), 0);
+}
+
+// Insert the scope context before `anchor` (no-op for open-ended runs, so their prompts are unchanged)
+function withScope(prompt: string, anchor: string, scopeCtx: string | undefined): string {
+  return scopeCtx ? insertBefore(prompt, anchor, scopeCtx) : prompt;
+}
+
+function fullDescription(theme: ThemeRow): string {
+  return theme.detailed_guidelines ? `${theme.description}. ${theme.detailed_guidelines}` : theme.description;
+}
+
+// Who the commenter is: the condensed profile, or for units without a condensed row (stance_only
+// triaged comments) the submitter metadata
+function commenterProfile(e: ExtractRow): string {
+  const sections = JSON.parse(e.structured_sections || '{}');
+  if (sections.commenterProfile) return sections.commenterProfile;
+  const m = extractMetadata(JSON.parse(e.attributes_json || '{}'));
+  return `${m.submitterType}: ${m.submitter}${m.location ? ` (${m.location})` : ''}`;
+}
+
+function formatExtractBlock(e: ExtractRow): string {
+  const extract = JSON.parse(e.extract_json);
+  let clusterLabel: string;
+  if (e.cluster_size >= 100) clusterLabel = `[FORM LETTER - ${e.cluster_size} identical submissions]`;
+  else if (e.cluster_size >= 10) clusterLabel = `[CLUSTER - ${e.cluster_size} similar submissions]`;
+  else if (e.cluster_size > 1) clusterLabel = `[SMALL CLUSTER - ${e.cluster_size} similar comments]`;
+  else clusterLabel = '[INDIVIDUAL]';
+
+  const sections: [string, string[] | undefined][] = [
+    ['Positions', extract.extract?.positions],
+    ['Concerns', extract.extract?.concerns],
+    ['Recommendations', extract.extract?.recommendations],
+    ['Experiences/Examples', extract.extract?.experiences],
+    ['Key Quotes', extract.extract?.key_quotes],
+  ];
+  const formatted = sections
+    .filter(([, list]) => list && list.length > 0)
+    .map(([title, list]) => `**${title}:**\n${list!.map(x => `- ${x}`).join('\n')}`)
+    .join('\n\n');
+
+  return `<comment id="${e.comment_id}">
 ${clusterLabel}
 <commenter_profile>
-${sections.commenterProfile || 'No profile information provided'}
+${commenterProfile(e)}
 </commenter_profile>
 
 <theme_specific_content relevance="${extract.relevance}">
-${formattedExtract.trim() || 'No specific content extracted for this theme'}
+${formatted || 'No specific content extracted for this theme'}
 </theme_specific_content>
 </comment>`;
-  }).join('\n\n---\n\n');
-  
-  // Add clustering context to prompt
+}
+
+function buildSummaryPrompt(theme: ThemeRow, items: (ExtractRow & { block: string })[]): string {
+  const totalComments = items.reduce((sum, e) => sum + e.cluster_size, 0);
   let clusteringContext = '';
-  if (totalComments > uniquePerspectives) {
+  if (totalComments > items.length) {
     clusteringContext = `
 IMPORTANT CONTEXT:
-- You are analyzing ${uniquePerspectives} unique perspectives
+- You are analyzing ${items.length} unique perspectives
 - These represent ${totalComments} total comments (including duplicates/similar submissions)
 - Larger clusters (form letters, campaigns) should be weighted more heavily in your analysis
 - When a perspective is marked as [FORM LETTER - N submissions] or [CLUSTER - N submissions], this means N people submitted identical or very similar comments
 - Consider both the diversity of viewpoints AND the volume of support for each viewpoint
 `;
   }
-  
-  const fullThemeDescription = theme.detailed_guidelines 
-    ? `${theme.description}. ${theme.detailed_guidelines}`
-    : theme.description;
-    
-  const prompt = THEME_SUMMARY_FROM_EXTRACTS_PROMPT
+  // Function replacements: extract text may contain "$&"-style patterns
+  return THEME_SUMMARY_FROM_EXTRACTS_PROMPT
     .replace('{THEME_CODE}', theme.code)
-    .replace('{THEME_DESCRIPTION}', fullThemeDescription)
-    .replace('{EXTRACTS}', clusteringContext + extractBlocks);
-  
-  const debugId = batchNum 
-    ? `theme_summary_v2_${theme.code}_batch_${batchNum}-of-${totalBatches}` 
-    : `theme_summary_v2_${theme.code}`;
-  
-  const response = await ai.generateContent(
-    prompt,
-    debug ? debugId : undefined,
-    undefined,
-    {
-      taskType: 'theme_summary_v2',
-      taskLevel: 0,
-      params: {
-        themeCode: theme.code,
-        batchNum: batchNum || 1,
-        totalBatches: totalBatches || 1,
-        extractCount: extracts.length
-      }
-    }
-  );
-  
-  return response;
+    .replace('{THEME_DESCRIPTION}', () => fullDescription(theme))
+    .replace('{EXTRACTS}', () => clusteringContext + items.map(i => i.block).join('\n\n---\n\n'));
 }
 
-async function processThemeInBatches(
-  ai: AIClient,
-  theme: { code: string; description: string; detailed_guidelines?: string },
-  extracts: { comment_id: string; extract_json: string; cluster_size: number; structured_sections: string }[],
-  batchOptions: any,
-  debug: boolean
-): Promise<string> {
-  // Create extract items with word counts
-  const items = extracts.map(e => {
-    const extract = JSON.parse(e.extract_json);
-    const sections = JSON.parse(e.structured_sections || '{}');
-    
-    // Count words in extract content
-    const extractText = [
-      ...(extract.extract.positions || []),
-      ...(extract.extract.concerns || []),
-      ...(extract.extract.recommendations || []),
-      ...(extract.extract.experiences || []),
-      ...(extract.extract.key_quotes || [])
-    ].join(' ');
-    
-    // Count words in commenter profile
-    const profileText = sections.commenterProfile || '';
-    
-    const totalText = extractText + ' ' + profileText;
-    const wordCount = totalText.split(/\s+/).filter(w => w.length > 0).length;
-    
-    return {
-      ...e,
-      wordCount
-    };
-  });
-  
-  // Create batches based on word count
-  const batches = createEvenBatches(items, {
-    batchWordLimit: batchOptions.batchWordLimit,
-    totalWordLimit: 0 // Force batching
-  });
-  
-  console.log(`   Split into ${batches.length} batches`);
-  batches.forEach((batch, i) => {
-    console.log(`   Batch ${i + 1}: ${batch.items.length} extracts, ${batch.wordCount} words`);
-  });
-  
-  // Process each batch
-  const batchResults: string[] = [];
-  for (let i = 0; i < batches.length; i++) {
-    console.log(`   Processing batch ${i + 1}/${batches.length}`);
-    const result = await analyzeThemeExtracts(ai, theme, batches[i].items, debug, i + 1, batches.length);
-    batchResults.push(result);
-  }
-  
-  // Merge results
-  console.log(`   Merging ${batchResults.length} batch results...`);
-  
-  const fullThemeDescription = theme.detailed_guidelines 
-    ? `${theme.description}. ${theme.detailed_guidelines}`
-    : theme.description;
-  
-  // For merging, format the batch results
-  const mergeBlocks = batchResults.map((result, i) => 
-    `<batch_analysis number="${i + 1}">\n${result}\n</batch_analysis>`
-  ).join('\n\n');
-  
-  const mergePrompt = EXTRACT_MERGE_PROMPT
+function buildMergePrompt(theme: ThemeRow, analyses: string[]): string {
+  const blocks = analyses.map((r, i) => `<batch_analysis number="${i + 1}">\n${r}\n</batch_analysis>`).join('\n\n');
+  return EXTRACT_MERGE_PROMPT
     .replace('{THEME_CODE}', theme.code)
-    .replace('{THEME_DESCRIPTION}', fullThemeDescription)
-    .replace('{EXTRACT_SETS}', mergeBlocks);
-  
-  const finalAnalysis = await ai.generateContent(
-    mergePrompt,
-    debug ? `theme_summary_v2_merge_${theme.code}_final` : undefined,
-    undefined,
-    {
-      taskType: 'theme_summary_v2_merge',
-      taskLevel: 0,
-      params: {
-        themeCode: theme.code,
-        batchCount: batches.length
-      }
-    }
-  );
-  
-  return finalAnalysis;
+    .replace('{THEME_DESCRIPTION}', () => fullDescription(theme))
+    .replace('{EXTRACT_SETS}', () => blocks);
+}
+
+function splitEvenly<T>(items: T[], width: number): T[][] {
+  const n = Math.ceil(items.length / width);
+  const groups: T[][] = Array.from({ length: n }, () => []);
+  const base = Math.floor(items.length / n), extra = items.length % n;
+  let k = 0;
+  for (let g = 0; g < n; g++) for (let i = 0; i < base + (g < extra ? 1 : 0); i++) groups[g].push(items[k++]);
+  return groups;
 }
 
 /**

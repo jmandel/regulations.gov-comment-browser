@@ -1,11 +1,13 @@
 import { Command } from "commander";
-import { openDb } from "../lib/database";
+import { Database } from "bun:sqlite";
 import { mkdir, writeFile, readdir } from "fs/promises";
 import { join } from "path";
+import { readDocumentInfo } from "../lib/document-meta";
+import { isScopeDbFile, listPublishableScopes } from "../lib/scope-db";
 
 export const generateLandingPageCommand = new Command("generate-landing-page")
   .description("Generate static landing page listing all regulations")
-  .option("-d, --db-dir <dir>", "Directory containing SQLite databases", "dbs")
+  .option("-d, --db-dir <dir>", "Directory containing SQLite databases (default: $DB_DIR or dbs)", process.env.DB_DIR || "dbs")
   .option("-o, --output <file>", "Output HTML file path", "dist/index.html")
   .action(generateLandingPage);
 
@@ -18,6 +20,8 @@ interface RegulationInfo {
   lastUpdated: string;
   agency: string;
   status: string;
+  // Scoped analyses published as sub-sites at <docket>/scopes/<slug>/
+  scopes: { slug: string; name: string; summary: string | null; inScope: number; total: number }[];
 }
 
 async function generateLandingPage(options: any) {
@@ -41,6 +45,8 @@ async function generateLandingPage(options: any) {
     if (f.endsWith('.sqlite.sqlite')) return false;
     // Exclude other sqlite variants
     if (f.includes('.sqlite.')) return false;
+    // Scope DBs are listed under their docket
+    if (isScopeDbFile(f)) return false;
     return true;
   });
   
@@ -58,45 +64,22 @@ async function generateLandingPage(options: any) {
     const documentId = dbFile.replace('.sqlite', '');
     console.log(`  Processing ${documentId}...`);
     
-    const db = openDb(documentId);
+    const db = new Database(join(options.dbDir, dbFile), { readonly: true }); // read-only: never create tables or files
 
-    // Read document details from database
-    let title = documentId;
-    let docketId = documentId;
-    let agency = "Unknown Agency";
-    let commentEndDate = "";
-
-    const hasMetadata = db.prepare(`
-      SELECT name FROM sqlite_master
-      WHERE type='table' AND name='document_metadata'
-    `).get();
-
-    if (hasMetadata) {
-      const metadata = db.prepare(`
-        SELECT title, docket_id, agency_name, agency_id, comment_end_date
-        FROM document_metadata
-        LIMIT 1
-      `).get() as any;
-
-      if (metadata) {
-        title = metadata.title || documentId;
-        docketId = metadata.docket_id || documentId;
-        agency = metadata.agency_name || metadata.agency_id || "Unknown Agency";
-        if (metadata.comment_end_date) commentEndDate = metadata.comment_end_date;
-      } else {
-        console.warn(`  ⚠️  No metadata found in database for ${documentId}`);
-      }
-    } else {
-      console.warn(`  ⚠️  No document_metadata table in database for ${documentId}`);
-    }
+    // Read document details from database (with fallbacks for older databases)
+    const info = readDocumentInfo(db, documentId);
+    const title = info.title;
+    const docketId = info.docketId;
+    const agency = info.agency;
+    let commentEndDate = info.commentEndDate || "";
 
     // Get statistics
     const stats = {
-      commentCount: (db.prepare("SELECT COUNT(*) as count FROM comments").get() as any).count,
-      condensedCount: (db.prepare("SELECT COUNT(*) as count FROM condensed_comments WHERE status = 'completed'").get() as any).count,
-      themeCount: (db.prepare("SELECT COUNT(*) as count FROM theme_hierarchy").get() as any).count,
-      scoredCount: (db.prepare("SELECT COUNT(DISTINCT comment_id) as count FROM comment_themes").get() as any).count,
-      summaryCount: (db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get() as any).count,
+      commentCount: safeCount(db, "SELECT COUNT(*) as count FROM comments"),
+      condensedCount: safeCount(db, "SELECT COUNT(*) as count FROM condensed_comments WHERE status = 'completed'"),
+      themeCount: safeCount(db, "SELECT COUNT(*) as count FROM theme_hierarchy"),
+      scoredCount: safeCount(db, "SELECT COUNT(DISTINCT comment_id) as count FROM comment_themes"),
+      summaryCount: safeCount(db, "SELECT COUNT(*) as count FROM theme_summaries"),
     };
 
     // Fall back to latest comment date if no comment_end_date
@@ -130,7 +113,10 @@ async function generateLandingPage(options: any) {
       themeCount: stats.themeCount,
       lastUpdated: commentEndDate || new Date().toISOString(),
       agency,
-      status
+      status,
+      scopes: listPublishableScopes(documentId, dbDir).map(sc => ({
+        slug: sc.slug, name: sc.name, summary: sc.summary, inScope: sc.counts.inScopeSubmissions, total: sc.counts.docketSubmissions,
+      })),
     });
 
     db.close();
@@ -328,6 +314,58 @@ function generateHTML(regulations: RegulationInfo[]): string {
     .meta-item strong {
       color: #4a5568;
     }
+
+    .scope-list {
+      border-top: 1px solid #e2e8f0;
+      padding: 0.75rem 1.5rem 1rem;
+    }
+
+    .scope-list-label {
+      font-size: 0.8125rem;
+      color: #718096;
+      margin-bottom: 0.25rem;
+    }
+
+    .scope-item a {
+      display: block;
+      padding: 0.5rem 0 0.5rem 0.875rem;
+      border-left: 2px solid #cbd5e0;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .scope-item + .scope-item a {
+      margin-top: 0.25rem;
+    }
+
+    .scope-item a:hover,
+    .scope-item a:focus-visible {
+      border-left-color: #2b6cb0;
+      outline: none;
+    }
+
+    .scope-name {
+      font-weight: 600;
+      color: #2b6cb0;
+    }
+
+    .scope-item a:hover .scope-name {
+      text-decoration: underline;
+    }
+
+    .scope-summary {
+      display: block;
+      font-size: 0.875rem;
+      color: #4a5568;
+    }
+
+    .scope-count {
+      font-size: 0.8125rem;
+      color: #718096;
+      font-variant-numeric: tabular-nums;
+      margin-left: 0.5rem;
+      white-space: nowrap;
+    }
     
     .about-section {
       background: white;
@@ -522,6 +560,19 @@ function generateHTML(regulations: RegulationInfo[]): string {
             ` : ''}
           </div>
         </a>
+        ${reg.scopes.length ? `
+        <div class="scope-list">
+          <p class="scope-list-label" id="scopes-${reg.id}">Scoped analyses</p>
+          <ul aria-labelledby="scopes-${reg.id}" style="list-style:none">
+          ${reg.scopes.map(sc => `
+          <li class="scope-item">
+            <a href="./${reg.id}/scopes/${sc.slug}/">
+              <span class="scope-name">${escapeHtml(sc.name)}</span><span class="scope-count">${sc.inScope.toLocaleString()} of ${sc.total.toLocaleString()} comments</span>
+              ${sc.summary ? `<span class="scope-summary">${escapeHtml(sc.summary)}</span>` : ''}
+            </a>
+          </li>`).join('')}
+          </ul>
+        </div>` : ''}
       </div>
       `).join('')}
     </div>
@@ -624,4 +675,9 @@ function escapeHtml(text: string): string {
     "'": '&#039;'
   };
   return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+// Read-only databases from older pipeline versions may lack a table; count it as 0
+function safeCount(db: Database, sql: string): number {
+  try { return (db.prepare(sql).get() as { count: number }).count; } catch { return 0; }
 }

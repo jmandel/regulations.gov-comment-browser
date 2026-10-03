@@ -1,13 +1,99 @@
 export interface Meta {
   documentId: string
+  title?: string
+  documentType?: string
+  agencyId?: string
+  commentStartDate?: string
+  commentEndDate?: string
   generatedAt: string
+  // Downloadable analysis databases (zipped SQLite + README), in data/; absent in older builds
+  downloads?: Array<{ kind: 'slim' | 'full'; file: string; bytes: number; sqliteBytes?: number; sha256?: string; url?: string }>  // url: absolute (release asset); else ./data/<file>
+  // Docket site: its scoped analyses, each a sub-site at `path` (relative to the docket site)
+  scopes?: ScopeListing[]
+  // Scope sub-site: the scope, where the docket's shared data lives and the way back to the docket
+  scope?: Omit<ScopeListing, 'path' | 'themes' | 'seedCommentId'> & { docketUnits?: number }
+  sharedData?: string
+  docketUrl?: string
   stats: {
     totalComments: number
     condensedComments: number
     totalThemes: number
     totalEntities: number
     scoredComments: number
+    // Present when tag-campaigns ran; each comment is in at most one campaign
+    campaigns?: number
+    campaignComments?: number
+    paraphrasedCampaignComments?: number
+    paraphraseCampaigns?: number
   }
+}
+
+export interface ScopeListing {
+  slug: string
+  name: string
+  summary?: string | null
+  path: string
+  inScopeSubmissions: number
+  docketSubmissions: number
+  inScopeUnits: number
+  themes?: number
+  seedCommentId?: string | null
+}
+
+// scope.json in a scope sub-site
+export interface ScopeInfo {
+  slug: string
+  name: string
+  summary?: string | null
+  promptMarkdown: string
+  seedCommentId?: string | null
+  updatedAt?: string
+  counts: {
+    docketSubmissions: number
+    docketUnits: number
+    inScopeSubmissions: number
+    inScopeUnits: number
+    inScopeComments?: number
+    inScopeFormLetterGroups?: number
+    inScopeOrganizations?: number
+  }
+}
+
+// scope-units.json: the in-scope units with what the relevance judge kept
+export interface ScopeUnitsFile {
+  version: number
+  units: Record<string, { excerpt?: string; note?: string; themes?: string[]; seed?: boolean }>
+}
+
+// overview.json: precomputed figures for the Overview page. Counts are submissions (copies included).
+export interface CompositionCounts {
+  campaignCopies: number   // exact copies of a campaign letter
+  campaignReworded: number // campaign letters reworded by the sender
+  typed: number            // not in a campaign, no attachment
+  attached: number         // not in a campaign, with an attached document
+}
+export interface OverviewData {
+  version: number
+  composition: CompositionCounts
+  submitters: Array<{ label: string; count: number; types: string[] }>
+  arrivals: Array<{ date: string; count: number }>
+  themeGists: Record<string, string>
+  themeComposition: Record<string, CompositionCounts>
+}
+
+// An organized comment campaign (campaigns.json, from tag-campaigns). method 'paraphrase': has
+// reworded letters (maybe plus exact-copy groups); 'form-letter': exact-copy groups only.
+export interface Campaign {
+  id: number
+  name: string
+  description?: string | null
+  method: 'paraphrase' | 'form-letter'
+  evidence?: string | null
+  total: number
+  exact: number
+  paraphrased: number
+  units: number
+  example?: string
 }
 
 export interface Theme {
@@ -106,22 +192,28 @@ export interface EntityTaxonomy {
   [category: string]: Entity[]
 }
 
+export interface StructuredSections {
+  oneLineSummary?: string
+  commenterProfile?: string
+  corePosition?: string
+  keyRecommendations?: string
+  mainConcerns?: string
+  notableExperiences?: string
+  keyQuotations?: string
+  detailedContent?: string
+}
+
+// A comment as held in memory. Only lean fields are loaded up front (from comments-index.json);
+// the full condensed sections, full text and a form-letter member's added text are fetched on
+// demand from shards (see utils/commentData.ts).
 export interface Comment {
   id: string
   submitter: string
   submitterType: string
   date: string
   location?: string
-  structuredSections?: {
-    oneLineSummary?: string
-    commenterProfile?: string
-    corePosition?: string
-    keyRecommendations?: string
-    mainConcerns?: string
-    notableExperiences?: string
-    keyQuotations?: string
-    detailedContent?: string
-  }
+  // Up front this holds only oneLineSummary (the representative's, for form-letter members)
+  structuredSections?: StructuredSections
   themeScores?: Record<string, number>
   entities?: Array<{
     category: string
@@ -130,10 +222,56 @@ export interface Comment {
   hasAttachments: boolean
   documentId?: string
   wordCount?: number
+  percentile?: number
   clusterSize?: number
   isClusterRepresentative?: boolean
   clusterRepresentativeId?: string | null
   isAlignedSummary?: boolean
+  // Form-letter members: words this member added to the template, and the start of that text
+  addedWords?: number
+  addedSnippet?: string
+  // Organized campaign this comment belongs to, and whether it is a reworded (not exact) copy
+  campaignId?: number
+  campaignParaphrase?: boolean
+  // Shards holding this comment's content (for members: the representative's)
+  detailShard?: number
+  textShard?: number
+  // Scope sub-site: whether the comment addresses the scope (members follow their representative),
+  // and the in-scope passages and one-line note from the relevance judgment (units only)
+  inScope?: boolean
+  scopeExcerpt?: string
+  scopeNote?: string
+  scopeSeed?: boolean
+}
+
+// Shape of comments-index.json
+export interface CommentsIndexFile {
+  version: number
+  documentId: string
+  clustered: boolean
+  submitterTypes: string[]
+  entityKeys: string[]
+  comments: Array<{
+    id: string
+    submitter: string
+    submitterType: number
+    date: string
+    location?: string
+    hasAttachments?: boolean
+    isRep?: boolean
+    clusterSize?: number
+    rep?: string
+    addedWords?: number
+    addedSnippet?: string
+    wordCount?: number
+    summary?: string
+    detailShard?: number
+    textShard?: number
+    themes?: string[]
+    entities?: number[]
+    campaign?: number
+    campaignParaphrase?: boolean
+  }>
 }
 
 export interface ThemeExtract {

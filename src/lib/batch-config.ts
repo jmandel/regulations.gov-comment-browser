@@ -11,6 +11,7 @@ export interface TaskConfig {
   concurrency?: number;
   mergeWidth?: number;
   model?: string;
+  models?: Record<string, string>;  // per-role models within a task, e.g. { typed: ..., attachment: ... }
   batching?: boolean | BatchConfig;
   validation?: Record<string, any>;
   thresholds?: Record<string, any>;
@@ -20,6 +21,8 @@ export interface TaskConfig {
 export interface EntityTaskConfig {
   concurrency?: number;
   model?: string;
+  models?: Record<string, string>;
+  thresholds?: Record<string, any>;
   stages?: {
     categoryDiscovery?: {
       mergeWidth?: number;
@@ -44,31 +47,16 @@ export interface BatchConfigFile {
     defaultModel?: string;
   };
   tasks: {
+    transcribe?: TaskConfig;
+    triage?: TaskConfig;
     condense?: TaskConfig;
     discoverThemes?: TaskConfig;
     summarizeThemes?: TaskConfig;
     extractThemeContent?: TaskConfig;
     discoverEntities?: EntityTaskConfig;
-    loadComments?: {
-      rateLimiting?: {
-        apiCallDelay?: number;
-        attachmentDelay?: number;
-        pageSize?: number;
-        description?: string;
-      };
-    };
+    tagCampaigns?: TaskConfig;
+    scopeRelevance?: TaskConfig;
   };
-  pipeline?: {
-    errorHandling?: {
-      maxCrashes?: number;
-      defaultRetryDelay?: number;
-      description?: string;
-    };
-  };
-  models?: Record<string, {
-    concurrency?: number;
-    description?: string;
-  }>;
 }
 
 let configCache: BatchConfigFile | null = null;
@@ -104,17 +92,12 @@ export function getTaskConfig(taskName: keyof BatchConfigFile['tasks'], model?: 
   validation?: Record<string, any>;
   thresholds?: Record<string, any>;
   stages?: EntityTaskConfig['stages'];
-  rateLimiting?: any;
 } {
   const config = loadBatchConfig();
   const taskConfig = config.tasks[taskName] || {};
   const globalDefaults = config.global;
   
-  // Calculate effective concurrency based on model
-  let concurrency = (taskConfig as any).concurrency || globalDefaults.concurrency.default;
-  if (model && config.models?.[model]?.concurrency) {
-    concurrency = Math.round(concurrency * config.models[model].concurrency);
-  }
+  const concurrency = (taskConfig as any).concurrency || globalDefaults.concurrency.default;
   
   return {
     concurrency,
@@ -183,4 +166,11 @@ export function getTaskModel(taskName: keyof BatchConfigFile['tasks'], cliModel?
   
   // 5. Hardcoded fallback
   return 'gemini-pro';
+}
+
+// Model for one role within a task: CLI override > tasks.<task>.models.<role> > task model > global default
+export function getTaskRoleModel(taskName: keyof BatchConfigFile['tasks'], role: string, cliModel?: string): string {
+  if (cliModel) return cliModel;
+  const taskConfig = (loadBatchConfig().tasks[taskName] || {}) as TaskConfig;
+  return taskConfig.models?.[role] || getTaskModel(taskName);
 }

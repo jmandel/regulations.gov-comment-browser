@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { BarChart3, Tag, MessageSquare, Home, FileText } from 'lucide-react'
+import { BarChart3, Tag, MessageSquare, Home, FileText, Megaphone } from 'lucide-react'
+import useStore from '../store/useStore'
 import clsx from 'clsx'
 
 const navItems = [
@@ -11,9 +12,13 @@ const navItems = [
 ]
 
 function Navigation() {
+  const hasCampaigns = useStore(s => s.campaigns.length > 0)
+  const items = hasCampaigns
+    ? [...navItems.slice(0, 4), { id: 'campaigns', label: 'Campaigns', icon: Megaphone, path: '/campaigns' }, navItems[4]]
+    : navItems
   return (
     <nav className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-      {navItems.map(({ id, label, icon: Icon, path }) => (
+      {items.map(({ id, label, icon: Icon, path }) => (
         <NavLink
           key={id}
           to={path}

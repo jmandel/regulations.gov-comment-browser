@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # publish the analysis databases as release assets
   pages: write
   id-token: write
 
@@ -52,6 +52,8 @@ jobs:
     - name: Build data and dashboards for each regulation
       env:
         REGSGOV_API_KEY: ${{ secrets.REGSGOV_API_KEY }}
+        # Downloadable databases are linked from the release, not served from the site
+        DATA_DOWNLOADS_URL: https://github.com/${{ github.repository }}/releases/download/analysis-databases
       run: |
         # Use the shared build script
         ./scripts/build-all-dashboards.sh --skip-install
@@ -61,6 +63,15 @@ jobs:
         # Build the FloodGate form letter generation app
         ./scripts/build-floodgate.sh
         
+    - name: Publish analysis databases as release assets
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: ./scripts/publish-data-packs.sh dist
+
+    - name: Remove database zips from the site
+      run: find dist -type f -name '*.sqlite.zip' -delete
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:

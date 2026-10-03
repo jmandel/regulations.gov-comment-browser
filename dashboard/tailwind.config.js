@@ -5,7 +5,12 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      // Public Sans: the US Web Design System typeface
+      fontFamily: {
+        sans: ['"Public Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
+      },
+    },
   },
   plugins: [
     require('@tailwindcss/typography')

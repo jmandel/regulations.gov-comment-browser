@@ -1,27 +1,36 @@
 import { Link, useParams } from 'react-router-dom'
 import { Copy, ChevronRight, FileText } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import useStore from '../store/useStore'
 import CommentCard from './CommentCard'
 import Breadcrumbs from './Breadcrumbs'
 import ThemeSummaryView from './ThemeSummaryView'
 import CopyCommentsModal from './CopyCommentsModal'
 
+const PAGE_SIZE = 50
+
 function ThemeDetail() {
   const { themeCode } = useParams<{ themeCode: string }>()
-  const { themes, themeSummaries, getCommentsForTheme, themeExtracts } = useStore()
+  const { themes, themeSummaries, getCommentsForTheme, themeExtracts, loadThemeExtracts } = useStore()
   const [showCopyModal, setShowCopyModal] = useState(false)
-  
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+
   const theme = themes.find(t => t.code === themeCode)
   const themeSummary = themeCode ? themeSummaries[themeCode] : undefined
-  const { direct } = themeCode ? getCommentsForTheme(themeCode) : { direct: [] }
-  const extracts = themeCode ? themeExtracts[themeCode] || {} : {}
-  
+  const direct = useMemo(() => (themeCode ? getCommentsForTheme(themeCode).direct : []), [themeCode, getCommentsForTheme])
+  // Per-theme extracts are fetched when the page opens
+  const loadedExtracts = themeCode ? themeExtracts[themeCode] : undefined
+  const extracts = loadedExtracts || {}
+  useEffect(() => {
+    if (themeCode) loadThemeExtracts(themeCode)
+    setVisibleCount(PAGE_SIZE)
+  }, [themeCode, loadThemeExtracts])
+
   // Filter to only show representative comments (or all if no clustering)
-  const displayedComments = direct.filter(c => 
-    c.isClusterRepresentative === true || 
+  const displayedComments = useMemo(() => direct.filter(c =>
+    c.isClusterRepresentative === true ||
     c.isClusterRepresentative === undefined // For databases without clustering
-  )
+  ), [direct])
   
   // Build theme hierarchy
   const themeHierarchy = useMemo(() => {
@@ -84,7 +93,10 @@ function ThemeDetail() {
                   )}
                 </h2>
                 <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium whitespace-nowrap">
-                  {theme.direct_count.toLocaleString()} {theme.direct_count === 1 ? 'comment' : 'comments'}
+                  {theme.comment_count.toLocaleString()} {theme.comment_count === 1 ? 'comment' : 'comments'}
+                  {theme.comment_count > theme.direct_count && (
+                    <> ({theme.direct_count.toLocaleString()} on this theme directly, the rest in sub-themes)</>
+                  )}
                   {theme.direct_count > displayedComments.length && (
                     <> ({displayedComments.length} {displayedComments.length === 1 ? 'cluster' : 'clusters'})</>
                   )}
@@ -145,14 +157,14 @@ function ThemeDetail() {
               No Detailed Analysis Available
             </h2>
             <p className="text-gray-700 mb-4">
-              This sub-theme hasn't been analyzed in detail yet. 
-              {theme.parent_code && (
+              Too few comments discussed this theme for a synthesized analysis (theme summaries need at least 5); the comments that did are listed below.
+              {theme.parent_code && themeSummaries[theme.parent_code] && (
                 <>
-                  {' '}View the parent theme for a broader analysis that may include this topic.
+                  {' '}The parent theme's analysis may cover this topic more broadly.
                 </>
               )}
             </p>
-            {theme.parent_code && (
+            {theme.parent_code && themeSummaries[theme.parent_code] && (
               <Link
                 to={`/themes/${theme.parent_code}`}
                 className="inline-flex items-center space-x-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
@@ -190,7 +202,7 @@ function ThemeDetail() {
                   )}
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-blue-600 font-medium">
-                      {child.direct_count} {child.direct_count === 1 ? 'comment' : 'comments'}
+                      {child.comment_count} {child.comment_count === 1 ? 'comment' : 'comments'}
                     </span>
                     <ChevronRight className="h-4 w-4 text-gray-400" />
                   </div>
@@ -213,7 +225,10 @@ function ThemeDetail() {
         
         {displayedComments.length > 0 ? (
           <div className="space-y-4">
-            {displayedComments.map(comment => (
+            {!loadedExtracts && (
+              <p className="text-sm text-gray-400 italic">Loading theme-specific extracts…</p>
+            )}
+            {displayedComments.slice(0, visibleCount).map(comment => (
               <CommentCard
                 key={comment.id}
                 comment={comment}
@@ -223,6 +238,14 @@ function ThemeDetail() {
                 themeCode={themeCode}
               />
             ))}
+            {displayedComments.length > visibleCount && (
+              <button
+                onClick={() => setVisibleCount(n => n + PAGE_SIZE * 2)}
+                className="w-full py-3 bg-white border border-gray-200 rounded-lg text-sm text-blue-600 hover:bg-gray-50"
+              >
+                Show more ({(displayedComments.length - visibleCount).toLocaleString()} remaining)
+              </button>
+            )}
           </div>
         ) : (
           <p className="text-gray-500 italic">No comments found addressing this theme</p>

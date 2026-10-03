@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useCallback, useRef, useTransition } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, useTransition, useDeferredValue } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { MessageSquare, Copy, Search, X, HelpCircle } from 'lucide-react'
+import { MessageSquare, Copy, Search, X, HelpCircle, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
 import CommentCard from './CommentCard'
 import CopyCommentsModal from './CopyCommentsModal'
@@ -12,15 +12,19 @@ import { getUniqueValues } from '../utils/helpers'
 import { parseSearchQuery, tokensToString, removeToken } from '../utils/searchParser'
 import { debounce } from 'lodash'
 import type { PickerItem } from './FilterAddButtons'
+import type { CompositionCounts } from '../types'
+import { PARTS, partLabel } from './overview/overviewData'
 
 interface FilterOptions {
   themes: string[]
   entities: string[]
   submitterTypes: string[]
+  campaigns?: string[]
+  parts?: string[]
   searchQuery: string
 }
 
-type PrefixType = 'theme' | 'entity' | 'type'
+type PrefixType = 'theme' | 'entity' | 'type' | 'campaign'
 
 interface PrefixDetection {
   type: PrefixType
@@ -28,7 +32,7 @@ interface PrefixDetection {
   prefixStart: number
 }
 
-const PREFIX_REGEX = /(?:^|\s)(theme|entity|type):(.*)$/i
+const PREFIX_REGEX = /(?:^|\s)(theme|entity|type|campaign):(.*)$/i
 
 function detectPrefix(query: string, cursorPos: number): PrefixDetection | null {
   const textToCursor = query.slice(0, cursorPos)
@@ -43,7 +47,9 @@ function detectPrefix(query: string, cursorPos: number): PrefixDetection | null 
 }
 
 function CommentBrowser() {
-  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {} } = useStore()
+  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering, campaigns = [], scope, commentScope, setCommentScope, meta, getUnitParts } = useStore()
+  const wholeDocket = !!scope && commentScope === 'docket'
+  const docketTotal = scope?.counts.docketSubmissions ?? 0
   const [searchParams] = useSearchParams()
   const [page, setPage] = useState(0)
   const [showCopyModal, setShowCopyModal] = useState(false)
@@ -67,27 +73,46 @@ function CommentBrowser() {
     [localSearchQuery]
   )
 
-  // Debounced search handler — called directly from onChange, not via useEffect
-  const debouncedSetSearchQuery = useMemo(
-    () => debounce((query: string) => {
+  // Debounced search handler — called directly from onChange, not via useEffect. While a quoted
+  // phrase is still open, wait for a longer pause: each partial phrase is a new search.
+  const debouncedSetSearchQuery = useMemo(() => {
+    const apply = (query: string) => {
       if (setFilters) {
         startTransition(() => {
           setFilters((prev: FilterOptions) => ({ ...prev, searchQuery: query }))
           setPage(0)
         })
       }
-    }, 300),
-    [setFilters]
-  )
+    }
+    const soon = debounce(apply, 300)
+    const later = debounce(apply, 1000)
+    const run = (query: string) => {
+      const openQuote = (query.match(/"/g) || []).length % 2 === 1
+      ;(openQuote ? soon : later).cancel()
+      ;(openQuote ? later : soon)(query)
+    }
+    run.cancel = () => { soon.cancel(); later.cancel() }
+    return run
+  }, [setFilters])
 
   // Apply URL query parameters on mount
   useEffect(() => {
-    const submitterType = searchParams.get('submitterType')
-    if (submitterType) {
+    // Repeatable: ?submitterType=A&submitterType=B (the Overview links a category's variants)
+    const submitterTypes = searchParams.getAll('submitterType')
+    if (submitterTypes.length) {
       setFilters((prev: FilterOptions) => ({
         ...prev,
-        submitterTypes: [submitterType]
+        submitterTypes
       }))
+    }
+    const campaign = searchParams.get('campaign')
+    if (campaign) {
+      setFilters((prev: FilterOptions) => ({ ...prev, campaigns: [campaign] }))
+    }
+    // ?part=<key>: a segment of the Overview's composition bar
+    const part = searchParams.get('part')
+    if (part && PARTS.some(p => p.key === part)) {
+      setFilters((prev: FilterOptions) => ({ ...prev, parts: [part] }))
     }
   }, [searchParams, setFilters])
 
@@ -127,7 +152,7 @@ function CommentBrowser() {
   const filteredComments = useMemo(() => {
     if (!getFilteredComments) return []
     return getFilteredComments()
-  }, [getFilteredComments, filters])
+  }, [getFilteredComments, filters, search, commentScope])
 
   // Available submitter types (with 5+ comments)
   const availableSubmitterTypes = useMemo(() => {
@@ -147,10 +172,33 @@ function CommentBrowser() {
 
   const commentsToCopy = filteredComments
 
-  // Memoize the comment list JSX — this is the expensive part
+  const unitNoun = (hasClustering ? 'cluster' : 'comment') + (filteredComments.length === 1 ? '' : 's')
+  // Submissions the listed units stand for (a form-letter group counts all its members)
+  const representedCount = useMemo(() => filteredComments.reduce((n, c) => n + (c.clusterSize || 1), 0), [filteredComments])
+
+  // With a composition-part filter, the number of comments in that part among the listed units
+  const activeParts = filters?.parts || []
+  const partCommentCount = useMemo(() => {
+    if (!activeParts.length) return null
+    const unitParts = getUnitParts()
+    let n = 0
+    for (const c of filteredComments) {
+      const counts = unitParts.get(c.id)
+      if (counts) for (const p of activeParts) n += counts[p as keyof CompositionCounts] || 0
+    }
+    return n
+  }, [filteredComments, activeParts.join(), getUnitParts, commentScope])
+  const partName = (key: string) => {
+    const p = PARTS.find(x => x.key === key)
+    return p ? partLabel(p, campaigns.length > 0) : key
+  }
+
+  // Memoize the comment list JSX — this is the expensive part. Rendered from a deferred copy so
+  // a new result list renders in the background without blocking typing.
+  const listedComments = useDeferredValue(paginatedComments)
   const commentListJsx = useMemo(() => (
-    paginatedComments.length > 0 ? (
-      paginatedComments.map(comment => (
+    listedComments.length > 0 ? (
+      listedComments.map(comment => (
         <CommentCard
           key={comment.id}
           comment={comment}
@@ -163,7 +211,7 @@ function CommentBrowser() {
         <p className="text-gray-500">No comments match your filters</p>
       </div>
     )
-  ), [paginatedComments])
+  ), [listedComments])
 
   // Build inline picker items for the active prefix type
   const inlinePickerItems = useMemo((): PickerItem[] => {
@@ -204,10 +252,20 @@ function CommentBrowser() {
           }))
           .filter(item => !q || item.label.toLowerCase().includes(q))
 
+      case 'campaign':
+        return campaigns
+          .map(c => ({
+            key: String(c.id),
+            label: c.name,
+            count: c.total,
+            selected: (filters?.campaigns || []).includes(String(c.id)),
+          }))
+          .filter(item => !q || item.label.toLowerCase().includes(q))
+
       default:
         return []
     }
-  }, [inlinePickerType, inlineFilterText, themes, entities, availableSubmitterTypes, filters])
+  }, [inlinePickerType, inlineFilterText, themes, entities, availableSubmitterTypes, filters, campaigns])
 
   // Reset highlight when items change
   useEffect(() => {
@@ -291,6 +349,12 @@ function CommentBrowser() {
     handleFilterChange('submitterTypes', updated)
   }, [filters?.submitterTypes, handleFilterChange])
 
+  const handleToggleCampaign = useCallback((id: string) => {
+    const current = filters?.campaigns || []
+    const updated = current.includes(id) ? current.filter((v: string) => v !== id) : [...current, id]
+    handleFilterChange('campaigns', updated)
+  }, [filters?.campaigns, handleFilterChange])
+
   const handleInlineSelect = useCallback((key: string) => {
     if (!inlinePickerType) return
 
@@ -304,11 +368,12 @@ function CommentBrowser() {
       case 'theme': handleToggleTheme(key); break
       case 'entity': handleToggleEntity(key); break
       case 'type': handleToggleSubmitterType(key); break
+      case 'campaign': handleToggleCampaign(key); break
     }
 
     closeInlinePicker()
     setTimeout(() => searchInputRef.current?.focus(), 0)
-  }, [inlinePickerType, localSearchQuery, prefixStart, debouncedSetSearchQuery, closeInlinePicker, handleToggleTheme, handleToggleEntity, handleToggleSubmitterType])
+  }, [inlinePickerType, localSearchQuery, prefixStart, debouncedSetSearchQuery, closeInlinePicker, handleToggleTheme, handleToggleEntity, handleToggleSubmitterType, handleToggleCampaign])
 
   const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!inlinePickerType || inlinePickerItems.length === 0) return
@@ -346,6 +411,8 @@ function CommentBrowser() {
         submitterTypes: [],
         themes: [],
         entities: [],
+        campaigns: [],
+        parts: [],
         searchQuery: ''
       }))
       setPage(0)
@@ -363,6 +430,7 @@ function CommentBrowser() {
   const inlinePickerLabel = inlinePickerType === 'theme' ? 'Select theme...'
     : inlinePickerType === 'entity' ? 'Select entity...'
     : inlinePickerType === 'type' ? 'Select submitter type...'
+    : inlinePickerType === 'campaign' ? 'Select campaign...'
     : ''
 
   return (
@@ -373,12 +441,18 @@ function CommentBrowser() {
           <div className="flex items-center space-x-3 min-w-0">
             <MessageSquare className="h-6 w-6 text-blue-600 flex-shrink-0" />
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Browse Comments</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{scope ? (wholeDocket ? 'All comments in the docket' : 'Comments in this scope') : 'Browse Comments'}</h1>
               <p className="text-sm text-gray-500 mt-1 truncate sm:whitespace-normal">
-                {comments.some(c => c.isClusterRepresentative !== undefined) ? (
-                  <>Showing {filteredComments.length} clusters representing {comments.length} comments</>
+                {partCommentCount !== null ? (
+                  <>Showing {filteredComments.length.toLocaleString()} {unitNoun}{hasClustering || scope ? <> representing {partCommentCount.toLocaleString()} comments</> : null} in {activeParts.map(partName).join(' or ')}</>
+                ) : scope ? (
+                  wholeDocket
+                    ? <>Showing {filteredComments.length.toLocaleString()} {unitNoun} from all {docketTotal.toLocaleString()} submissions, in or out of scope</>
+                    : <>Showing {filteredComments.length.toLocaleString()} {unitNoun} representing {representedCount.toLocaleString()} of the {comments.length.toLocaleString()} submissions (out of {docketTotal.toLocaleString()}) that address this scope</>
+                ) : hasClustering ? (
+                  <>Showing {filteredComments.length.toLocaleString()} {unitNoun} representing {representedCount.toLocaleString()} of {comments.length.toLocaleString()} comments</>
                 ) : (
-                  <>Showing {filteredComments.length} of {comments.length} comments</>
+                  <>Showing {filteredComments.length.toLocaleString()} of {comments.length.toLocaleString()} comments</>
                 )}
               </p>
             </div>
@@ -392,6 +466,29 @@ function CommentBrowser() {
             <span className="hidden sm:inline">Copy for LLM</span>
           </button>
         </div>
+        {scope && (
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+            <span className="text-gray-600" id="comment-scope-label">Search in</span>
+            <div role="radiogroup" aria-labelledby="comment-scope-label" className="inline-flex rounded-md border border-gray-300 p-0.5 bg-gray-50">
+              {([['scope', 'This scope'], ['docket', 'Whole docket']] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  role="radio"
+                  aria-checked={commentScope === value}
+                  onClick={() => { setCommentScope(value); setPage(0) }}
+                  className={`px-3 py-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${commentScope === value ? 'bg-white shadow-sm text-[#14233c] font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {wholeDocket && (
+              <span className="text-xs text-gray-500">
+                Out-of-scope comments carry no scope themes. <a href={meta?.docketUrl ? `${meta.docketUrl}#/comments` : '#'} className="underline hover:text-gray-700">Open the docket's comment browser</a>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Search + Filters */}
@@ -446,12 +543,31 @@ function CommentBrowser() {
           </button>
         </div>
 
+        {/* Full-text search progress */}
+        {filters.searchQuery && search.query === filters.searchQuery && search.phase !== 'done' && search.phase !== 'idle' && (
+          <div className={`mt-2 flex items-center gap-2 text-xs ${search.phase === 'error' ? 'text-red-600' : 'text-gray-500'}`}>
+            {search.phase !== 'error' && <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />}
+            {search.phase === 'index' && <span>Showing matches in names and summaries; loading the full-text index…</span>}
+            {search.phase === 'verify' && (
+              <span>
+                Checking exact phrase in {(search.pending ?? 0).toLocaleString()} candidate comments
+                {search.progress && search.progress.total > 1 ? ` (${Math.round((search.progress.done / search.progress.total) * 100)}% of text loaded)` : ''}…
+              </span>
+            )}
+            {search.phase === 'error' && <span>{search.error}</span>}
+          </div>
+        )}
+
         {/* Active Filter Chips */}
         <ActiveFilterChips
           searchTokens={searchTokens}
           themes={filters.themes || []}
           entities={filters.entities || []}
           submitterTypes={filters.submitterTypes || []}
+          campaigns={(filters.campaigns || []).map(id => ({ id, name: campaigns.find(c => String(c.id) === id)?.name || `Campaign ${id}` }))}
+          onRemoveCampaign={(id) => handleFilterChange('campaigns', (filters.campaigns || []).filter((v: string) => v !== id))}
+          parts={activeParts.map(key => ({ key, label: partName(key) }))}
+          onRemovePart={(key) => handleFilterChange('parts', activeParts.filter((v: string) => v !== key))}
           themeList={themes}
           entityMap={entities}
           onRemoveSearchToken={handleRemoveSearchToken}

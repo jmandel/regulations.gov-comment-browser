@@ -5,9 +5,9 @@ import Breadcrumbs from './Breadcrumbs'
 
 function CommentDetail() {
   const { commentId } = useParams<{ commentId: string }>()
-  const { comments } = useStore()
-  
-  const comment = comments.find(c => c.id === commentId)
+  const { getCommentById } = useStore()
+
+  const comment = commentId ? getCommentById(commentId) : undefined
   
   if (!comment) {
     return (

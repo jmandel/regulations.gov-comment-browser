@@ -2,7 +2,10 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Batch Configuration Schema",
   "type": "object",
-  "required": ["global", "tasks"],
+  "required": [
+    "global",
+    "tasks"
+  ],
   "properties": {
     "$schema": {
       "type": "string"
@@ -42,34 +45,6 @@
         },
         "discoverEntities": {
           "$ref": "#/definitions/entityTaskConfig"
-        },
-        "loadComments": {
-          "$ref": "#/definitions/loadTaskConfig"
-        }
-      }
-    },
-    "pipeline": {
-      "type": "object",
-      "properties": {
-        "errorHandling": {
-          "type": "object",
-          "properties": {
-            "maxCrashes": { "type": "integer" },
-            "defaultRetryDelay": { "type": "integer" },
-            "description": { "type": "string" }
-          }
-        }
-      }
-    },
-    "models": {
-      "type": "object",
-      "patternProperties": {
-        "^.*$": {
-          "type": "object",
-          "properties": {
-            "concurrency": { "type": "number" },
-            "description": { "type": "string" }
-          }
         }
       }
     }
@@ -77,7 +52,9 @@
   "definitions": {
     "setting": {
       "type": "object",
-      "required": ["default"],
+      "required": [
+        "default"
+      ],
       "properties": {
         "default": {
           "type": "integer"
@@ -89,7 +66,10 @@
     },
     "batchConfig": {
       "type": "object",
-      "required": ["triggerWordLimit", "batchWordLimit"],
+      "required": [
+        "triggerWordLimit",
+        "batchWordLimit"
+      ],
       "properties": {
         "triggerWordLimit": {
           "type": "integer",
@@ -119,8 +99,12 @@
         },
         "batching": {
           "oneOf": [
-            { "type": "boolean" },
-            { "$ref": "#/definitions/batchConfig" }
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/definitions/batchConfig"
+            }
           ]
         },
         "validation": {
@@ -128,6 +112,13 @@
         },
         "thresholds": {
           "type": "object"
+        },
+        "models": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Per-role models within the task (getTaskRoleModel), e.g. discoverThemes: batch/merge; summarizeThemes: summary/merge/structure"
         },
         "description": {
           "type": "string"
@@ -144,40 +135,74 @@
           "type": "string",
           "description": "AI model to use for this task"
         },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "minUnitsCap": {
+              "type": "integer",
+              "description": "Keep an entity found in at least min(1% of units, minUnitsCap) units"
+            },
+            "wordsPerCall": {
+              "type": "integer",
+              "description": "Words of comment text per base and theme call"
+            },
+            "sweepWordsPerCall": {
+              "type": "integer",
+              "description": "Words per sweep call; the sweep reads every unit no earlier call read, plus the rest of long letters"
+            },
+            "maxWordsPerUnit": {
+              "type": "integer",
+              "description": "Long letters are truncated to this many words in base and theme calls; the sweep reads the rest as further pieces"
+            },
+            "typedShare": {
+              "type": "number",
+              "description": "Share of a theme or sweep call's words given to short typed comments (the rest to long and attachment letters)"
+            },
+            "longMinWords": {
+              "type": "integer",
+              "description": "Units with attachments or more than this many words count as long letters"
+            }
+          }
+        },
+        "description": {
+          "type": "string"
+        },
         "stages": {
           "type": "object",
           "properties": {
             "categoryDiscovery": {
               "type": "object",
               "properties": {
-                "mergeWidth": { "type": "integer" },
-                "model": { "type": "string", "description": "Override model for this stage" },
-                "batching": { "$ref": "#/definitions/batchConfig" },
-                "description": { "type": "string" }
+                "mergeWidth": {
+                  "type": "integer"
+                },
+                "model": {
+                  "type": "string",
+                  "description": "Override model for this stage"
+                },
+                "batching": {
+                  "$ref": "#/definitions/batchConfig"
+                },
+                "description": {
+                  "type": "string"
+                }
               }
             },
             "entityExtraction": {
               "type": "object",
               "properties": {
-                "model": { "type": "string", "description": "Override model for this stage" },
-                "batching": { "$ref": "#/definitions/batchConfig" },
-                "description": { "type": "string" }
+                "model": {
+                  "type": "string",
+                  "description": "Override model for this stage"
+                },
+                "batching": {
+                  "$ref": "#/definitions/batchConfig"
+                },
+                "description": {
+                  "type": "string"
+                }
               }
             }
-          }
-        }
-      }
-    },
-    "loadTaskConfig": {
-      "type": "object",
-      "properties": {
-        "rateLimiting": {
-          "type": "object",
-          "properties": {
-            "apiCallDelay": { "type": "integer" },
-            "attachmentDelay": { "type": "integer" },
-            "pageSize": { "type": "integer" },
-            "description": { "type": "string" }
           }
         }
       }

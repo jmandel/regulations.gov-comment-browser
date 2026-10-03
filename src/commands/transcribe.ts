@@ -1,12 +1,12 @@
 import { Command } from "commander";
 import { openDb, withTransaction, getProcessingStatus } from "../lib/database";
 import { initDebug } from "../lib/debug";
-import { AIClient } from "../lib/ai-client";
-import { loadComments, checkClusteringStatus } from "../lib/comment-processing";
+import { checkClusteringStatus } from "../lib/comment-processing";
 import { TRANSCRIBE_PROMPT } from "../prompts/transcribe";
 import type { RawComment, CommentAttributes, Attachment } from "../types";
-import { runPool } from "../lib/worker-pool";
-import { getTaskConfig, getTaskModel } from "../lib/batch-config";
+import { runLlmRequests, type LlmRequest } from "../lib/step-runner";
+import { htmlToText, wordCount } from "../lib/text";
+import { getTaskConfig, getTaskModel, getTaskRoleModel } from "../lib/batch-config";
 import { createPartFromBase64 } from "@google/genai";
 import type { Part } from "@google/genai";
 import { mkdtemp, writeFile, unlink } from "fs/promises";
@@ -15,7 +15,7 @@ import { tmpdir } from "os";
 import { $ } from "bun";
 
 export const transcribeCommand = new Command("transcribe")
-  .description("Transcribe comments and attachments into clean markdown")
+  .description("Transcribe comments with attachments into clean markdown (typed-only comments are stored as-is)")
   .argument("<document-id>", "Document ID (e.g., CMS-2025-0050-0031)")
   .option("-l, --limit <n>", "Process only N comments", parseInt)
   .option("--retry-failed", "Retry previously failed comments")
@@ -23,6 +23,8 @@ export const transcribeCommand = new Command("transcribe")
   .option("-c, --concurrency <n>", "Number of parallel API calls (default: 5)", parseInt)
   .option("-m, --model <model>", "AI model to use (overrides config)")
   .option("--use-clustering", "Only transcribe representative comments from clusters")
+  .option("--batch", "Use the Gemini Batch API (half price, slower)")
+  .option("--chunk-size <n>", "Comments per chunk of attachment comments (default: 500)", parseInt)
   .action(transcribeComments);
 
 // MIME types that Gemini can ingest natively as inline data
@@ -53,7 +55,7 @@ async function docxToText(blob: Uint8Array): Promise<string> {
 }
 
 // Build multimodal Part[] for a comment and its attachments
-async function buildTranscriptionParts(
+export async function buildTranscriptionParts(
   comment: RawComment,
   attachments: Map<string, Attachment[]>,
 ): Promise<{ parts: Part[]; description: string } | null> {
@@ -139,22 +141,34 @@ async function buildTranscriptionParts(
   return { parts, description: desc };
 }
 
+// Attachment formats buildTranscriptionParts can read; comments without one are stored as typed
+const READABLE_FORMATS = new Set([...Object.keys(NATIVE_MIME), "docx", "txt"]);
+
+// Keep raw attachment bytes held in memory per runLlmRequests call bounded
+const CHUNK_MAX_BYTES = 300_000_000;
+const CHUNK_MAX_COMMENTS = 500;
+
+function commentText(comment: RawComment): string {
+  const attrs = JSON.parse(comment.attributes_json) as CommentAttributes;
+  return (attrs.comment || attrs.text || "").trim();
+}
+
 async function transcribeComments(documentId: string, options: any) {
   await initDebug(options.debug);
 
   const db = openDb(documentId);
 
   const effectiveModel = getTaskModel('transcribe', options.model);
-  const ai = new AIClient(effectiveModel, db);
+  const mode = options.batch ? "batch" : "live";
 
   console.log(`📜 Transcribing comments for document ${documentId}`);
-  console.log(`   Using model: ${effectiveModel}`);
+  console.log(`   Using model: ${effectiveModel}${mode === "batch" ? " (Batch API)" : ""}`);
 
   // Check for clustering if requested
   if (options.useClustering) {
     const clusteringExists = checkClusteringStatus(db);
     if (!clusteringExists) {
-      console.error("❌ No clustering data found. Run 'cluster-comments-fast' first.");
+      console.error("❌ No clustering data found. Run 'cluster-form-letters' first.");
       process.exit(1);
     }
     console.log("🔗 Using stored clustering to transcribe only representative comments");
@@ -225,8 +239,20 @@ async function transcribeComments(documentId: string, options: any) {
     return;
   }
 
-  // Load attachments
-  const { attachments } = loadComments(db);
+  // Attachment sizes per comment (readable formats with content only); blobs are loaded per chunk
+  const readableBytes = new Map<string, number>();
+  const attStmt = db.prepare(
+    "SELECT comment_id, format, length(blob_data) AS bytes FROM attachments WHERE comment_id = ? AND blob_data IS NOT NULL"
+  );
+  for (const c of comments) {
+    for (const a of attStmt.all(c.id) as { comment_id: string; format: string | null; bytes: number }[]) {
+      if (!READABLE_FORMATS.has((a.format || "").toLowerCase())) continue;
+      readableBytes.set(c.id, (readableBytes.get(c.id) || 0) + a.bytes);
+    }
+  }
+  const typedOnly = comments.filter(c => !readableBytes.has(c.id));
+  const withAttachments = comments.filter(c => readableBytes.has(c.id));
+  console.log(`   ${typedOnly.length} typed-only (stored as-is, no LLM call), ${withAttachments.length} with attachments (LLM)`);
 
   // Prepare statements
   const insertTranscription = db.prepare(`
@@ -258,67 +284,122 @@ async function transcribeComments(documentId: string, options: any) {
       last_attempt_at = CURRENT_TIMESTAMP
   `);
 
-  let processed = 0;
   let successful = 0;
   let failed = 0;
+  let direct = 0;
 
+  // Typed-only comments: the comment box text is the transcription. Unlike the LLM path, we
+  // don't strip "see attached" boilerplate; it's stored as typed.
+  withTransaction(db, () => {
+    for (const c of typedOnly) {
+      const text = htmlToText(commentText(c));
+      if (!text) {
+        updateFailed.run(c.id, "Empty comment content and no attachments");
+        failed++;
+        continue;
+      }
+      insertTranscription.run(c.id, text, wordCount(text));
+      direct++;
+    }
+  });
+  if (typedOnly.length > 0) console.log(`   ✅ Stored ${direct} typed-only transcriptions`);
+
+  // Attachment comments go to the model, in chunks so we never hold every attachment in memory
   const taskConfig = getTaskConfig('transcribe', options.model);
   const concurrency = options.concurrency || taskConfig.concurrency;
+  const loadAttachments = db.prepare("SELECT * FROM attachments WHERE comment_id = ?");
+  let costUsd = 0;
 
-  async function processComment(comment: any): Promise<void> {
-    const localProcessed = ++processed;
-    console.log(`\n[${localProcessed}/${comments.length}] Transcribing comment ${comment.id}`);
-
-    try {
-      markProcessing.run(comment.id);
-
-      // Build multimodal parts (comment text + native binary attachments)
-      const built = await buildTranscriptionParts(comment, attachments);
-      if (!built) {
-        console.log(`  [${comment.id}] ⚠️  Skipped (empty content, no attachments)`);
-        updateFailed.run(comment.id, "Empty comment content and no attachments");
-        failed++;
-        return;
-      }
-      console.log(`  [${comment.id}] Parts: ${built.description}`);
-
-      const response = await ai.generateMultimodal(
-        built.parts,
-        options.debug ? `transcribe_${comment.id}` : undefined,
-        `transcribe_${comment.id}`,
-        {
-          taskType: 'transcribe',
-          taskLevel: 0,
-          params: { commentId: comment.id }
-        }
-      );
-
-      const wordCount = response.trim().split(/\s+/).length;
-
-      withTransaction(db, () => {
-        insertTranscription.run(comment.id, response.trim(), wordCount);
-      });
-
-      successful++;
-      console.log(`  [${comment.id}] ✅ Transcribed (${wordCount} words)`);
-
-    } catch (error) {
-      failed++;
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error(`  [${comment.id}] ❌ Error: ${errorMsg}`);
-      updateFailed.run(comment.id, errorMsg);
+  const chunks: RawComment[][] = [];
+  let cur: RawComment[] = [];
+  let curBytes = 0;
+  for (const c of withAttachments) {
+    const bytes = readableBytes.get(c.id)!;
+    if (cur.length > 0 && (cur.length >= (options.chunkSize || CHUNK_MAX_COMMENTS) || curBytes + bytes > CHUNK_MAX_BYTES)) {
+      chunks.push(cur);
+      cur = [];
+      curBytes = 0;
     }
+    cur.push(c);
+    curBytes += bytes;
   }
+  if (cur.length > 0) chunks.push(cur);
 
-  await runPool(comments, concurrency, async (comment, index) => {
-    await processComment(comment);
-  });
+  const processChunk = async (chunk: RawComment[], i: number) => {
+    if (chunks.length > 1) console.log(`\n📦 Chunk ${i + 1}/${chunks.length}: ${chunk.length} comments`);
+    const attachments = new Map<string, Attachment[]>();
+    const requests: LlmRequest[] = [];
+    for (const c of chunk) {
+      attachments.set(c.id, loadAttachments.all(c.id) as Attachment[]);
+      const built = await buildTranscriptionParts(c, attachments);
+      attachments.delete(c.id);
+      if (!built) {
+        console.log(`  [${c.id}] ⚠️  Skipped (empty content, no readable attachments)`);
+        updateFailed.run(c.id, "Empty comment content and no attachments");
+        failed++;
+        continue;
+      }
+      if (options.debug) console.log(`  [${c.id}] Parts: ${built.description}`);
+      markProcessing.run(c.id);
+      requests.push({ key: c.id, model: effectiveModel, parts: built.parts });
+    }
+
+    const handled = new Set<string>();
+    const summary = await runLlmRequests(requests, (req, res) => {
+      const markdown = res.text.trim();
+      if (!markdown) throw new Error("empty transcription");
+      insertTranscription.run(req.key, markdown, wordCount(markdown));
+      handled.add(req.key);
+      successful++;
+    }, {
+      db,
+      task: "transcribe",
+      mode,
+      concurrency,
+      label: `transcribe:${documentId}:${chunk[0].id}`,
+    });
+    costUsd += summary.costUsd;
+
+    // Flash-Lite occasionally returns nothing for an ordinary letter; retry those once on the
+    // fallback model (tasks.transcribe.models.fallback) unless the model was forced with -m
+    const retry = requests.filter(r => !handled.has(r.key));
+    const fallbackModel = getTaskRoleModel('transcribe', 'fallback');
+    if (retry.length > 0 && !options.model && fallbackModel !== effectiveModel) {
+      console.log(`   🔁 Retrying ${retry.length} failed transcription(s) with ${fallbackModel}`);
+      const fallback = await runLlmRequests(retry.map(r => ({ ...r, model: fallbackModel })), (req, res) => {
+        const markdown = res.text.trim();
+        if (!markdown) throw new Error("empty transcription");
+        insertTranscription.run(req.key, markdown, wordCount(markdown));
+        handled.add(req.key);
+        successful++;
+      }, {
+        db,
+        task: "transcribe",
+        mode,
+        concurrency,
+        label: `transcribe-fallback:${documentId}:${chunk[0].id}`,
+      });
+      costUsd += fallback.costUsd;
+    }
+
+    for (const req of requests) {
+      if (handled.has(req.key)) continue;
+      updateFailed.run(req.key, "LLM transcription failed (see run log)");
+      failed++;
+    }
+  };
+  // Batch jobs mostly wait in Google's queue, so submit every chunk at once; live mode keeps one
+  // chunk at a time so it doesn't multiply the concurrency limit
+  if (mode === "batch") await Promise.all(chunks.map((chunk, i) => processChunk(chunk, i)));
+  else for (const [i, chunk] of chunks.entries()) await processChunk(chunk, i);
 
   // Final summary
   console.log("\n📊 Transcription complete:");
-  console.log(`  ✅ Successful: ${successful}`);
+  console.log(`  📝 Typed-only (no LLM): ${direct}`);
+  console.log(`  ✅ Transcribed by LLM: ${successful}`);
   console.log(`  ❌ Failed: ${failed}`);
-  console.log(`  📄 Total processed: ${processed}`);
+  console.log(`  📄 Total processed: ${comments.length}`);
+  if (withAttachments.length > 0) console.log(`  💰 ~$${costUsd.toFixed(3)}${mode === "batch" ? " (batch price)" : ""}`);
 
   const finalStatus = getProcessingStatus(db, "transcriptions");
   console.log("\n📈 Overall progress:");

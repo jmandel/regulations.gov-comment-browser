@@ -1,3 +1,5 @@
+import { scopeBlock, insertBefore } from "./scope";
+
 /**
  * Shared constant defining the strict output format for all taxonomy generation.
  * This version uses ALL CAPS for emphasis, provides a concrete example, and avoids markdown.
@@ -155,3 +157,20 @@ CRITICAL: Remember that each depth-two node should be substantial enough that so
 --- FORMATTING REQUIREMENTS ---
 ${TAXONOMY_OUTPUT_FORMAT_INSTRUCTIONS}
 --- END OF FORMATTING REQUIREMENTS ---`;
+
+// ── Scoped variants (scope-db / --scope). The open-ended prompts above are unchanged. ─────────
+
+const DISCOVERY_INPUT_PARAGRAPH = `You are analyzing the most substantive parts of each comment: their commenter profiles, core positions, key recommendations, and main concerns. These structured sections capture the essential policy arguments and positions taken by commenters.`;
+
+// Scoped discovery reads the in-scope excerpts chosen by scope-relevance, not whole condensed comments
+export function buildScopedDiscoveryPrompt(scopeMd: string): string {
+  if (!THEME_DISCOVERY_PROMPT.includes(DISCOVERY_INPUT_PARAGRAPH)) throw new Error("theme discovery prompt changed: input paragraph not found");
+  const prompt = THEME_DISCOVERY_PROMPT.replace(DISCOVERY_INPUT_PARAGRAPH, `You are analyzing excerpts: for each comment, only the passages that address the scope of this analysis (below), with a one-line note on what part of the scope it touches. The taxonomy should organize what commenters said about this scope, so build it around the subject matter the scope asks about.`);
+  return insertBefore(prompt, "CRITICAL RULE: Organize themes", scopeBlock(scopeMd));
+}
+
+export function buildScopedMergePrompt(scopeMd: string): string {
+  return insertBefore(THEME_MERGE_PROMPT, "Your input taxonomies:", scopeBlock(scopeMd) + `
+Size the merged taxonomy to the material within this scope. The counts suggested below are for whole-docket analyses: a narrow scope may warrant only a handful of top-level themes and fewer depth-two nodes. Never pad with themes outside the scope. If the scope lists specific issues, it is natural (not required) to organize top-level themes around them.
+`);
+}

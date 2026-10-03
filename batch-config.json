@@ -1,7 +1,6 @@
 {
   "$schema": "./batch-config-schema.json",
   "description": "Task-specific batching and concurrency configuration",
-  
   "global": {
     "concurrency": {
       "default": 5,
@@ -11,120 +10,139 @@
       "default": 10,
       "description": "Default number of items to merge at once in hierarchical tasks"
     },
-    "defaultModel": "gemini-3-flash"
+    "defaultModel": "gemini-3.8-flash"
   },
-  
   "tasks": {
     "transcribe": {
       "concurrency": 5,
-      "model": "gemini-3-flash",
-      "batching": false,
-      "description": "Transcribes comments and attachments into clean markdown"
+      "model": "gemini-3.5-flash-lite",
+      "description": "Transcribes comments with attachments into clean markdown; typed-only comments are stored as-is without an LLM call",
+      "models": {
+        "fallback": "gemini-3.8-flash"
+      }
     },
-
+    "triage": {
+      "concurrency": 10,
+      "model": "gemini-3.5-flash-lite",
+      "thresholds": {
+        "maxWords": 80,
+        "batchSize": 100
+      },
+      "description": "Labels short ungrouped typed comments as no_substance / stance_only / substantive so only substantive ones get condensed"
+    },
     "condense": {
       "concurrency": 5,
-      "model": "gemini-3-flash",
-      "batching": false,
-      "description": "Extracts structured metadata sections from transcriptions"
+      "model": "gemini-3.8-flash",
+      "description": "Extracts structured sections; Flash-Lite for typed comments, 3.8 Flash with thinking off for attachment letters (Flash-Lite omitted recommendations in long letters; thinking added cost with no quality gain in 2026-10 trials)",
+      "models": {
+        "typed": "gemini-3.5-flash-lite",
+        "attachment": "gemini-3.8-flash-nothink"
+      }
     },
-    
     "discoverThemes": {
       "concurrency": 5,
       "mergeWidth": 10,
-      "model": "gemini-3-flash",
+      "model": "gemini-3.8-flash",
+      "description": "Input: every form-letter representative, promoted member and attachment letter, plus a seeded sample of typedSample typed-only comments (0 = none); no_substance/stance_only triaged comments excluded. Batches are sized by the condensed text actually sent",
+      "models": {
+        "batch": "gemini-3.8-flash",
+        "merge": "gemini-3.8-flash"
+      },
+      "thresholds": {
+        "typedSample": 1000,
+        "sampleSeed": 1
+      },
       "batching": {
         "triggerWordLimit": 250000,
         "batchWordLimit": 150000,
         "description": "Large batches for initial theme discovery"
       }
     },
-    
     "extractThemeContent": {
       "concurrency": 10,
-      "model": "gemini-3-flash",
-      "batching": false,
-      "description": "Extracts theme-specific content from individual comments"
+      "model": "gemini-3.8-flash",
+      "description": "Short units: Flash-Lite gate picks theme groups, then batched extraction per group. Long units: one call each with the whole taxonomy",
+      "models": {
+        "gate": "gemini-3.5-flash-lite",
+        "short": "gemini-3.8-flash-nothink",
+        "long": "gemini-3.8-flash-nothink"
+      },
+      "thresholds": {
+        "shortMaxWords": 400,
+        "shortBatchSize": 15,
+        "gateBatchSize": 40
+      }
     },
-    
     "summarizeThemes": {
-      "concurrency": 4,
+      "concurrency": 10,
       "mergeWidth": 4,
-      "model": "gemini-3-flash",
+      "model": "gemini-3.8-flash",
+      "description": "Phases across all themes: per-batch summaries, then mergeWidth-way merges level by level for large themes, then JSON structuring. All calls go through runLlmRequests (--batch, llm_cache)",
+      "models": {
+        "summary": "gemini-3.8-flash",
+        "merge": "gemini-3.8-flash",
+        "structure": "gemini-3.8-flash"
+      },
       "batching": {
         "triggerWordLimit": 50000,
         "batchWordLimit": 40000,
         "description": "Batching for v2 summarization based on extracted content"
       },
       "thresholds": {
-        "minCommentsPerTheme": 5,
-        "maxHierarchyDepth": 2
+        "minCommentsPerTheme": 5
       }
     },
-    
     "discoverEntities": {
-      "concurrency": 3,
-      "model": "gemini-3-flash",
-      "stages": {
-        "categoryDiscovery": {
-          "mergeWidth": 10,
-          "model": "gemini-3-flash",
-          "batching": {
-            "triggerWordLimit": 50000,
-            "batchWordLimit": 50000,
-            "description": "Medium batches for category identification"
-          },
-          "description": "Uses hierarchical merging to combine category lists from multiple batches"
-        },
-        "entityExtraction": {
-          "model": "gemini-3-flash",
-          "concurrency": 20,  
-          "batching": {
-            "triggerWordLimit": 1000,
-            "batchWordLimit": 1000,
-            "description": "Small batches for precise entity extraction"
-          },
-          "timeoutPerBatch": 60000,
-          "maxFailures": 3,
-          "description": "No merging - entities are automatically deduplicated across batches. Each batch extraction has a 60s timeout."
-        }
+      "concurrency": 15,
+      "model": "gemini-3.8-flash-nothink",
+      "description": "Phases: a base taxonomy from a seeded random sample of wordsPerCall words; one call per top-level theme over that theme's units (long and attachment letters first, typedShare of the words for short typed comments) asking only for missing entities; a sweep reading every unit no call has read plus the rest of long letters (beyond maxWordsPerUnit) in parallel calls of sweepWordsPerCall words; one gap-fill call per top-level theme over the taxonomy and theme titles (no comment text) for broad, common entities the reading calls pass over; then one consolidation call over the entity lists, match counts and acronym contexts. Every unit is then scanned locally; entities are kept if found in at least min(1% of units, minUnitsCap) units and at most 50%",
+      "thresholds": {
+        "minUnitsCap": 10,
+        "wordsPerCall": 150000,
+        "sweepWordsPerCall": 300000,
+        "maxWordsPerUnit": 4000,
+        "typedShare": 0.15,
+        "longMinWords": 400
       }
     },
-    
-    "loadComments": {
-      "rateLimiting": {
-        "apiCallDelay": 1200,
-        "attachmentDelay": 1000,
-        "pageSize": 250,
-        "description": "Rate limits for regulations.gov API"
-      }
-    }
-  },
-  
-  "pipeline": {
-    "errorHandling": {
-      "maxCrashes": 10,
-      "defaultRetryDelay": 5000,
-      "description": "Pipeline-level error recovery settings"
-    }
-  },
-  
-  "models": {
-    "gemini-pro": {
-      "concurrency": 3.0,
-      "description": "Standard concurrency"
-    },
-    "gemini-flash": {
-      "concurrency": 6,
-      "description": "Can handle 50% more concurrent requests"
-    },
-    "gemini-flash-lite": {
+    "tagCampaigns": {
       "concurrency": 10,
-      "description": "Can handle 2x concurrent requests"
+      "model": "gemini-3.8-flash-nothink",
+      "description": "Embeds units (gemini-embedding-2), groups them by average-linkage cosine at levels[0], and has an LLM judge each group as a campaign (common template/brief) or same-topic letters; rejected groups are split at the next level and re-judged. Then merges duplicate campaigns (centroids >= mergeLevel, LLM-confirmed) and adds near-miss comments (>= expandMinNeighbors members at >= expandLevel, LLM-confirmed). Judge: 3.5 Flash-Lite accepted 71% of candidate groups including plainly independent dermatology letters; 3.8 Flash without thinking was stricter and matched hand review",
+      "models": {
+        "judge": "gemini-3.8-flash-nothink",
+        "name": "gemini-3.5-flash-lite"
+      },
+      "thresholds": {
+        "levels": [
+          0.92,
+          0.94,
+          0.96
+        ],
+        "minUnits": 4,
+        "minExact": 10,
+        "mergeLevel": 0.95,
+        "expandLevel": 0.92,
+        "expandMinNeighbors": 2,
+        "embeddingModel": "gemini-embedding-2"
+      }
     },
-    "claude": {
-      "concurrency": 2,
-      "description": "Reduce concurrency for Claude"
+    "scopeRelevance": {
+      "concurrency": 10,
+      "model": "gemini-3.5-flash-lite",
+      "description": "Scoped analyses: judges whether each analysis unit addresses the scope and copies the in-scope passages. Short typed units (typed text, or the condensed summary when shorter) are judged 40 per call; attachment letters, promoted members and long typed comments from their full transcript, packed up to longBatchWords/longBatchSize per call. Both use 3.8 Flash without thinking: on the PFS sample Flash-Lite marked 29 of 657 short units relevant for an interoperability scope, nearly all generic fee-cut letters (3.8 Flash: 0, and no in-scope short units were missed); for long letters, low thinking (14/20 known positives) and one letter per call (15/20) both found fewer than no-thinking packed calls (18/20). 'label' drafts a scope's name/summary, 'draft' drafts a scope prompt from a seed comment",
+      "models": {
+        "short": "gemini-3.8-flash-nothink",
+        "long": "gemini-3.8-flash-nothink",
+        "label": "gemini-3.5-flash-lite",
+        "draft": "gemini-3.8-flash"
+      },
+      "thresholds": {
+        "longMinWords": 400,
+        "shortBatchSize": 40,
+        "longBatchWords": 12000,
+        "longBatchSize": 4
+      }
     }
   }
 }

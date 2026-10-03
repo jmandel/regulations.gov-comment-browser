@@ -91,6 +91,24 @@ build_dashboard() {
     mkdir -p "$OUTPUT_DIR/$output_path"
     cp -r dashboard/dist/* "$OUTPUT_DIR/$output_path/"
 
+    # Scoped analyses: one sub-site per published scope (meta.json lists those whose relevance is
+    # current), at <docket>/scopes/<slug>/. Each has only its own small data/ directory; its
+    # index.html points at the docket's assets/, and the dashboard reads the docket's comment
+    # shards and search index through meta.json's sharedData (../../data/).
+    rm -rf "$OUTPUT_DIR/$output_path/scopes"
+    local slugs
+    slugs=$(bun -e "const m = JSON.parse(await Bun.file('$TEMP_DATA_DIR/meta.json').text()); console.log((m.scopes || []).map(s => s.slug).join(' '))")
+    for slug in $slugs; do
+        local scope_dir="$OUTPUT_DIR/$output_path/scopes/$slug"
+        log_info "Building scoped analysis $slug..."
+        if ! bun run src/cli.ts build-website "$regulation_id" --scope "$slug" --output "$scope_dir/data"; then
+            log_warning "Scoped analysis $slug failed to build; skipping it (the docket Overview still lists it)"
+            rm -rf "$scope_dir"
+            continue
+        fi
+        sed 's#"\./assets/#"../../assets/#g' "$OUTPUT_DIR/$output_path/index.html" > "$scope_dir/index.html"
+    done
+
     # Create redirect from document ID if it differs from docket ID (backward compat)
     if [ "$regulation_id" != "$output_path" ]; then
         log_info "Creating redirect $regulation_id -> $output_path for backward compatibility"
@@ -161,7 +179,10 @@ main() {
                 ;;
         esac
     done
-    
+
+    # The pipeline commands read DB_DIR too (src/lib/database.ts), so --db-dir applies to them
+    export DB_DIR
+
     # Install dependencies unless skipped
     if [ "$SKIP_INSTALL" != "true" ]; then
         install_dependencies
@@ -193,8 +214,11 @@ main() {
             exit 1
         fi
     else
-        # Build all databases
-        db_files=("$DB_DIR"/*.sqlite)
+        # Build all databases (scope DBs, <doc>.scope.<slug>.sqlite, are built with their docket)
+        db_files=()
+        for f in "$DB_DIR"/*.sqlite; do
+            [[ "$(basename "$f")" == *.scope.*.sqlite ]] || db_files+=("$f")
+        done
     fi
     
     shopt -u nullglob
@@ -218,6 +242,10 @@ main() {
     for db_file in "${db_files[@]}"; do
         # Skip WAL and SHM related files and other sqlite variants
         if [[ "$db_file" == *.sqlite-* ]] || [[ "$db_file" == *.sqlite.* ]]; then
+            continue
+        fi
+        # Scope DBs (<doc>.scope.<slug>.sqlite) are built with their docket, not as dockets
+        if [[ "$(basename "$db_file")" == *.scope.*.sqlite ]]; then
             continue
         fi
         
