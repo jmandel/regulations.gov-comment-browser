@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { openDb } from "../lib/database";
+import { Database } from "bun:sqlite";
 import { mkdir, writeFile, readdir } from "fs/promises";
 import { join } from "path";
 import { readDocumentInfo } from "../lib/document-meta";
@@ -59,7 +59,7 @@ async function generateLandingPage(options: any) {
     const documentId = dbFile.replace('.sqlite', '');
     console.log(`  Processing ${documentId}...`);
     
-    const db = openDb(documentId);
+    const db = new Database(join(options.dbDir, dbFile), { readonly: true }); // read-only: never create tables or files
 
     // Read document details from database (with fallbacks for older databases)
     const info = readDocumentInfo(db, documentId);
@@ -70,11 +70,11 @@ async function generateLandingPage(options: any) {
 
     // Get statistics
     const stats = {
-      commentCount: (db.prepare("SELECT COUNT(*) as count FROM comments").get() as any).count,
-      condensedCount: (db.prepare("SELECT COUNT(*) as count FROM condensed_comments WHERE status = 'completed'").get() as any).count,
-      themeCount: (db.prepare("SELECT COUNT(*) as count FROM theme_hierarchy").get() as any).count,
-      scoredCount: (db.prepare("SELECT COUNT(DISTINCT comment_id) as count FROM comment_themes").get() as any).count,
-      summaryCount: (db.prepare("SELECT COUNT(*) as count FROM theme_summaries").get() as any).count,
+      commentCount: safeCount(db, "SELECT COUNT(*) as count FROM comments"),
+      condensedCount: safeCount(db, "SELECT COUNT(*) as count FROM condensed_comments WHERE status = 'completed'"),
+      themeCount: safeCount(db, "SELECT COUNT(*) as count FROM theme_hierarchy"),
+      scoredCount: safeCount(db, "SELECT COUNT(DISTINCT comment_id) as count FROM comment_themes"),
+      summaryCount: safeCount(db, "SELECT COUNT(*) as count FROM theme_summaries"),
     };
 
     // Fall back to latest comment date if no comment_end_date
@@ -602,4 +602,9 @@ function escapeHtml(text: string): string {
     "'": '&#039;'
   };
   return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+// Read-only databases from older pipeline versions may lack a table; count it as 0
+function safeCount(db: Database, sql: string): number {
+  try { return (db.prepare(sql).get() as { count: number }).count; } catch { return 0; }
 }

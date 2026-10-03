@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { openDb } from "../lib/database";
+import { Database } from "bun:sqlite";
 import { mkdir, writeFile, readdir } from "fs/promises";
 import { join } from "path";
 import { $ } from "bun";
@@ -53,7 +53,7 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
   for (const dbFile of dbFiles) {
     const documentId = dbFile.replace('.sqlite', '');
     try {
-      const db = openDb(documentId);
+      const db = new Database(join(options.dbDir, dbFile), { readonly: true }); // read-only: never create tables or files
 
       let title = documentId;
       let agency = "Unknown Agency";
@@ -79,12 +79,12 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
         } catch (_) {}
       }
 
-      const commentCount = (db.prepare("SELECT COUNT(*) as count FROM comments").get() as any).count;
-      const themeCount = (db.prepare("SELECT COUNT(*) as count FROM theme_hierarchy").get() as any).count;
+      const commentCount = safeCount(db, "SELECT COUNT(*) as count FROM comments");
+      const themeCount = safeCount(db, "SELECT COUNT(*) as count FROM theme_hierarchy");
 
       let entityCount = 0;
       try {
-        entityCount = (db.prepare("SELECT COUNT(*) as count FROM entity_taxonomy").get() as any).count;
+        entityCount = safeCount(db, "SELECT COUNT(*) as count FROM entity_taxonomy");
       } catch (_) {}
 
       dockets.push({
@@ -129,7 +129,8 @@ async function buildSkill(options: { dbDir: string; output: string; baseUrl: str
 function generateSkillMd(dockets: DocketInfo[], baseUrl: string): string {
   const docketTable = dockets.map(d => {
     const date = d.lastCommentDate ? d.lastCommentDate.split('T')[0] : "—";
-    return `| ${d.id} | ${d.title} | ${d.agency} | ${date} | ${d.commentCount.toLocaleString()} | ${d.themeCount} |`;
+    const db = (kind: string) => `[${kind}](${baseUrl}/${d.id}/data/${d.id}-${kind}.sqlite.zip)`;
+    return `| ${d.id} | ${d.title} | ${d.agency} | ${date} | ${d.commentCount.toLocaleString()} | ${d.themeCount} | ${db("slim")} · ${db("full")} |`;
   }).join('\n');
 
   const generatedDate = new Date().toISOString().split('T')[0];
@@ -143,35 +144,34 @@ description: |
   docket IDs, rulemaking, notice-and-comment, or want to understand what commenters said about
   a proposed rule. Also use when someone asks about themes or sentiment in public comments, who
   submitted comments on a regulation, or what organizations think about a policy proposal.
-  Provides AI-generated theme hierarchies, structured comment summaries, entity taxonomies, and
-  full comment text for ${dockets.length} federal regulation dockets with ${dockets.reduce((s, d) => s + d.commentCount, 0).toLocaleString()} total comments.
+  Provides downloadable SQLite analysis databases (for code-capable agents), AI-generated theme
+  hierarchies and reports, structured comment summaries, form-letter and campaign groupings,
+  entity taxonomies, and full comment text for ${dockets.length} federal regulation dockets with ${dockets.reduce((s, d) => s + d.commentCount, 0).toLocaleString()} total comments.
 ---
 
 # Regulations.gov Comment Browser
 
-AI-analyzed public comments on U.S. federal regulations, published as static JSON. Each docket
-has been processed through an analysis pipeline: comments are condensed into structured summaries,
-organized by a hierarchical theme taxonomy, and tagged with recognized entities (organizations,
-standards, programs). Theme-level narrative summaries synthesize the positions and arguments.
+AI-analyzed public comments on U.S. federal regulations. Each docket has been processed through an
+analysis pipeline: identical and near-identical form letters are grouped (and, where tagged,
+organized campaigns including reworded ones), attached PDFs/DOCX/scans are transcribed, each
+distinct comment is condensed into structured sections, a hierarchical theme taxonomy is built, and
+each comment's positions, concerns, recommendations, experiences and quotes are extracted per theme.
+Every theme has a narrative report, and each top-level issue area has a group report across its
+sub-themes. Entities (organizations, standards, programs) are tagged.
+
+**Two ways in:**
+- **If you can run code** (Python or \`sqlite3\` in a sandbox): download the docket's analysis
+  database and query it — see *Downloadable Databases* below. This is the best route for anything
+  beyond a quick overview: counts, filters, quotes, full-text search over every comment.
+- **Otherwise:** fetch the published JSON files — see *Fetching Data (JSON)*.
 
 ## Available Dockets
 
 *Updated ${generatedDate}*
 
-| Docket ID | Title | Agency | Closed | Comments | Themes |
-|-----------|-------|--------|--------|----------|--------|
+| Docket ID | Title | Agency | Closed | Comments | Themes | Analysis DBs |
+|-----------|-------|--------|--------|----------|--------|--------------|
 ${docketTable}
-
-## Fetching Data
-
-All data is publicly hosted as static JSON. Fetch any file by URL.
-
-**URL pattern:**
-\`\`\`
-${baseUrl}/{DOCKET_ID}/data/{FILE}
-\`\`\`
-
-Example: \`${baseUrl}/${dockets[0]?.id || "HHS-ONC-2025-0005-0001"}/data/meta.json\`
 
 ## Downloadable Databases (best for serious analysis)
 
@@ -223,8 +223,27 @@ SELECT markdown FROM theme_reports WHERE theme_code = '1';
 Always say whether a number counts submissions (people) or units (distinct texts). Summaries,
 extracts, reports, transcripts of attachments, campaign tags and triage labels are LLM output.
 
+## Fetching Data (JSON)
+
+All data is publicly hosted as static JSON. Fetch any file by URL.
+
+**URL pattern:**
+\`\`\`
+${baseUrl}/{DOCKET_ID}/data/{FILE}
+\`\`\`
+
+Example: \`${baseUrl}/${dockets[0]?.id || "HHS-ONC-2025-0005-0001"}/data/meta.json\`
+
 ## How to Approach Different Queries
 
+### If you can run code: use the analysis database for every kind of question
+Download the slim database (or full, for verbatim text and full-text search) as shown above, read
+\`_readme\` (sections \`counting\`, \`caveats\`, \`example_analyses\`), and answer with SQL:
+broad questions from \`theme_reports\` and \`themes\`; "what did X say" from \`submissions\` +
+\`extract_items\`; "find comments that mention…" with the FTS indexes; overviews from \`docket\`,
+\`themes\` and \`campaigns\`. The JSON routes below are for environments without code execution.
+
+### Without code execution
 Think about what the user actually needs before fetching data. The pre-built theme summaries
 are excellent for overview questions but lack granularity. Full comments have everything but
 require searching. Here's the decision tree:
@@ -508,3 +527,7 @@ Maps entity labels (as "Category|Label") to arrays of comment IDs.
 `;
 }
 
+// Read-only databases from older pipeline versions may lack a table; count it as 0
+function safeCount(db: Database, sql: string): number {
+  try { return (db.prepare(sql).get() as { count: number }).count; } catch { return 0; }
+}
