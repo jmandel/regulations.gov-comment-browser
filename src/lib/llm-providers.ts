@@ -1,4 +1,4 @@
-import { GoogleGenAI, type Part, type GenerateContentConfig } from "@google/genai";
+import { GoogleGenAI, MediaResolution, type Part, type GenerateContentConfig } from "@google/genai";
 import { debugStreamStart, debugStreamWrite, debugStreamEnd } from "./debug";
 
 // Simple provider functions that just handle the generation call
@@ -21,8 +21,7 @@ export interface GenerationResult {
 }
 
 // Model names accepted by --model / batch-config.json → Gemini API model IDs and per-model config.
-// Defaults (batch-config.json): gemini-3.5-flash-lite for mechanical work (transcription),
-// gemini-3.8-flash for everything else.
+// Per-step defaults live in batch-config.json.
 // 3.8 Flash thinks by default. "LOW" matched "minimal" in a 2026-10 trial (slightly more thought
 // tokens). It must be uppercase: the Batch API rejects "minimal" and silently ignores lowercase
 // "low" (0 thought tokens), while "LOW" works in both live and batch calls.
@@ -31,6 +30,9 @@ export const GEMINI_MODELS: Record<string, { id: string; config?: GenerateConten
   "gemini-3.8-flash": { id: "gemini-3.8-flash", config: { thinkingConfig: { thinkingLevel: "LOW" } as any } },
   // Same model with a zero thinking budget (the API still allows a little thinking)
   "gemini-3.8-flash-nothink": { id: "gemini-3.8-flash", config: { thinkingConfig: { thinkingBudget: 0 } } },
+  // Same, reading PDFs and images at high media resolution (transcription: charts, shaded tables and
+  // screenshots scored 4.7/5 vs 3.5 for Flash-Lite at default resolution in a 2026-10 trial)
+  "gemini-3.8-flash-nothink-hires": { id: "gemini-3.8-flash", config: { thinkingConfig: { thinkingBudget: 0 }, mediaResolution: MediaResolution.MEDIA_RESOLUTION_HIGH } },
   "gemini-3.5-flash-lite": { id: "gemini-3.5-flash-lite" },
   // Legacy names, kept so existing commands and configs keep working
   "gemini-3-flash": { id: "gemini-3-flash-preview" },
