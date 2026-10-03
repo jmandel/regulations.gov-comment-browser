@@ -172,6 +172,10 @@ function CommentBrowser() {
 
   const commentsToCopy = filteredComments
 
+  const unitNoun = (hasClustering ? 'cluster' : 'comment') + (filteredComments.length === 1 ? '' : 's')
+  // Submissions the listed units stand for (a form-letter group counts all its members)
+  const representedCount = useMemo(() => filteredComments.reduce((n, c) => n + (c.clusterSize || 1), 0), [filteredComments])
+
   // With a composition-part filter, the number of comments in that part among the listed units
   const activeParts = filters?.parts || []
   const partCommentCount = useMemo(() => {
@@ -440,15 +444,15 @@ function CommentBrowser() {
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{scope ? (wholeDocket ? 'All comments in the docket' : 'Comments in this scope') : 'Browse Comments'}</h1>
               <p className="text-sm text-gray-500 mt-1 truncate sm:whitespace-normal">
                 {partCommentCount !== null ? (
-                  <>Showing {filteredComments.length.toLocaleString()} {hasClustering ? 'clusters' : 'comments'}{hasClustering || scope ? <> representing {partCommentCount.toLocaleString()} comments</> : null} in {activeParts.map(partName).join(' or ')}</>
+                  <>Showing {filteredComments.length.toLocaleString()} {unitNoun}{hasClustering || scope ? <> representing {partCommentCount.toLocaleString()} comments</> : null} in {activeParts.map(partName).join(' or ')}</>
                 ) : scope ? (
                   wholeDocket
-                    ? <>Showing {filteredComments.length.toLocaleString()} {hasClustering ? 'clusters' : 'comments'} from all {docketTotal.toLocaleString()} submissions, in or out of scope</>
-                    : <>Showing {filteredComments.length.toLocaleString()} {hasClustering ? 'clusters' : 'comments'} representing the {comments.length.toLocaleString()} of {docketTotal.toLocaleString()} submissions that address this scope</>
+                    ? <>Showing {filteredComments.length.toLocaleString()} {unitNoun} from all {docketTotal.toLocaleString()} submissions, in or out of scope</>
+                    : <>Showing {filteredComments.length.toLocaleString()} {unitNoun} representing {representedCount.toLocaleString()} of the {comments.length.toLocaleString()} submissions (out of {docketTotal.toLocaleString()}) that address this scope</>
                 ) : hasClustering ? (
-                  <>Showing {filteredComments.length} clusters representing {comments.length} comments</>
+                  <>Showing {filteredComments.length.toLocaleString()} {unitNoun} representing {representedCount.toLocaleString()} of {comments.length.toLocaleString()} comments</>
                 ) : (
-                  <>Showing {filteredComments.length} of {comments.length} comments</>
+                  <>Showing {filteredComments.length.toLocaleString()} of {comments.length.toLocaleString()} comments</>
                 )}
               </p>
             </div>
