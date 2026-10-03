@@ -20,7 +20,7 @@ interface FilterOptions {
 // on a unit's content. A unit matches when any of its submissions (itself and its form-letter
 // members) passes all of them, the same way the Overview counts submissions.
 const SUBMISSION_FILTERS = ['parts', 'submitterTypes', 'filedAs', 'states'] as const
-function submissionPredicate(f: FilterOptions): ((c: Comment) => boolean) | null {
+export function submissionPredicate(f: FilterOptions): ((c: Comment) => boolean) | null {
   const parts = f.parts?.length ? new Set(f.parts) : null
   const types = f.submitterTypes?.length ? new Set(f.submitterTypes) : null
   const filed = f.filedAs?.length ? new Set(f.filedAs) : null
