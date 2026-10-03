@@ -23,11 +23,12 @@ export interface GenerationResult {
 // Model names accepted by --model / batch-config.json → Gemini API model IDs and per-model config.
 // Defaults (batch-config.json): gemini-3.5-flash-lite for mechanical work (transcription),
 // gemini-3.8-flash for everything else.
-// 3.8 Flash thinks by default. "low" matched "minimal" in a 2026-10 trial (slightly more thought
-// tokens), and unlike "minimal" the Batch API accepts it, so live and batch runs behave the same.
+// 3.8 Flash thinks by default. "LOW" matched "minimal" in a 2026-10 trial (slightly more thought
+// tokens). It must be uppercase: the Batch API rejects "minimal" and silently ignores lowercase
+// "low" (0 thought tokens), while "LOW" works in both live and batch calls.
 // 3.5 Flash-Lite doesn't think unless given a thinking budget.
 export const GEMINI_MODELS: Record<string, { id: string; config?: GenerateContentConfig }> = {
-  "gemini-3.8-flash": { id: "gemini-3.8-flash", config: { thinkingConfig: { thinkingLevel: "low" } as any } },
+  "gemini-3.8-flash": { id: "gemini-3.8-flash", config: { thinkingConfig: { thinkingLevel: "LOW" } as any } },
   // Same model with a zero thinking budget (the API still allows a little thinking)
   "gemini-3.8-flash-nothink": { id: "gemini-3.8-flash", config: { thinkingConfig: { thinkingBudget: 0 } } },
   "gemini-3.5-flash-lite": { id: "gemini-3.5-flash-lite" },
