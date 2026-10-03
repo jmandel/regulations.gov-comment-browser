@@ -5,6 +5,7 @@ import { checkClusteringStatus } from "../lib/comment-processing";
 import { CONDENSE_PROMPT } from "../prompts/condense";
 import { parseCondensedSections } from "../lib/parse-condensed-sections";
 import { getTaskConfig, getTaskRoleModel } from "../lib/batch-config";
+import { loadClassifications, SUBMITTER_TYPE_BY_KEY, type SubmitterClassification } from "../lib/submitter-meta";
 import { runLlmRequests, estimateCost, type LlmRequest } from "../lib/step-runner";
 
 export const condenseCommand = new Command("condense")
@@ -45,7 +46,10 @@ const IS_ATTACHMENT = `(
   OR EXISTS (SELECT 1 FROM form_letter_additions fa WHERE fa.comment_id = c.id AND fa.promoted = 1)
 ) AS is_attachment`;
 
-function buildMetadata(attributesJson: string): string {
+// Name and organization as filed, plus who the comment speaks for from classify-submitters (run
+// before condense). The filed category is left out: it is often blank or wrong, and summaries
+// echoed it ("A healthcare professional…" for a patient who picked a provider category).
+function buildMetadata(attributesJson: string, cls: SubmitterClassification | undefined): string {
   const attrs = JSON.parse(attributesJson || '{}');
   const metadataParts: string[] = [];
   if (attrs.firstName || attrs.lastName) {
@@ -54,8 +58,11 @@ function buildMetadata(attributesJson: string): string {
   if (attrs.organization) {
     metadataParts.push(`Organization: ${attrs.organization}`);
   }
-  if (attrs.category) {
-    metadataParts.push(`Category: ${attrs.category}`);
+  if (cls) {
+    const type = SUBMITTER_TYPE_BY_KEY.get(cls.type)?.label || cls.type;
+    metadataParts.push(cls.speaksFor === 'organization'
+      ? `Commenter (determined from the letter): organization${cls.organization ? `, ${cls.organization}` : ''} (${type})`
+      : `Commenter (determined from the letter): individual (${type})`);
   }
   return metadataParts.length > 0
     ? metadataParts.join('\n')
@@ -170,13 +177,14 @@ async function condenseComments(documentId: string, options: any) {
     for (const c of comments) markProcessing.run(c.id);
   });
 
+  const classifications = loadClassifications(db);
   const byId = new Map(comments.map(c => [c.id, c]));
   const requests: LlmRequest[] = comments.map(c => ({
     key: c.id,
     model: c.is_attachment ? attachmentModel : typedModel,
     parts: [{
       text: CONDENSE_PROMPT
-        .replace("{COMMENTER_METADATA}", buildMetadata(c.attributes_json))
+        .replace("{COMMENTER_METADATA}", buildMetadata(c.attributes_json, classifications.get(c.id)))
         .replace("{COMMENT_TEXT}", c.markdown),
     }],
   }));

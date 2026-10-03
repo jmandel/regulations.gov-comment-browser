@@ -11,7 +11,7 @@ You MUST organize every comment into these exact sections with these exact heade
 
 ### COMMENTER PROFILE
 - **Name/Organization:** [Name if provided, otherwise "Anonymous"]
-- **Type:** [Individual | Business | Healthcare Provider | Advocacy Group | Government Entity | Trade Association | Academic/Research | Other]
+- **Type:** [The commenter type from the metadata below, if given; otherwise Individual or Organization]
 - **Role/Expertise:** [Specific professional role, credentials, or relevant experience if mentioned]
 - **Geographic Scope:** [Local/State/National/International, with location if specified]
 - **Stake in Issue:** [Direct description of how this regulation affects them]
@@ -58,7 +58,7 @@ You MUST organize every comment into these exact sections with these exact heade
 
 ---
 
-Here is metadata from the submission system for this comment:
+Here is metadata for this comment. When a "Commenter" line is given, describe the commenter consistently with it in the one-line summary and profile, using the most specific role the text supports:
 
 {COMMENTER_METADATA}
 

@@ -20,7 +20,7 @@ import { scopeRelevanceCommand } from "./scope";
 import { openScopeDb, getScope, hasClustering } from "../lib/scope-db";
 
 export const pipelineCommand = new Command("pipeline")
-  .description("Run the complete analysis pipeline: load, cluster, triage, transcribe, match scanned copies, tag campaigns (optional), condense, classify submitters, discover themes, extract theme content, summarize themes, discover entities, build website, and vacuum database")
+  .description("Run the complete analysis pipeline: load, cluster, triage, transcribe, match scanned copies, tag campaigns (optional), classify submitters, condense, discover themes, extract theme content, summarize themes, discover entities, build website, and vacuum database")
   .argument("<source-arg>", "Source argument (e.g., CMS-2025-0050-0031 or path to CSV)")
   .option("-s, --skip-attachments", "Skip downloading attachments")
   .option("--mirrulations", "Load comments from the Mirrulations S3 mirror instead of the regulations.gov API (best for large dockets)")
@@ -28,9 +28,9 @@ export const pipelineCommand = new Command("pipeline")
   .option("-d, --debug", "Enable debug mode for all steps")
   .option("-o, --output <dir>", "Output directory for website files", "dist/data")
   .option("-l, --limit-total-comment-load <N>", "Limit initial number of comments loaded")
-  .option("--start-at <step>", "Start at a specific step (1-14): 1=load, 2=cluster, 3=triage, 4=transcribe, 5=match-scans, 6=tag-campaigns (only with --tag-campaigns), 7=condense, 8=classify-submitters, 9=discover-themes, 10=extract-theme-content, 11=summarize-themes, 12=discover-entities, 13=build-website, 14=vacuum-db")
+  .option("--start-at <step>", "Start at a specific step (1-14): 1=load, 2=cluster, 3=triage, 4=transcribe, 5=match-scans, 6=tag-campaigns (only with --tag-campaigns), 7=classify-submitters, 8=condense, 9=discover-themes, 10=extract-theme-content, 11=summarize-themes, 12=discover-entities, 13=build-website, 14=vacuum-db")
   .option("-c, --concurrency <N>", "Number of concurrent operations")
-  .option("--batch", "Run LLM steps (triage, transcribe, condense, classify-submitters, theme discovery/extraction/summaries) through the Gemini Batch API: half price, minutes-to-hours per step")
+  .option("--batch", "Run LLM steps (triage, transcribe, classify-submitters, condense, theme discovery/extraction/summaries) through the Gemini Batch API: half price, minutes-to-hours per step")
   .option("--max-crashes <N>", "Maximum number of crashes before giving up (default: 10)", parseInt)
   .option("-m, --model <model>", "Override the per-step models in batch-config.json for every step (e.g. gemini-3.8-flash, gemini-3.5-flash-lite)")
   .option("--no-clustering", "Skip clustering entirely (process all comments)")
@@ -166,6 +166,20 @@ export const pipelineCommand = new Command("pipeline")
       },
       {
         num: 7,
+        name: "Classifying submitters",
+        icon: "🪪",
+        execute: async () => {
+          await classifySubmittersCommand.parseAsync([
+            'bun', 'cli.ts',
+            documentId,
+            ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
+            ...(options.model ? ['--model', options.model] : []),
+            ...(options.batch ? ['--batch'] : []),
+          ]);
+        }
+      },
+      {
+        num: 8,
         name: "Condensing comments",
         icon: "📝",
         execute: async () => {
@@ -177,20 +191,6 @@ export const pipelineCommand = new Command("pipeline")
             ...(options.model ? ['--model', options.model] : []),
             ...(options.batch ? ['--batch'] : []),
             ...(!!options.clustering ? ['--use-clustering'] : []),
-          ]);
-        }
-      },
-      {
-        num: 8,
-        name: "Classifying submitters",
-        icon: "🪪",
-        execute: async () => {
-          await classifySubmittersCommand.parseAsync([
-            'bun', 'cli.ts',
-            documentId,
-            ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
-            ...(options.model ? ['--model', options.model] : []),
-            ...(options.batch ? ['--batch'] : []),
           ]);
         }
       },
@@ -368,7 +368,7 @@ async function runScopedPipeline(documentId: string, options: any) {
   db.close();
   const missing = r.units - (r.condensed || 0);
   if (!r.condensed || missing > Math.max(5, r.units * 0.02)) {
-    console.error(`❌ The docket's shared steps aren't done: ${r.condensed || 0} of ${r.units} units condensed. Run them first:\n   bun run src/cli.ts pipeline ${documentId} --start-at 1   (or --start-at <step> to resume; steps 1-7 are needed)`);
+    console.error(`❌ The docket's shared steps aren't done: ${r.condensed || 0} of ${r.units} units condensed. Run them first:\n   bun run src/cli.ts pipeline ${documentId} --start-at 1   (or --start-at <step> to resume; steps 1-8 are needed)`);
     process.exit(1);
   }
   if (missing > 0) console.warn(`⚠️  ${missing} units have no condensed row and won't be in the scoped analysis`);

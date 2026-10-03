@@ -30,6 +30,8 @@ function useNearViewport<T extends Element>(enabled: boolean) {
 
 interface CommentCardProps {
   comment: Comment
+  // Shown when the card is listed only because some of its form-letter copies match the filters
+  matchNote?: string
   showThemes?: boolean
   showEntities?: boolean
   clickable?: boolean
@@ -61,7 +63,8 @@ function CommentCard({
   clickable = true,
   themeExtract,
   themeCode,
-  sections = defaultSections
+  sections = defaultSections,
+  matchNote
 }: CommentCardProps) {
   const [showCopyModal, setShowCopyModal] = useState(false)
   const regulationsUrl = getRegulationsGovUrl(comment.documentId || '', comment.id)
@@ -106,6 +109,10 @@ function CommentCard({
           )}
         </div>
         
+        {matchNote && (
+          <p className="mt-2 text-xs text-gray-600">{matchNote}</p>
+        )}
+
         {/* Row 2: Date, ID, word count, actions */}
         <div className="flex items-center justify-between mt-2 gap-2">
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600 min-w-0">

@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useTransition, useDeferredValue } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { MessageSquare, Copy, Search, X, HelpCircle, Loader2 } from 'lucide-react'
-import useStore from '../store/useStore'
+import useStore, { submissionPredicate } from '../store/useStore'
+import type { Comment } from '../types'
 import CommentCard from './CommentCard'
 import CopyCommentsModal from './CopyCommentsModal'
 import ActiveFilterChips from './ActiveFilterChips'
@@ -189,6 +190,18 @@ function CommentBrowser() {
     return p ? partLabel(p, campaigns.length > 0) : key
   }
 
+  // A form-letter group listed only because some of its copies match the submission filters
+  // (type, filed as, state, part): say so, since the card shows the representative's own details
+  const matchNoteFor = useMemo(() => {
+    const test = filters ? submissionPredicate(filters) : null
+    const matches = test ? getSubmissionMatches() : null
+    return (c: Comment): string | undefined => {
+      if (!test || !matches || test(c) || !c.clusterSize || c.clusterSize < 2) return undefined
+      const n = matches.get(c.id) || 0
+      return n ? `Listed because ${n.toLocaleString()} of its ${c.clusterSize.toLocaleString()} copies match your filters; the details below are the original letter's.` : undefined
+    }
+  }, [filters, getSubmissionMatches, commentScope])
+
   // Memoize the comment list JSX — this is the expensive part. Rendered from a deferred copy so
   // a new result list renders in the background without blocking typing.
   const listedComments = useDeferredValue(paginatedComments)
@@ -200,6 +213,7 @@ function CommentBrowser() {
           comment={comment}
           showThemes={false}
           showEntities={false}
+          matchNote={matchNoteFor(comment)}
         />
       ))
     ) : (
@@ -207,7 +221,7 @@ function CommentBrowser() {
         <p className="text-gray-500">No comments match your filters</p>
       </div>
     )
-  ), [listedComments])
+  ), [listedComments, matchNoteFor])
 
   // Build inline picker items for the active prefix type
   const inlinePickerItems = useMemo((): PickerItem[] => {
