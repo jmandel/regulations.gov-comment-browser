@@ -189,6 +189,11 @@ const useStore = create<StoreState>((set, get) => {
 
     loadThemeExtracts: (themeCode: string) => {
       if (get().themeExtracts[themeCode]) return Promise.resolve()
+      // No file is written for a theme without direct extracts (e.g. a group theme); skip the 404
+      if (get().themes.find(t => t.code === themeCode)?.direct_count === 0) {
+        set(state => ({ themeExtracts: { ...state.themeExtracts, [themeCode]: {} } }))
+        return Promise.resolve()
+      }
       let p = themeExtractRequests.get(themeCode)
       if (!p) {
         p = fetch(`./data/theme-extracts/${encodeURIComponent(themeCode)}.json`)

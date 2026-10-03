@@ -20,15 +20,22 @@ async function buildWebsite(documentId: string, options: any) {
   await mkdir(join(outputDir, "indexes"), { recursive: true });
   
   // Look up docket ID from DB metadata (falls back to document ID)
-  const docMeta = db.prepare("SELECT docket_id, title, document_type, agency_id, comment_start_date, comment_end_date FROM document_metadata LIMIT 1").get() as
-    { docket_id?: string; title?: string; document_type?: string; agency_id?: string; comment_start_date?: string; comment_end_date?: string } | null;
-  const docketId = docMeta?.docket_id || documentId;
+  const docMeta = db.prepare("SELECT docket_id, title, document_type, agency_id, comment_start_date, comment_end_date, metadata_json FROM document_metadata LIMIT 1").get() as
+    { docket_id?: string; title?: string; document_type?: string; agency_id?: string; comment_start_date?: string; comment_end_date?: string; metadata_json?: string } | null;
+  // Databases loaded before document_metadata existed: comment IDs carry the docket ID as their prefix
+  const firstCommentId = (db.prepare("SELECT id FROM comments ORDER BY id LIMIT 1").get() as { id?: string } | null)?.id;
+  const docketId = docMeta?.docket_id || firstCommentId?.match(/^(.+)-\d+$/)?.[1] || documentId;
+  // Some documents' title is only their Federal Register document number (e.g. "2025-13118"); prefer the subject
+  let title = docMeta?.title;
+  if (title && /^\d{4}-\d+$/.test(title.trim())) {
+    try { title = JSON.parse(docMeta?.metadata_json || "{}").subject || title; } catch {}
+  }
 
   // 1. Generate metadata
   const meta = {
     documentId: docketId,
     sourceDocumentId: documentId,
-    title: docMeta?.title || documentId,
+    title: title || docketId,
     documentType: docMeta?.document_type || undefined,
     agencyId: docMeta?.agency_id || undefined,
     commentStartDate: docMeta?.comment_start_date || undefined,
@@ -89,7 +96,7 @@ function getStats(db: any) {
     const clusterStats = db.prepare(`
       SELECT 
         COUNT(*) as total_comments,
-        COALESCE(SUM(cluster_size), COUNT(*)) as actual_submissions
+        SUM(CASE WHEN ccm.comment_id IS NULL THEN 1 WHEN ccm.is_representative = 1 THEN COALESCE(ccl.cluster_size, 1) ELSE 0 END) as actual_submissions
       FROM comments c
       LEFT JOIN comment_cluster_membership ccm ON c.id = ccm.comment_id
       LEFT JOIN comment_clusters ccl ON ccm.cluster_id = ccl.cluster_id AND ccm.is_representative = 1
@@ -632,7 +639,11 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
       try { sections = JSON.parse(cc.s); } catch { console.warn(`Failed to parse structured sections for comment ${r.id}`); }
       if (cc.wc != null) wordCountOf.set(r.id, cc.wc);
     }
-    const detailedContent = (getTranscription.get(r.id) as any)?.markdown || null;
+    // Full text: the transcription, or (older databases, condensed before transcription was its
+    // own step) the detailedContent the condense step wrote into its sections
+    const legacyText = typeof sections?.detailedContent === "string" ? sections.detailedContent : null;
+    if (sections && "detailedContent" in sections) delete sections.detailedContent;
+    const detailedContent = (getTranscription.get(r.id) as any)?.markdown || legacyText || null;
     if (sections?.oneLineSummary) summaryOf.set(r.id, sections.oneLineSummary);
 
     // Search index over this unit's text

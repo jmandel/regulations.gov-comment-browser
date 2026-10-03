@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
 import useStore from '../store/useStore'
 import { CompositionBar, SplitBar, ArrivalsChart } from './overview/OverviewCharts'
-import { deriveOverview, fmt, shareInWords, formatDay, PARTS } from './overview/overviewData'
+import { deriveOverview, fmt, shareInWords, formatDay, PARTS, partLabel } from './overview/overviewData'
 
 const SUBMITTER_ROWS = 8
 const CAMPAIGN_ROWS = 5
@@ -18,6 +18,10 @@ function OverviewPanel() {
   const c = ov.composition
   const total = c.campaignCopies + c.campaignReworded + c.typed + c.attached || meta?.stats.totalComments || 0
   const campaignTotal = c.campaignCopies + c.campaignReworded
+  const campaignsTagged = campaigns.length > 0
+  // Without campaign tags, form-letter clustering (when run) still tells how many comments were
+  // copies of another one
+  const clusterCopies = useMemo(() => campaignsTagged ? 0 : comments.filter(x => x.isClusterRepresentative === false).length, [campaignsTagged, comments])
 
   // Headline, written from the data
   const headline = useMemo(() => {
@@ -27,10 +31,11 @@ function OverviewPanel() {
       const tail = reworded < 0.2 ? ', mostly as identical copies' : reworded > 0.6 ? ', mostly reworded rather than copied' : ''
       return `${lead} ${shareInWords(campaignTotal / total)} came from ${fmt(campaigns.length)} organized campaign${campaigns.length === 1 ? '' : 's'}${tail}.`
     }
-    if (!c.attached) return `${lead} All were typed into the comment form.`
-    if (!c.typed) return `${lead} All were submitted as attached documents.`
-    return `${lead} ${shareInWords(c.attached / total)} were submitted as attached documents; the rest were typed into the comment form.`
-  }, [total, campaigns.length, campaignTotal, c])
+    const copies = clusterCopies ? ` ${shareInWords(clusterCopies / total)} were copies or near-copies of another comment.` : ''
+    if (!c.attached) return `${lead} All were typed into the comment form.${copies}`
+    if (!c.typed) return `${lead} All were submitted as attached documents.${copies}`
+    return `${lead} ${shareInWords(c.attached / total)} were submitted as attached documents; the rest were typed into the comment form.${copies}`
+  }, [total, campaigns.length, campaignTotal, c, clusterCopies])
 
   // Top-level themes (issue areas), most-discussed first
   const issueAreas = useMemo(() =>
@@ -73,7 +78,7 @@ function OverviewPanel() {
         </h1>
       </header>
 
-      {total > 0 && <CompositionBar composition={c} total={total} />}
+      {total > 0 && <CompositionBar composition={c} total={total} campaignsTagged={campaignsTagged} />}
 
       <div className="mt-12 sm:mt-16 grid grid-cols-1 lg:grid-cols-12 gap-x-16 gap-y-14">
         {/* What commenters raised */}
@@ -106,7 +111,7 @@ function OverviewPanel() {
                           value={t.comment_count}
                           max={issueMax}
                           split={split}
-                          label={split ? PARTS.filter(p => split[p.key]).map(p => `${p.label} ${fmt(split[p.key])}`).join(', ') : undefined}
+                          label={split ? PARTS.filter(p => split[p.key]).map(p => `${partLabel(p, campaignsTagged)} ${fmt(split[p.key])}`).join(', ') : undefined}
                         />
                       </span>
                       {gist && <span className="mt-2 block text-sm leading-relaxed text-[var(--ov-ink-2)] max-w-[72ch]">{gist}</span>}

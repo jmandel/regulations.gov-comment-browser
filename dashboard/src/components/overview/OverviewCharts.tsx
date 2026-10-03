@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { CompositionCounts, OverviewData } from '../../types'
-import { PARTS, Part, fmt, pct, formatDay } from './overviewData'
+import { PARTS, Part, fmt, pct, formatDay, partLabel } from './overviewData'
 
 // The hero: every submission, split into campaign copies, reworded campaign letters, individual
 // comments and attached letters. Segments and legend entries link to where each group can be read.
-export function CompositionBar({ composition, total }: { composition: CompositionCounts; total: number }) {
+export function CompositionBar({ composition, total, campaignsTagged = true }: { composition: CompositionCounts; total: number; campaignsTagged?: boolean }) {
   const [active, setActive] = useState<Part | null>(null)
   const parts = PARTS.filter(p => composition[p.key] > 0)
   const sum = parts.reduce((s, p) => s + composition[p.key], 0) || 1
@@ -13,7 +13,7 @@ export function CompositionBar({ composition, total }: { composition: Compositio
   return (
     <figure className="mt-8 sm:mt-10">
       <figcaption className="sr-only">
-        How the {fmt(total)} comments break down: {parts.map(p => `${p.label}, ${fmt(composition[p.key])}`).join('; ')}.
+        How the {fmt(total)} comments break down: {parts.map(p => `${partLabel(p, campaignsTagged)}, ${fmt(composition[p.key])}`).join('; ')}.
       </figcaption>
       <div className="ov-grow flex h-9 sm:h-12 gap-[2px] rounded overflow-hidden" aria-hidden="true">
         {parts.map(p => (
@@ -21,7 +21,7 @@ export function CompositionBar({ composition, total }: { composition: Compositio
             key={p.key}
             to={p.to}
             tabIndex={-1}
-            title={`${p.label}: ${fmt(composition[p.key])} (${pct(composition[p.key], total)})`}
+            title={`${partLabel(p, campaignsTagged)}: ${fmt(composition[p.key])} (${pct(composition[p.key], total)})`}
             onMouseEnter={() => setActive(p.key)}
             onMouseLeave={() => setActive(null)}
             className="block h-full transition-opacity duration-150 motion-reduce:transition-none"
@@ -49,13 +49,13 @@ export function CompositionBar({ composition, total }: { composition: Compositio
             >
               <span className="flex items-start gap-2 text-sm font-medium leading-snug text-[var(--ov-ink)]">
                 <span className="mt-[0.3em] h-2.5 w-2.5 rounded-sm flex-shrink-0" style={{ background: p.color }} aria-hidden="true" />
-                <span className="group-hover:underline underline-offset-2">{p.label}</span>
+                <span className="group-hover:underline underline-offset-2">{partLabel(p, campaignsTagged)}</span>
               </span>
               <span className="mt-1 flex items-baseline gap-2">
                 <span className="tnum text-2xl sm:text-[1.75rem] font-semibold leading-none">{fmt(composition[p.key])}</span>
                 <span className="tnum text-sm text-[var(--ov-ink-2)]">{pct(composition[p.key], total)}</span>
               </span>
-              <span className="mt-1.5 block text-[0.8125rem] leading-snug text-[var(--ov-ink-3)] max-w-[30ch]">{p.description}</span>
+              <span className="mt-1.5 block text-[0.8125rem] leading-snug text-[var(--ov-ink-3)] max-w-[30ch]">{campaignsTagged ? p.description : p.plainDescription || p.description}</span>
             </Link>
           </li>
         ))}

@@ -29,7 +29,7 @@ function CampaignBrowser() {
   if (campaigns.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-        No campaign data for this docket (the tag-campaigns step was not run).
+        No organized campaigns have been identified for this docket.
       </div>
     )
   }
