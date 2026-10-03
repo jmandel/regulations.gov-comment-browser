@@ -75,7 +75,12 @@ export interface CompositionCounts {
 export interface OverviewData {
   version: number
   composition: CompositionCounts
-  submitters: Array<{ label: string; count: number; types: string[] }>
+  // Commenter types, from one source: AI-assigned (typeSource 'ai') or the folded filed category
+  // ('filed'; older builds have no typeSource). Labels match comments-index.json submitterTypes.
+  submitters: Array<{ label: string; count: number; split?: CompositionCounts; group?: 'individual' | 'organization'; organizations?: Array<{ name: string; count: number }>; organizationCount?: number }>
+  typeSource?: 'ai' | 'filed'
+  filedAs?: Record<FiledAs, number>
+  geography?: { total: number; withState: number; withCountry: number; states: Array<{ state: string; count: number }>; countries: Array<{ country: string; count: number }> }
   arrivals: Array<{ date: string; count: number }>
   themeGists: Record<string, string>
   themeComposition: Record<string, CompositionCounts>
@@ -203,15 +208,24 @@ export interface StructuredSections {
   detailedContent?: string
 }
 
+export type FiledAs = 'organization' | 'person' | 'anonymous'
+
 // A comment as held in memory. Only lean fields are loaded up front (from comments-index.json);
 // the full condensed sections, full text and a form-letter member's added text are fetched on
 // demand from shards (see utils/commentData.ts).
 export interface Comment {
   id: string
   submitter: string
-  submitterType: string
-  date: string
-  location?: string
+  nameFromTitle?: boolean // submitter name taken from the submission's title (no name was filed)
+  submitterType: string   // commenter type label (AI-assigned or folded filed category; see typeSource)
+  typeGroup?: 'individual' | 'organization' // AI-assigned types only
+  org?: string            // organization the comment speaks for (AI-assigned), when not the submitter name
+  filedAs?: FiledAs
+  date: string            // received date
+  city?: string
+  state?: string
+  country?: string
+  location?: string       // city, state, country joined
   // Up front this holds only oneLineSummary (the representative's, for form-letter members)
   structuredSections?: StructuredSections
   themeScores?: Record<string, number>
@@ -249,13 +263,23 @@ export interface CommentsIndexFile {
   version: number
   documentId: string
   clustered: boolean
+  typeSource?: 'ai' | 'filed'
   submitterTypes: string[]
+  typeGroups?: Array<'individual' | 'organization' | null>
+  states?: string[]
+  countries?: string[]
   entityKeys: string[]
   comments: Array<{
     id: string
     submitter: string
+    nameFromTitle?: boolean
     submitterType: number
+    filedAs?: 'o' | 'p' | 'a'
+    org?: string
     date: string
+    city?: string
+    state?: number
+    country?: number
     location?: string
     hasAttachments?: boolean
     isRep?: boolean

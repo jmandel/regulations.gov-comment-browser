@@ -7,10 +7,10 @@ interface ActiveFilterChipsProps {
   themes: string[]
   entities: string[]
   submitterTypes: string[]
+  typeLabel?: string
   campaigns?: { id: string; name: string }[]
   onRemoveCampaign?: (id: string) => void
-  parts?: { key: string; label: string }[]
-  onRemovePart?: (key: string) => void
+  parts?: { key: string; label: string; onRemove: () => void }[] // submission filters: composition part, filed as, state
   themeList: Theme[]
   entityMap: Record<string, { label: string; mentionCount: number }[]>
   onRemoveSearchToken: (tokenId: string) => void
@@ -26,10 +26,10 @@ function ActiveFilterChips({
   themes,
   entities,
   submitterTypes,
+  typeLabel = 'Type',
   campaigns = [],
   onRemoveCampaign,
   parts = [],
-  onRemovePart,
   themeList,
   entityMap: _entityMap,
   onRemoveSearchToken,
@@ -132,7 +132,7 @@ function ActiveFilterChips({
           key={`type-${value}`}
           className="inline-flex items-center gap-1 px-2.5 py-1 text-sm rounded-full border bg-purple-50 text-purple-700 border-purple-200"
         >
-          {value}
+          <span className="font-medium">{typeLabel}:</span> {value}
           <button
             onClick={() => onRemoveSubmitterType(value)}
             className="ml-0.5 hover:text-purple-900 transition-colors"
@@ -157,14 +157,14 @@ function ActiveFilterChips({
         </span>
       ))}
 
-      {/* Composition-part chips (from the Overview's bar) */}
+      {/* Submission filter chips: composition part (the Overview's bar), filed as, state */}
       {parts.map(p => (
         <span
           key={`part-${p.key}`}
           className="inline-flex items-center gap-1 px-2.5 py-1 text-sm rounded-full border bg-slate-100 text-slate-800 border-slate-300"
         >
           {p.label}
-          <button onClick={() => onRemovePart?.(p.key)} className="ml-0.5 hover:text-slate-950 transition-colors" aria-label={`Remove filter: ${p.label}`}>
+          <button onClick={p.onRemove} className="ml-0.5 hover:text-slate-950 transition-colors" aria-label={`Remove filter: ${p.label}`}>
             <X className="h-3 w-3" />
           </button>
         </span>

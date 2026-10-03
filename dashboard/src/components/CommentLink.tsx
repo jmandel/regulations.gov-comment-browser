@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Building2, User, Users } from 'lucide-react'
+import { isOrganization as isOrgComment } from './SubmitterInfo'
 import useStore from '../store/useStore'
 
 interface CommentLinkProps {
@@ -28,11 +29,7 @@ function CommentLink({
     )
   }
   
-  const isOrganization = comment.submitterType === 'Organization' || 
-                         comment.submitterType === 'Business' ||
-                         comment.submitterType === 'Healthcare Organization' ||
-                         comment.submitterType === 'Government Agency' ||
-                         comment.submitterType === 'Trade Association'
+  const isOrganization = isOrgComment(comment)
   
   const hasCluster = comment.clusterSize && comment.clusterSize > 1
   const additionalComments = hasCluster ? (comment.clusterSize! - 1) : 0

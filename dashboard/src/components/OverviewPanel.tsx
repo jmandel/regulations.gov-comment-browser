@@ -4,10 +4,10 @@ import { ExternalLink } from 'lucide-react'
 import useStore from '../store/useStore'
 import { CompositionBar, SplitBar, ArrivalsChart } from './overview/OverviewCharts'
 import { DataDownloads } from './overview/DataDownloads'
+import { WhoCommented, WhereCommenters } from './overview/WhoCommented'
 import { ScopedAnalysesList, AboutScope } from './scope/ScopeSections'
 import { deriveOverview, fmt, formatDay, PARTS, partLabel } from './overview/overviewData'
 
-const SUBMITTER_ROWS = 8
 const CAMPAIGN_ROWS = 5
 
 const linkClass = 'text-[var(--ov-link)] underline decoration-1 underline-offset-2 decoration-[var(--ov-link)]/40 hover:decoration-[var(--ov-link)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ov-link)] rounded-sm'
@@ -31,14 +31,6 @@ function OverviewPanel() {
   [themes])
   const issueMax = issueAreas[0]?.comment_count || 0
   const hasThemeSplit = issueAreas.some(t => ov.themeComposition[t.code])
-
-  const submitterRows = useMemo(() => {
-    const rows = ov.submitters.slice(0, SUBMITTER_ROWS)
-    const rest = ov.submitters.slice(SUBMITTER_ROWS)
-    if (rest.length) rows.push({ label: `All other categories (${rest.length})`, count: rest.reduce((s, r) => s + r.count, 0), types: [] })
-    return rows
-  }, [ov.submitters])
-  const submitterMax = Math.max(...submitterRows.map(r => r.count), 1)
 
   const docketId = meta?.documentId
   const start = formatDay(meta?.commentStartDate, { month: 'long', day: 'numeric' })
@@ -69,6 +61,8 @@ function OverviewPanel() {
       {total > 0 && <CompositionBar composition={c} total={total} campaignsTagged={campaignsTagged} />}
 
       {!scope && meta?.scopes && meta.scopes.length > 0 && <ScopedAnalysesList scopes={meta.scopes} />}
+
+      {ov.submitters.length > 0 && <div className="mt-12 sm:mt-16"><WhoCommented ov={ov} /></div>}
 
       <div className="mt-12 sm:mt-16 grid grid-cols-1 lg:grid-cols-12 gap-x-16 gap-y-14">
         {/* What commenters raised */}
@@ -125,35 +119,7 @@ function OverviewPanel() {
             </section>
           )}
 
-          {submitterRows.length > 0 && (
-            <section aria-labelledby="ov-who">
-              <div className="flex items-baseline justify-between gap-4">
-                <h2 id="ov-who" className="text-lg font-semibold">Who commented</h2>
-                <Link to="/comments" className={`${linkClass} text-sm whitespace-nowrap`}>Browse comments</Link>
-              </div>
-              <p className="mt-1 text-sm text-[var(--ov-ink-2)]">The category each commenter chose on regulations.gov.</p>
-              <ul className="mt-4 space-y-3">
-                {submitterRows.map(r => {
-                  const body = (
-                    <>
-                      <span className="flex items-baseline justify-between gap-4 text-sm">
-                        <span className={r.types.length ? 'group-hover:underline underline-offset-2' : 'text-[var(--ov-ink-2)]'}>{r.label}</span>
-                        <span className="tnum font-medium">{fmt(r.count)}</span>
-                      </span>
-                      <span className="mt-1 block"><SplitBar value={r.count} max={submitterMax} /></span>
-                    </>
-                  )
-                  return (
-                    <li key={r.label}>
-                      {r.types.length
-                        ? <Link to={`/comments?${r.types.map(t => `submitterType=${encodeURIComponent(t)}`).join('&')}`} className={rowLinkClass}>{body}</Link>
-                        : <div>{body}</div>}
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          )}
+          {ov.geography && <WhereCommenters geo={ov.geography} />}
 
           {campaigns.length > 0 && (
             <section aria-labelledby="ov-campaigns">

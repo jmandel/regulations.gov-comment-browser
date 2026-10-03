@@ -339,6 +339,20 @@ export function initSchema(db: Database) {
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
     );
     CREATE INDEX IF NOT EXISTS idx_comment_campaigns_campaign ON comment_campaigns(campaign_id);
+
+    -- classify-submitters: who each submission speaks for, assigned by an LLM from the filed
+    -- metadata and the start/end of the text (form-letter members mostly derived; see method).
+    -- The filed metadata in comments.attributes_json is never changed.
+    CREATE TABLE IF NOT EXISTS submitter_classifications (
+      comment_id TEXT PRIMARY KEY,
+      speaks_for TEXT NOT NULL CHECK(speaks_for IN ('individual', 'organization')),
+      type TEXT NOT NULL,              -- SUBMITTER_TYPES key (src/lib/submitter-meta.ts)
+      organization TEXT,               -- name of the organization it speaks for; NULL for individuals
+      method TEXT NOT NULL,            -- 'llm' | 'representative' (member with the rep's organization) | 'filed-category' | 'template'
+      model TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (comment_id) REFERENCES comments(id)
+    );
   `);
 }
 

@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from 'react'
-import { ExternalLink, Paperclip, Calendar, MapPin, User, Building2, Quote, FileText, Users } from 'lucide-react'
+import { ExternalLink, Paperclip, Calendar, MapPin, Quote, FileText, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -10,6 +10,7 @@ import type { Comment, ThemeExtract } from '../types'
 import CopyCommentsModal from './CopyCommentsModal'
 import { useCommentContent } from '../utils/commentData'
 import CampaignBadge from './CampaignBadge'
+import { SubmitterIcon, SubmitterName, SubmitterType } from './SubmitterInfo'
 
 // True once the element has come within ~1 screen of the viewport
 function useNearViewport<T extends Element>(enabled: boolean) {
@@ -82,17 +83,9 @@ function CommentCard({
         {/* Row 1: Author + type */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center space-x-2 min-w-0 flex-1">
-            {(comment.submitterType === 'Organization' || 
-              comment.submitterType === 'Business' ||
-              comment.submitterType === 'Healthcare Organization' ||
-              comment.submitterType === 'Government Agency' ||
-              comment.submitterType === 'Trade Association') ? (
-              <Building2 className="h-4 w-4 text-gray-500 flex-shrink-0" />
-            ) : (
-              <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
-            )}
-            <h4 className="font-semibold text-gray-900 truncate">{comment.submitter}</h4>
-            <span className="text-sm text-gray-600 flex-shrink-0 hidden sm:inline">• {comment.submitterType}</span>
+            <SubmitterIcon comment={comment} />
+            <SubmitterName comment={comment} />
+            <SubmitterType comment={comment} className="flex-shrink min-w-0 truncate hidden sm:inline" />
           </div>
           <CampaignBadge comment={comment} />
           {comment.inScope === false && (
@@ -116,10 +109,11 @@ function CommentCard({
         {/* Row 2: Date, ID, word count, actions */}
         <div className="flex items-center justify-between mt-2 gap-2">
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600 min-w-0">
-            <span className="flex items-center space-x-1">
+            <span className="flex items-center space-x-1" title="Date received">
               <Calendar className="h-3 w-3 flex-shrink-0" />
               <span>{formatDate(comment.date)}</span>
             </span>
+            <SubmitterType comment={comment} className="sm:hidden" />
             {comment.location && (
               <span className="flex items-center space-x-1 hidden sm:flex">
                 <MapPin className="h-3 w-3" />

@@ -7,6 +7,7 @@ import { matchScansCommand } from "./match-scans";
 import { triageCommand } from "./triage";
 import { transcribeCommand } from "./transcribe";
 import { condenseCommand } from "./condense";
+import { classifySubmittersCommand } from "./classify-submitters";
 import { discoverThemesCommand } from "./discover-themes";
 import { extractThemeContentCommand } from "./extract-theme-content";
 import { summarizeThemesV2Command } from "./summarize-themes-v2";
@@ -19,7 +20,7 @@ import { scopeRelevanceCommand } from "./scope";
 import { openScopeDb, getScope, hasClustering } from "../lib/scope-db";
 
 export const pipelineCommand = new Command("pipeline")
-  .description("Run the complete analysis pipeline: load, cluster, triage, transcribe, match scanned copies, tag campaigns (optional), condense, discover themes, extract theme content, summarize themes, discover entities, build website, and vacuum database")
+  .description("Run the complete analysis pipeline: load, cluster, triage, transcribe, match scanned copies, tag campaigns (optional), condense, classify submitters, discover themes, extract theme content, summarize themes, discover entities, build website, and vacuum database")
   .argument("<source-arg>", "Source argument (e.g., CMS-2025-0050-0031 or path to CSV)")
   .option("-s, --skip-attachments", "Skip downloading attachments")
   .option("--mirrulations", "Load comments from the Mirrulations S3 mirror instead of the regulations.gov API (best for large dockets)")
@@ -27,9 +28,9 @@ export const pipelineCommand = new Command("pipeline")
   .option("-d, --debug", "Enable debug mode for all steps")
   .option("-o, --output <dir>", "Output directory for website files", "dist/data")
   .option("-l, --limit-total-comment-load <N>", "Limit initial number of comments loaded")
-  .option("--start-at <step>", "Start at a specific step (1-13): 1=load, 2=cluster, 3=triage, 4=transcribe, 5=match-scans, 6=tag-campaigns (only with --tag-campaigns), 7=condense, 8=discover-themes, 9=extract-theme-content, 10=summarize-themes, 11=discover-entities, 12=build-website, 13=vacuum-db")
+  .option("--start-at <step>", "Start at a specific step (1-14): 1=load, 2=cluster, 3=triage, 4=transcribe, 5=match-scans, 6=tag-campaigns (only with --tag-campaigns), 7=condense, 8=classify-submitters, 9=discover-themes, 10=extract-theme-content, 11=summarize-themes, 12=discover-entities, 13=build-website, 14=vacuum-db")
   .option("-c, --concurrency <N>", "Number of concurrent operations")
-  .option("--batch", "Run LLM steps (triage, transcribe, condense, theme discovery/extraction/summaries) through the Gemini Batch API: half price, minutes-to-hours per step")
+  .option("--batch", "Run LLM steps (triage, transcribe, condense, classify-submitters, theme discovery/extraction/summaries) through the Gemini Batch API: half price, minutes-to-hours per step")
   .option("--max-crashes <N>", "Maximum number of crashes before giving up (default: 10)", parseInt)
   .option("-m, --model <model>", "Override the per-step models in batch-config.json for every step (e.g. gemini-3.8-flash, gemini-3.5-flash-lite)")
   .option("--no-clustering", "Skip clustering entirely (process all comments)")
@@ -47,7 +48,7 @@ export const pipelineCommand = new Command("pipeline")
     const startStep = options.startAt ? parseInt(options.startAt) : 1;
     const maxCrashes = options.maxCrashes || 10;
     
-    const STEP_COUNT = 13;
+    const STEP_COUNT = 14;
     if (isNaN(startStep) || startStep < 1 || startStep > STEP_COUNT) {
       console.error(`❌ Invalid start step. Please provide a number between 1 and ${STEP_COUNT}.`);
       process.exit(1);
@@ -181,6 +182,20 @@ export const pipelineCommand = new Command("pipeline")
       },
       {
         num: 8,
+        name: "Classifying submitters",
+        icon: "🪪",
+        execute: async () => {
+          await classifySubmittersCommand.parseAsync([
+            'bun', 'cli.ts',
+            documentId,
+            ...(options.concurrency ? ['--concurrency', options.concurrency] : []),
+            ...(options.model ? ['--model', options.model] : []),
+            ...(options.batch ? ['--batch'] : []),
+          ]);
+        }
+      },
+      {
+        num: 9,
         name: "Discovering themes",
         icon: "🔍",
         execute: async () => {
@@ -196,7 +211,7 @@ export const pipelineCommand = new Command("pipeline")
         }
       },
       {
-        num: 9,
+        num: 10,
         name: "Extracting theme content",
         icon: "🎯",
         execute: async () => {
@@ -212,7 +227,7 @@ export const pipelineCommand = new Command("pipeline")
         }
       },
       {
-        num: 10,
+        num: 11,
         name: "Summarizing themes",
         icon: "📄",
         execute: async () => {
@@ -228,7 +243,7 @@ export const pipelineCommand = new Command("pipeline")
         }
       },
       {
-        num: 11,
+        num: 12,
         name: "Discovering entities",
         icon: "🏷️",
         execute: async () => {
@@ -242,7 +257,7 @@ export const pipelineCommand = new Command("pipeline")
         }
       },
       {
-        num: 12,
+        num: 13,
         name: "Building website files",
         icon: "🏗️",
         execute: async () => {
@@ -254,7 +269,7 @@ export const pipelineCommand = new Command("pipeline")
         }
       },
       {
-        num: 13,
+        num: 14,
         name: "Vacuuming database",
         icon: "🧹",
         execute: async () => {
