@@ -9,8 +9,8 @@ export type Part = keyof CompositionCounts
 export const PARTS: Array<{ key: Part; label: string; description: string; plainLabel?: string; plainDescription?: string; color: string; to: string }> = [
   { key: 'campaignCopies', label: 'Campaign copies', description: 'Identical letters sent as part of an organized campaign', color: 'var(--ov-copies)', to: '/comments?part=campaignCopies' },
   { key: 'campaignReworded', label: 'Reworded campaign letters', description: 'Campaign letters the sender rewrote in their own words', color: 'var(--ov-reworded)', to: '/comments?part=campaignReworded' },
-  { key: 'typed', label: 'Typed comments', plainLabel: 'Typed comments', description: 'Typed into the comment form, not part of a campaign', plainDescription: 'Typed into the comment form', color: 'var(--ov-typed)', to: '/comments?part=typed' },
-  { key: 'attached', label: 'Attached letters', description: 'Uploaded as a document, not part of a campaign', plainDescription: 'Uploaded as a document', color: 'var(--ov-attached)', to: '/comments?part=attached' },
+  { key: 'typed', label: 'Written in the comment form', description: 'Entered directly in the regulations.gov comment box, not part of a campaign', plainDescription: 'Entered directly in the regulations.gov comment box', color: 'var(--ov-typed)', to: '/comments?part=typed' },
+  { key: 'attached', label: 'Attached document', description: 'Sent as an attached PDF or Word file, not part of a campaign', plainDescription: 'Sent as an attached PDF or Word file', color: 'var(--ov-attached)', to: '/comments?part=attached' },
 ]
 
 export const fmt = (n: number) => n.toLocaleString('en-US')
