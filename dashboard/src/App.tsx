@@ -17,7 +17,10 @@ import ErrorScreen from './components/ErrorScreen'
 import ScrollToTop from './components/ScrollToTop'
 
 function App() {
-  const { loading, error, loadData } = useStore()
+  // Select fields rather than the whole store: re-rendering App re-renders every route and Link
+  const loading = useStore(s => s.loading)
+  const error = useStore(s => s.error)
+  const loadData = useStore(s => s.loadData)
 
   useEffect(() => {
     loadData()

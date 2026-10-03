@@ -9,6 +9,8 @@ interface ActiveFilterChipsProps {
   submitterTypes: string[]
   campaigns?: { id: string; name: string }[]
   onRemoveCampaign?: (id: string) => void
+  parts?: { key: string; label: string }[]
+  onRemovePart?: (key: string) => void
   themeList: Theme[]
   entityMap: Record<string, { label: string; mentionCount: number }[]>
   onRemoveSearchToken: (tokenId: string) => void
@@ -26,6 +28,8 @@ function ActiveFilterChips({
   submitterTypes,
   campaigns = [],
   onRemoveCampaign,
+  parts = [],
+  onRemovePart,
   themeList,
   entityMap: _entityMap,
   onRemoveSearchToken,
@@ -35,7 +39,7 @@ function ActiveFilterChips({
   onClearAll,
   onClickSearchToken,
 }: ActiveFilterChipsProps) {
-  const totalFilters = searchTokens.length + themes.length + entities.length + submitterTypes.length + campaigns.length
+  const totalFilters = searchTokens.length + themes.length + entities.length + submitterTypes.length + campaigns.length + parts.length
   if (totalFilters === 0) return null
 
   // Group search tokens by orGroup
@@ -148,6 +152,19 @@ function ActiveFilterChips({
           <span className="font-medium shrink-0">Campaign:</span>
           <span className="truncate">{c.name}</span>
           <button onClick={() => onRemoveCampaign?.(c.id)} className="ml-0.5 hover:text-amber-950 transition-colors shrink-0">
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+
+      {/* Composition-part chips (from the Overview's bar) */}
+      {parts.map(p => (
+        <span
+          key={`part-${p.key}`}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-sm rounded-full border bg-slate-100 text-slate-800 border-slate-300"
+        >
+          {p.label}
+          <button onClick={() => onRemovePart?.(p.key)} className="ml-0.5 hover:text-slate-950 transition-colors" aria-label={`Remove filter: ${p.label}`}>
             <X className="h-3 w-3" />
           </button>
         </span>

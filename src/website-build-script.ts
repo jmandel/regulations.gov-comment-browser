@@ -5,6 +5,7 @@ import { readdirSync, statSync } from "fs";
 import { join } from "path";
 import { readDocumentInfo } from "./lib/document-meta";
 import { buildDatasetPacks, submitterCategoryLabel, DEFAULT_SITE_URL, packDownloadsBaseUrl } from "./lib/dataset-pack";
+import { PhraseIndexBuilder } from "./lib/phrase-index";
 import { openScopeDbReadOnly, getScope, relevanceIsCurrent, scopeCounts, listPublishableScopes } from "./lib/scope-db";
 
 export const buildWebsiteCommand = new Command("build-website")
@@ -643,6 +644,8 @@ function getEntityTaxonomy(db: any) {
 //                              sections minus oneLineSummary, plus members' full added text)
 //   comment-text/NNNN.json     { [unitId]: detailedContent } (full transcription)
 //   search/index.json + search/postings.bin   word -> unit inverted index for full-text search
+//   search/pairs.json + search/pairs/NNN.json  adjacent word pair -> unit index for phrase search
+//                                             (src/lib/phrase-index.ts)
 // A "unit" is a comment that carries its own content: a cluster representative, or every
 // comment when there is no clustering. Shards hold consecutive units (by ID) and are cut by size.
 const DETAIL_SHARD_BYTES = 256 * 1024;
@@ -743,6 +746,7 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
   const index: any[] = [];
   const unitIds: string[] = [];
   const postings = new Map<string, number[]>();
+  const pairIndex = new PhraseIndexBuilder(MAX_INDEXED_WORD);
   const detailShardOf = new Map<string, number>();
   const textShardOf = new Map<string, number>();
   let detailShard: Record<string, any> = {}, detailBytes = 0, detailN = 0;
@@ -787,6 +791,7 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
       if (w.length > MAX_INDEXED_WORD) continue;
       let p = postings.get(w); if (!p) postings.set(w, p = []); p.push(ordinal);
     }
+    pairIndex.add(ordinal, text);
 
     // Detail shard: condensed sections (minus the one-line summary, which is in the index) + members' added text
     const detail: Record<string, any> = {};
@@ -897,8 +902,9 @@ async function exportAllComments(db: any, outputDir: string, documentId: string)
   }
   await writeFile(join(outputDir, "search", "postings.bin"), new Uint8Array(bytes));
   await writeFile(join(outputDir, "search", "index.json"), JSON.stringify({ version: 1, maxWord: MAX_INDEXED_WORD, units: unitIds, words, lens }));
+  const pairs = await pairIndex.write(join(outputDir, "search"));
 
-  console.log(`  ✅ Exported ${index.length} comments (${unitIds.length} units, ${detailedTotal} with full text) in ${detailN} detail + ${textN} text shards; search index ${words.length} words, ${(bytes.length / 1e6).toFixed(1)} MB postings`);
+  console.log(`  ✅ Exported ${index.length} comments (${unitIds.length} units, ${detailedTotal} with full text) in ${detailN} detail + ${textN} text shards; search index ${words.length} words, ${(bytes.length / 1e6).toFixed(1)} MB postings, ${pairs.keys} word pairs in ${pairs.shards} shards (${(pairs.bytes / 1e6).toFixed(1)} MB)`);
 }
 
 async function generateClusterReport(db: any, outputDir: string) {

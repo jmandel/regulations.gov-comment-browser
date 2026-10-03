@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef, useTransition } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, useTransition, useDeferredValue } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { MessageSquare, Copy, Search, X, HelpCircle, Loader2 } from 'lucide-react'
 import useStore from '../store/useStore'
@@ -12,12 +12,15 @@ import { getUniqueValues } from '../utils/helpers'
 import { parseSearchQuery, tokensToString, removeToken } from '../utils/searchParser'
 import { debounce } from 'lodash'
 import type { PickerItem } from './FilterAddButtons'
+import type { CompositionCounts } from '../types'
+import { PARTS, partLabel } from './overview/overviewData'
 
 interface FilterOptions {
   themes: string[]
   entities: string[]
   submitterTypes: string[]
   campaigns?: string[]
+  parts?: string[]
   searchQuery: string
 }
 
@@ -44,7 +47,7 @@ function detectPrefix(query: string, cursorPos: number): PrefixDetection | null 
 }
 
 function CommentBrowser() {
-  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering, campaigns = [], scope, commentScope, setCommentScope, meta } = useStore()
+  const { loading, comments = [], filters, setFilters, getFilteredComments, themes = [], entities = {}, search, hasClustering, campaigns = [], scope, commentScope, setCommentScope, meta, getUnitParts } = useStore()
   const wholeDocket = !!scope && commentScope === 'docket'
   const docketTotal = scope?.counts.docketSubmissions ?? 0
   const [searchParams] = useSearchParams()
@@ -70,18 +73,27 @@ function CommentBrowser() {
     [localSearchQuery]
   )
 
-  // Debounced search handler — called directly from onChange, not via useEffect
-  const debouncedSetSearchQuery = useMemo(
-    () => debounce((query: string) => {
+  // Debounced search handler — called directly from onChange, not via useEffect. While a quoted
+  // phrase is still open, wait for a longer pause: each partial phrase is a new search.
+  const debouncedSetSearchQuery = useMemo(() => {
+    const apply = (query: string) => {
       if (setFilters) {
         startTransition(() => {
           setFilters((prev: FilterOptions) => ({ ...prev, searchQuery: query }))
           setPage(0)
         })
       }
-    }, 300),
-    [setFilters]
-  )
+    }
+    const soon = debounce(apply, 300)
+    const later = debounce(apply, 1000)
+    const run = (query: string) => {
+      const openQuote = (query.match(/"/g) || []).length % 2 === 1
+      ;(openQuote ? soon : later).cancel()
+      ;(openQuote ? later : soon)(query)
+    }
+    run.cancel = () => { soon.cancel(); later.cancel() }
+    return run
+  }, [setFilters])
 
   // Apply URL query parameters on mount
   useEffect(() => {
@@ -96,6 +108,11 @@ function CommentBrowser() {
     const campaign = searchParams.get('campaign')
     if (campaign) {
       setFilters((prev: FilterOptions) => ({ ...prev, campaigns: [campaign] }))
+    }
+    // ?part=<key>: a segment of the Overview's composition bar
+    const part = searchParams.get('part')
+    if (part && PARTS.some(p => p.key === part)) {
+      setFilters((prev: FilterOptions) => ({ ...prev, parts: [part] }))
     }
   }, [searchParams, setFilters])
 
@@ -155,10 +172,29 @@ function CommentBrowser() {
 
   const commentsToCopy = filteredComments
 
-  // Memoize the comment list JSX — this is the expensive part
+  // With a composition-part filter, the number of comments in that part among the listed units
+  const activeParts = filters?.parts || []
+  const partCommentCount = useMemo(() => {
+    if (!activeParts.length) return null
+    const unitParts = getUnitParts()
+    let n = 0
+    for (const c of filteredComments) {
+      const counts = unitParts.get(c.id)
+      if (counts) for (const p of activeParts) n += counts[p as keyof CompositionCounts] || 0
+    }
+    return n
+  }, [filteredComments, activeParts.join(), getUnitParts, commentScope])
+  const partName = (key: string) => {
+    const p = PARTS.find(x => x.key === key)
+    return p ? partLabel(p, campaigns.length > 0) : key
+  }
+
+  // Memoize the comment list JSX — this is the expensive part. Rendered from a deferred copy so
+  // a new result list renders in the background without blocking typing.
+  const listedComments = useDeferredValue(paginatedComments)
   const commentListJsx = useMemo(() => (
-    paginatedComments.length > 0 ? (
-      paginatedComments.map(comment => (
+    listedComments.length > 0 ? (
+      listedComments.map(comment => (
         <CommentCard
           key={comment.id}
           comment={comment}
@@ -171,7 +207,7 @@ function CommentBrowser() {
         <p className="text-gray-500">No comments match your filters</p>
       </div>
     )
-  ), [paginatedComments])
+  ), [listedComments])
 
   // Build inline picker items for the active prefix type
   const inlinePickerItems = useMemo((): PickerItem[] => {
@@ -372,6 +408,7 @@ function CommentBrowser() {
         themes: [],
         entities: [],
         campaigns: [],
+        parts: [],
         searchQuery: ''
       }))
       setPage(0)
@@ -402,7 +439,9 @@ function CommentBrowser() {
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{scope ? (wholeDocket ? 'All comments in the docket' : 'Comments in this scope') : 'Browse Comments'}</h1>
               <p className="text-sm text-gray-500 mt-1 truncate sm:whitespace-normal">
-                {scope ? (
+                {partCommentCount !== null ? (
+                  <>Showing {filteredComments.length.toLocaleString()} {hasClustering ? 'clusters' : 'comments'}{hasClustering || scope ? <> representing {partCommentCount.toLocaleString()} comments</> : null} in {activeParts.map(partName).join(' or ')}</>
+                ) : scope ? (
                   wholeDocket
                     ? <>Showing {filteredComments.length.toLocaleString()} {hasClustering ? 'clusters' : 'comments'} from all {docketTotal.toLocaleString()} submissions, in or out of scope</>
                     : <>Showing {filteredComments.length.toLocaleString()} {hasClustering ? 'clusters' : 'comments'} representing the {comments.length.toLocaleString()} of {docketTotal.toLocaleString()} submissions that address this scope</>
@@ -523,6 +562,8 @@ function CommentBrowser() {
           submitterTypes={filters.submitterTypes || []}
           campaigns={(filters.campaigns || []).map(id => ({ id, name: campaigns.find(c => String(c.id) === id)?.name || `Campaign ${id}` }))}
           onRemoveCampaign={(id) => handleFilterChange('campaigns', (filters.campaigns || []).filter((v: string) => v !== id))}
+          parts={activeParts.map(key => ({ key, label: partName(key) }))}
+          onRemovePart={(key) => handleFilterChange('parts', activeParts.filter((v: string) => v !== key))}
           themeList={themes}
           entityMap={entities}
           onRemoveSearchToken={handleRemoveSearchToken}

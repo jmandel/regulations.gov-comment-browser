@@ -1,4 +1,5 @@
 import type { Comment, CompositionCounts, OverviewData, ThemeSummary } from '../../types'
+import { commentPart } from '../../utils/helpers'
 
 export type Part = keyof CompositionCounts
 
@@ -6,10 +7,10 @@ export type Part = keyof CompositionCounts
 // plainLabel/plainDescription: used when no campaigns were tagged (older builds, or tag-campaigns
 // not run), where "individual" and "not part of a campaign" can't be claimed
 export const PARTS: Array<{ key: Part; label: string; description: string; plainLabel?: string; plainDescription?: string; color: string; to: string }> = [
-  { key: 'campaignCopies', label: 'Campaign copies', description: 'Identical letters sent as part of an organized campaign', color: 'var(--ov-copies)', to: '/campaigns' },
-  { key: 'campaignReworded', label: 'Reworded campaign letters', description: 'Campaign letters the sender rewrote in their own words', color: 'var(--ov-reworded)', to: '/campaigns' },
-  { key: 'typed', label: 'Individual comments', plainLabel: 'Typed comments', description: 'Typed into the comment form, not part of a campaign', plainDescription: 'Typed into the comment form', color: 'var(--ov-typed)', to: '/comments' },
-  { key: 'attached', label: 'Attached letters', description: 'Uploaded as a document, not part of a campaign', plainDescription: 'Uploaded as a document', color: 'var(--ov-attached)', to: '/comments' },
+  { key: 'campaignCopies', label: 'Campaign copies', description: 'Identical letters sent as part of an organized campaign', color: 'var(--ov-copies)', to: '/comments?part=campaignCopies' },
+  { key: 'campaignReworded', label: 'Reworded campaign letters', description: 'Campaign letters the sender rewrote in their own words', color: 'var(--ov-reworded)', to: '/comments?part=campaignReworded' },
+  { key: 'typed', label: 'Individual comments', plainLabel: 'Typed comments', description: 'Typed into the comment form, not part of a campaign', plainDescription: 'Typed into the comment form', color: 'var(--ov-typed)', to: '/comments?part=typed' },
+  { key: 'attached', label: 'Attached letters', description: 'Uploaded as a document, not part of a campaign', plainDescription: 'Uploaded as a document', color: 'var(--ov-attached)', to: '/comments?part=attached' },
 ]
 
 export const fmt = (n: number) => n.toLocaleString('en-US')
@@ -37,8 +38,7 @@ export function deriveOverview(
   const byType = new Map<string, number>()
   const byDay = new Map<string, number>()
   for (const c of comments) {
-    const part: Part = c.campaignId !== undefined ? (c.campaignParaphrase ? 'campaignReworded' : 'campaignCopies') : c.hasAttachments ? 'attached' : 'typed'
-    composition[part]++
+    composition[commentPart(c)]++
     byType.set(c.submitterType, (byType.get(c.submitterType) || 0) + 1)
     const day = c.date?.slice(0, 10)
     if (day) byDay.set(day, (byDay.get(day) || 0) + 1)

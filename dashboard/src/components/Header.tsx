@@ -2,7 +2,8 @@ import { FileText } from 'lucide-react'
 import useStore from '../store/useStore'
 
 function Header() {
-  const { meta, scope } = useStore()
+  const meta = useStore(s => s.meta)
+  const scope = useStore(s => s.scope)
 
   return (
     <header className="bg-white shadow-sm border-b">

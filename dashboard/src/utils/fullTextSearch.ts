@@ -9,8 +9,11 @@
 // groups, -negation):
 // - A term made only of letters/digits matches exactly the units with a vocabulary word that
 //   contains it, so it is answered from the index alone.
-// - Phrases and terms with punctuation are narrowed to units containing every word in them,
-//   then verified against the units' text, which is fetched shard by shard (with progress).
+// - Phrases and terms with punctuation are narrowed to units containing every word in them and,
+//   when the docket has the word-pair index (search/pairs.json + pairs/NNN.json, see
+//   src/lib/phrase-index.ts), every adjacent pair of words with the separator between them. A
+//   phrase of exactly two words is then answered from the pair index; other candidates are
+//   verified against the units' text, which is fetched shard by shard (with progress).
 import type { Comment } from '../types'
 import type { SearchToken } from './searchParser'
 import { buildSearchText, matchesSearchText } from './searchParser'
@@ -20,17 +23,37 @@ import { sharedData } from './dataPaths'
 const WORD_RE = /[\p{L}\p{N}]+/gu
 const SINGLE_WORD_RE = /^[\p{L}\p{N}]+$/u
 
-interface SearchIndex {
+// Posting lists stored back to back, as written by build-website
+interface PostingLists {
+  offsets: Uint32Array // byte offset of each list; offsets[i+1] - offsets[i] = length
+  bitmap: Uint8Array // 1 if list i is a bitmap
+  postings: Uint8Array
+}
+
+interface SearchIndex extends PostingLists {
   units: string[]
   unitOrdinal: Map<string, number>
   words: string[]
-  offsets: Uint32Array // byte offset of each word's list; offsets[i+1] - offsets[i] = length
-  bitmap: Uint8Array // 1 if word i's list is a bitmap
-  postings: Uint8Array
   maxWord: number
 }
 
+function listOffsets(lens: number[]): Pick<PostingLists, 'offsets' | 'bitmap'> {
+  const offsets = new Uint32Array(lens.length + 1)
+  const bitmap = new Uint8Array(lens.length)
+  for (let i = 0; i < lens.length; i++) {
+    if (lens[i] < 0) bitmap[i] = 1
+    offsets[i + 1] = offsets[i] + Math.abs(lens[i])
+  }
+  return { offsets, bitmap }
+}
+
 let indexPromise: Promise<SearchIndex> | null = null
+let loadedIndex: SearchIndex | null = null
+
+// The search index if it has finished loading
+export function peekSearchIndex(): SearchIndex | null {
+  return loadedIndex
+}
 
 export function loadSearchIndex(): Promise<SearchIndex> {
   if (!indexPromise) {
@@ -45,33 +68,25 @@ export function loadSearchIndex(): Promise<SearchIndex> {
           return r.arrayBuffer()
         }),
       ])
-      const n = meta.words.length
-      const offsets = new Uint32Array(n + 1)
-      const bitmap = new Uint8Array(n)
-      for (let i = 0; i < n; i++) {
-        const len = meta.lens[i]
-        if (len < 0) bitmap[i] = 1
-        offsets[i + 1] = offsets[i] + Math.abs(len)
-      }
       const unitOrdinal = new Map<string, number>()
       meta.units.forEach((id: string, i: number) => unitOrdinal.set(id, i))
-      return {
+      loadedIndex = {
         units: meta.units,
         unitOrdinal,
         words: meta.words,
-        offsets,
-        bitmap,
+        ...listOffsets(meta.lens),
         postings: new Uint8Array(buf),
         maxWord: meta.maxWord ?? 60,
       }
+      return loadedIndex
     })()
     indexPromise.catch(() => { indexPromise = null })
   }
   return indexPromise
 }
 
-// Mark every unit in word i's posting list
-function addPostings(ix: SearchIndex, i: number, out: Uint8Array) {
+// Mark every unit in list i
+function addPostings(ix: PostingLists, i: number, out: Uint8Array) {
   const start = ix.offsets[i]
   const end = ix.offsets[i + 1]
   const p = ix.postings
@@ -115,10 +130,163 @@ function unitsWithWordContaining(ix: SearchIndex, fragment: string, cache: Map<s
   return hit
 }
 
+// --- Word-pair index (optional; dockets built before it lack search/pairs.json) ---
+
+interface PairMeta {
+  shards: number
+  maxWord: number
+  maxSep: number
+  longUnits: Set<number> // units with a word too long to index; checked against their text
+}
+
+interface PairShard extends PostingLists {
+  keys: string[] // sorted
+}
+
+// A phrase's units according to the pair index: `units` has every unit containing all the pairs
+// looked up; `exact` means these are exactly the units containing the phrase, apart from
+// `longUnits`, which the index can't rule out
+export interface PhraseMatch {
+  units: Uint8Array
+  exact: boolean
+  longUnits: Set<number>
+}
+
+const MAX_PAIR_SHARDS = 24 // per query; positions needing more are skipped (less narrowing)
+
+let pairMetaPromise: Promise<PairMeta | null> | null = null
+const pairShards = new Map<number, Promise<PairShard>>()
+
+function loadPairMeta(): Promise<PairMeta | null> {
+  if (!pairMetaPromise) {
+    pairMetaPromise = fetch(sharedData('search/pairs.json'))
+      .then(r => (r.ok ? r.json() : null))
+      .then(m => (m ? { shards: m.shards, maxWord: m.maxWord, maxSep: m.maxSep, longUnits: new Set<number>(m.longUnits) } : null))
+      .catch(() => null)
+  }
+  return pairMetaPromise
+}
+
+function loadPairShard(n: number): Promise<PairShard> {
+  let p = pairShards.get(n)
+  if (!p) {
+    p = fetch(sharedData(`search/pairs/${String(n).padStart(3, '0')}.json`))
+      .then(r => {
+        if (!r.ok) throw new Error(`search pairs ${n}: HTTP ${r.status}`)
+        return r.json()
+      })
+      .then(({ keys, lens, postings }) => {
+        const bin = atob(postings)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        return { keys, ...listOffsets(lens), postings: bytes }
+      })
+    p.catch(() => pairShards.delete(n))
+    pairShards.set(n, p)
+  }
+  return p
+}
+
+// Same hash as src/lib/phrase-index.ts
+function fnv1a(s: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619) >>> 0
+  }
+  return h
+}
+
+function lowerBound(arr: string[], key: string): number {
+  let lo = 0
+  let hi = arr.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (arr[mid] < key) lo = mid + 1
+    else hi = mid
+  }
+  return lo
+}
+
+// One lookup: the key `left + sep + right`, or every key starting with it when the phrase may
+// continue the right-hand word ("primary sou" -> "primary source", "primary sources")
+interface PairLookup { shard: number; key: string; prefix: boolean }
+
+// Narrow a phrase with the pair index. Each adjacent pair of words in the phrase must occur in
+// the unit with the same separator. The first word may end a longer word and the last may start
+// one (substring semantics), so those are expanded over the vocabulary.
+async function matchPhrase(ix: SearchIndex, meta: PairMeta, value: string): Promise<PhraseMatch | null> {
+  const parts = [...value.matchAll(WORD_RE)]
+  if (parts.length < 2) return null
+  const n = parts.length
+  const startsWithWord = parts[0].index === 0
+  const endsWithWord = parts[n - 1].index! + parts[n - 1][0].length === value.length
+  const positions: PairLookup[][] = []
+  for (let i = 0; i < n - 1; i++) {
+    const left = parts[i][0]
+    const right = parts[i + 1][0]
+    const sep = value.slice(parts[i].index! + left.length, parts[i + 1].index)
+    if (left.length > meta.maxWord || right.length > meta.maxWord || sep.length > meta.maxSep) return null
+    const lefts = i === 0 && startsWithWord ? ix.words.filter(w => w.endsWith(left)) : [left]
+    const prefix = i === n - 2 && endsWithWord
+    positions.push(lefts.map(l => ({ shard: fnv1a(l + sep + right[0]) % meta.shards, key: l + sep + right, prefix })))
+  }
+  // Use the cheapest positions within the shard budget
+  const order = positions
+    .map(p => ({ p, shards: new Set(p.map(l => l.shard)) }))
+    .sort((a, b) => a.shards.size - b.shards.size)
+  const used: PairLookup[][] = []
+  const shardSet = new Set<number>()
+  for (const { p, shards } of order) {
+    const next = new Set([...shardSet, ...shards])
+    if (next.size > MAX_PAIR_SHARDS) continue
+    used.push(p)
+    next.forEach(s => shardSet.add(s))
+  }
+  if (used.length === 0) return null
+  const shards = new Map<number, PairShard>()
+  await Promise.all([...shardSet].map(async s => shards.set(s, await loadPairShard(s))))
+
+  let units: Uint8Array | null = null
+  for (const lookups of used) {
+    const hit = new Uint8Array(ix.units.length)
+    for (const { shard, key, prefix } of lookups) {
+      const sh = shards.get(shard)!
+      for (let j = lowerBound(sh.keys, key); j < sh.keys.length; j++) {
+        const k = sh.keys[j]
+        if (prefix ? !k.startsWith(key) : k !== key) break
+        addPostings(sh, j, hit)
+      }
+    }
+    if (units) for (let o = 0; o < hit.length; o++) units[o] &= hit[o]
+    else units = hit
+  }
+  return { units: units!, exact: n === 2 && startsWithWord && endsWithWord, longUnits: meta.longUnits }
+}
+
+// Look up the query's phrases (and punctuated terms) in the pair index, if the docket has one
+export async function matchPhrases(ix: SearchIndex, tokens: SearchToken[]): Promise<Map<string, PhraseMatch>> {
+  const out = new Map<string, PhraseMatch>()
+  const values = [...new Set(tokens.map(t => t.value.toLowerCase()).filter(v => !SINGLE_WORD_RE.test(v)))]
+  if (values.length === 0) return out
+  const meta = await loadPairMeta()
+  if (!meta) return out
+  await Promise.all(values.map(async v => {
+    const m = await matchPhrase(ix, meta, v)
+    if (m) out.set(v, m)
+  }))
+  return out
+}
+
 // Three-valued match per unit: 0 = no, 1 = yes, 2 = maybe (needs text verification)
 type Tri = 0 | 1 | 2
 
-function tokenMatcher(ix: SearchIndex, token: SearchToken, cache: Map<string, Uint8Array>): (ordinal: number) => Tri {
+function tokenMatcher(
+  ix: SearchIndex,
+  token: SearchToken,
+  cache: Map<string, Uint8Array>,
+  phrases: Map<string, PhraseMatch>,
+): (ordinal: number) => Tri {
   const value = token.value.toLowerCase()
   if (SINGLE_WORD_RE.test(value)) {
     const set = unitsWithWordContaining(ix, value, cache)
@@ -128,7 +296,14 @@ function tokenMatcher(ix: SearchIndex, token: SearchToken, cache: Map<string, Ui
   if (parts.length === 0) return () => 2
   // Every word of the phrase must occur (a superset of the units containing the phrase)
   const sets = parts.map(w => unitsWithWordContaining(ix, w, cache))
-  return o => (sets.every(s => s[o]) ? 2 : 0)
+  const words = (o: number) => sets.every(s => s[o])
+  const pm = phrases.get(value)
+  if (!pm) return o => (words(o) ? 2 : 0)
+  // ...and every pair looked up; units with unindexed long words keep the word-only check
+  return o => {
+    if (pm.units[o]) return pm.exact ? 1 : words(o) ? 2 : 0
+    return pm.longUnits.has(o) && words(o) ? 2 : 0
+  }
 }
 
 function and(a: Tri, b: Tri): Tri {
@@ -158,11 +333,18 @@ export interface IndexSearchResult {
 }
 
 // Evaluate the query over `units` (comments) with the index
-export function searchWithIndex(ix: SearchIndex, tokens: SearchToken[], units: Comment[]): IndexSearchResult {
+// (`phrases` from matchPhrases; without it phrases are narrowed by their words only)
+export function searchWithIndex(
+  ix: SearchIndex,
+  tokens: SearchToken[],
+  units: Comment[],
+  phrases: Map<string, PhraseMatch> = new Map(),
+): IndexSearchResult {
   const cache = new Map<string, Uint8Array>()
+  const matcher = (t: SearchToken) => tokenMatcher(ix, t, cache, phrases)
   const groups = groupTokens(tokens).map(g => ({
-    pos: g.filter(t => !t.negated).map(t => tokenMatcher(ix, t, cache)),
-    neg: g.filter(t => t.negated).map(t => tokenMatcher(ix, t, cache)),
+    pos: g.filter(t => !t.negated).map(matcher),
+    neg: g.filter(t => t.negated).map(matcher),
   }))
   const matches = new Set<string>()
   const toVerify = new Set<string>()

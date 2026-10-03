@@ -1,15 +1,16 @@
 import { create } from 'zustand'
-import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile, Campaign, OverviewData, ScopeInfo, ScopeUnitsFile } from '../types'
+import type { Meta, Theme, Entity, Comment, ThemeIndex, EntityIndex, ThemeSummary, ThemeExtract, CommentsIndexFile, Campaign, OverviewData, ScopeInfo, ScopeUnitsFile, CompositionCounts } from '../types'
 import { ownData, sharedData, setSharedDataBase } from '../utils/dataPaths'
-import { parseThemeDescription } from '../utils/helpers'
-import { parseSearchQuery, matchesSearchQuery } from '../utils/searchParser'
-import { loadSearchIndex, searchWithIndex, verifyCandidates } from '../utils/fullTextSearch'
+import { parseThemeDescription, commentPart } from '../utils/helpers'
+import { parseSearchQuery, buildSearchText, matchesSearchText, type SearchToken } from '../utils/searchParser'
+import { loadSearchIndex, peekSearchIndex, matchPhrases, searchWithIndex, verifyCandidates } from '../utils/fullTextSearch'
 
 interface FilterOptions {
   themes: string[]
   entities: string[]
   submitterTypes: string[]
   campaigns?: string[] // campaign ids
+  parts?: string[] // Overview composition parts (campaignCopies, campaignReworded, typed, attached)
   searchQuery: string
 }
 
@@ -40,6 +41,7 @@ interface StoreState {
   // comment browser searches in-scope units (default) or the whole docket
   scope: ScopeInfo | null
   docketUnits: Comment[]
+  docketComments: Comment[]
   commentScope: 'scope' | 'docket'
   campaigns: Campaign[]
   campaignsById: Map<number, Campaign>
@@ -73,15 +75,19 @@ interface StoreState {
   getCommentsForTheme: (themeCode: string) => { direct: Comment[], touches: Comment[] }
   getCommentsForEntity: (category: string, label: string) => Comment[]
   getFilteredComments: () => Comment[]
+  // Per browsed unit, how many of its comments (itself and its form-letter members) fall in each
+  // Overview composition part
+  getUnitParts: () => Map<string, CompositionCounts>
   getCommentById: (commentId: string) => Comment | undefined
 }
 
 let searchGeneration = 0
+const unitPartsCache = new WeakMap<Comment[], Map<string, CompositionCounts>>()
 const themeExtractRequests = new Map<string, Promise<void>>()
 
 const useStore = create<StoreState>((set, get) => {
-  // Run a text search: instant pass over up-front fields, then the full-text index, then
-  // verification of phrase candidates against fetched text
+  // Run a text search: instant pass over up-front fields (until the full-text index has loaded),
+  // then the full-text index, then verification of phrase candidates against fetched text
   async function runSearch(query: string) {
     const gen = ++searchGeneration
     const tokens = parseSearchQuery(query)
@@ -90,14 +96,25 @@ const useStore = create<StoreState>((set, get) => {
       return
     }
     const units = browsedUnits(get())
-    const leanIds = new Set(units.filter(c => matchesSearchQuery(c, tokens)).map(c => c.id))
-    set({ search: { query, ids: leanIds, phase: 'index' } })
+    let leanIds: Set<string> | null = null
+    let ix = peekSearchIndex()
+    if (!ix) {
+      leanIds = new Set(units.filter(c => matchesLeanText(c, tokens)).map(c => c.id))
+      set({ search: { query, ids: leanIds, phase: 'index' } })
+    }
 
-    let ix
+    let phrases
     try {
-      ix = await loadSearchIndex()
+      ix ??= await loadSearchIndex()
+      if (gen !== searchGeneration) return
+      // Phrase lookups in the optional pair index; without it phrases are verified against text
+      phrases = await matchPhrases(ix, tokens).catch(err => {
+        console.warn('Pair index unavailable:', err)
+        return undefined
+      })
     } catch (err) {
       if (gen === searchGeneration) {
+        leanIds ??= new Set(units.filter(c => matchesLeanText(c, tokens)).map(c => c.id))
         set({ search: { query, ids: leanIds, phase: 'error', error: `Full-text index unavailable (${err}); showing matches on summaries and names only` } })
       }
       return
@@ -105,37 +122,50 @@ const useStore = create<StoreState>((set, get) => {
     if (gen !== searchGeneration) return
 
     const t0 = performance.now()
-    const { matches, toVerify } = searchWithIndex(ix, tokens, units)
+    const { matches, toVerify } = searchWithIndex(ix, tokens, units, phrases)
     console.log(`Index search "${query}": ${matches.size} matches, ${toVerify.size} to verify (${(performance.now() - t0).toFixed(1)}ms)`)
     if (toVerify.size === 0) {
       set({ search: { query, ids: matches, phase: 'done' } })
       return
     }
 
-    // Show definite matches plus unverified candidates; drop candidates that fail verification
+    // Show definite matches plus unverified candidates; drop candidates that fail verification.
+    // Progress reaches the store at most every 250 ms, as each update re-filters and re-renders.
     const ids = new Set([...matches, ...toVerify])
     let pending = toVerify.size
-    set({ search: { query, ids, phase: 'verify', pending, progress: { done: 0, total: 1 } } })
+    let progress = { done: 0, total: 1 }
+    set({ search: { query, ids, phase: 'verify', pending, progress } })
+    let lastFlush = performance.now()
+    let idsChanged = false
+    const flush = (force = false) => {
+      if (gen !== searchGeneration || (!force && performance.now() - lastFlush < 250)) return
+      lastFlush = performance.now()
+      const changed = idsChanged
+      idsChanged = false
+      set(state => ({ search: { ...state.search, ...(changed ? { ids: new Set(ids) } : {}), pending, progress } }))
+    }
     const candidates = units.filter(c => toVerify.has(c.id))
     const t1 = performance.now()
     try {
       await verifyCandidates(
         candidates,
         tokens,
-        (_matched, rejected) => {
+        (matched, rejected) => {
           if (gen !== searchGeneration) return
           for (const id of rejected) ids.delete(id)
-          pending -= _matched.length + rejected.length
-          set(state => ({ search: { ...state.search, ids: new Set(ids), pending } }))
+          if (rejected.length) idsChanged = true
+          pending -= matched.length + rejected.length
+          flush()
         },
-        progress => {
-          if (gen !== searchGeneration) return
-          set(state => ({ search: { ...state.search, progress } }))
+        p => {
+          progress = p
+          flush()
         },
         () => gen !== searchGeneration,
       )
     } catch (err) {
       if (gen === searchGeneration) {
+        flush(true)
         set(state => ({ search: { ...state.search, phase: 'error', error: `Could not verify all phrase matches (${err}); some results may not contain the exact phrase` } }))
       }
       return
@@ -156,6 +186,7 @@ const useStore = create<StoreState>((set, get) => {
     units: [],
     scope: null,
     docketUnits: [],
+    docketComments: [],
     commentScope: 'scope',
     campaigns: [],
     campaignsById: new Map(),
@@ -181,6 +212,7 @@ const useStore = create<StoreState>((set, get) => {
       entities: [],
       submitterTypes: [],
       campaigns: [],
+      parts: [],
       searchQuery: ''
     },
 
@@ -296,6 +328,7 @@ const useStore = create<StoreState>((set, get) => {
           units,
           scope,
           docketUnits,
+          docketComments: expanded.comments,
           campaigns: scopedCampaigns,
           campaignsById: new Map(scopedCampaigns.map(c => [c.id, c])),
           overview,
@@ -328,7 +361,7 @@ const useStore = create<StoreState>((set, get) => {
           filtered = filtered.filter(c => ids.has(c.id))
         } else {
           const tokens = parseSearchQuery(state.filters.searchQuery)
-          if (tokens.length > 0) filtered = filtered.filter(c => matchesSearchQuery(c, tokens))
+          if (tokens.length > 0) filtered = filtered.filter(c => matchesLeanText(c, tokens))
         }
       }
 
@@ -359,6 +392,16 @@ const useStore = create<StoreState>((set, get) => {
         filtered = filtered.filter(c => c.campaignId !== undefined && wanted.has(c.campaignId))
       }
 
+      // Apply composition-part filters: units with at least one comment in the part
+      if (state.filters.parts?.length) {
+        const unitParts = state.getUnitParts()
+        const wanted = state.filters.parts as (keyof CompositionCounts)[]
+        filtered = filtered.filter(c => {
+          const n = unitParts.get(c.id)
+          return !!n && wanted.some(p => n[p] > 0)
+        })
+      }
+
       // Apply submitter type filters
       if (state.filters.submitterTypes?.length > 0) {
         filtered = filtered.filter(c =>
@@ -368,6 +411,23 @@ const useStore = create<StoreState>((set, get) => {
 
       console.log(`Total filtering time: ${(performance.now() - startTime).toFixed(2)}ms (${browsedUnits(state).length} → ${filtered.length} comments)`)
       return filtered
+    },
+
+    getUnitParts: () => {
+      const state = get()
+      const all = state.scope && state.commentScope === 'docket' ? state.docketComments : state.comments
+      let m = unitPartsCache.get(all)
+      if (!m) {
+        m = new Map()
+        for (const c of all) {
+          const unit = c.isClusterRepresentative === false ? c.clusterRepresentativeId! : c.id
+          let n = m.get(unit)
+          if (!n) m.set(unit, n = { campaignCopies: 0, campaignReworded: 0, typed: 0, attached: 0 })
+          n[commentPart(c)]++
+        }
+        unitPartsCache.set(all, m)
+      }
+      return m
     },
 
     getCommentsForTheme: (themeCode: string) => {
@@ -391,6 +451,14 @@ const useStore = create<StoreState>((set, get) => {
 })
 
 export default useStore
+
+// Search over the up-front fields (summary, submitter, ID) before the full-text index is loaded
+const leanTexts = new WeakMap<Comment, string>()
+function matchesLeanText(c: Comment, tokens: SearchToken[]): boolean {
+  let text = leanTexts.get(c)
+  if (text === undefined) leanTexts.set(c, text = buildSearchText(c))
+  return matchesSearchText(text, tokens)
+}
 
 // The units the comment browser and search work over
 function browsedUnits(state: { scope: ScopeInfo | null; commentScope: 'scope' | 'docket'; units: Comment[]; docketUnits: Comment[] }): Comment[] {
